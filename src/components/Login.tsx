@@ -26,14 +26,14 @@ export default function Login() {
   return (
     <div className="min-h-screen flex">
       {/* Left side: Login Form */}
-      <div className="w-full md:w-1/2 flex items-center justify-center bg-white px-6">
-        <div className="p-10 w-full max-w-sm bg-white/90 backdrop-blur-sm rounded-3xl shadow-lg border border-gray-100 animate-slide-in">
+      <div className="w-full md:w-1/2 flex items-center justify-center bg-gradient-to-br from-white to-[#F0FAFA] px-6">
+        <div className="p-10 w-full max-w-md bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-100 animate-slide-in">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#008080] to-[#ADD8E6] mb-4 shadow-md">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#008080] to-[#00BFFF] mb-4 shadow-md">
               <Lock className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back</h1>
-            <p className="text-gray-600">Access your Savings Account</p>
+            <h1 className="text-3xl font-bold text-gray-800 mb-1">Welcome Back</h1>
+            <p className="text-gray-600">Your Trusted Partner in Smart Savings</p>
           </div>
 
           {error && (
@@ -90,16 +90,17 @@ export default function Login() {
       </div>
 
       {/* Right side: Graphics / Floating Text */}
-      <div className="hidden md:flex w-1/2 bg-gradient-to-br from-[#ADD8E6] to-[#E75480] relative overflow-hidden">
+      <div className="hidden md:flex w-1/2 bg-gradient-to-br from-[#00BFFF] via-[#008080] to-[#FF6F91] relative overflow-hidden">
         <div className="absolute top-16 left-12 text-white font-bold text-4xl tracking-wide animate-float">
-          Smart <br /> Savings Hub
+          Empower Your <br /> Savings Journey
         </div>
         <div className="absolute bottom-20 right-10 text-white text-lg animate-float-slow">
-          Empowering Financial Growth, Securely.
+          Safe. Smart. Sustainable Growth.
         </div>
-        {/* Floating circles for design */}
-        <div className="absolute -top-20 -left-20 w-72 h-72 bg-white opacity-10 rounded-full animate-spin-slow"></div>
-        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-white opacity-10 rounded-full animate-spin-slow-reverse"></div>
+
+        {/* Floating circles */}
+        <div className="absolute -top-24 -left-24 w-80 h-80 bg-white opacity-10 rounded-full animate-spin-slow"></div>
+        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-white opacity-10 rounded-full animate-spin-slow-reverse"></div>
       </div>
 
       {/* Animations */}
@@ -121,12 +122,12 @@ export default function Login() {
           to { transform: rotate(0deg); }
         }
         @keyframes slide-in {
-          from { opacity: 0; transform: translateX(-30px); }
+          from { opacity: 0; transform: translateX(-40px); }
           to { opacity: 1; transform: translateX(0); }
         }
         .animate-float { animation: float 5s ease-in-out infinite; }
         .animate-float-slow { animation: float-slow 7s ease-in-out infinite; }
-        .animate-spin-slow { animation: spin-slow 18s linear infinite; }
+        .animate-spin-slow { animation: spin-slow 20s linear infinite; }
         .animate-spin-slow-reverse { animation: spin-slow-reverse 22s linear infinite; }
         .animate-slide-in { animation: slide-in 0.8s ease forwards; }
       `}</style>
