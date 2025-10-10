@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { supabase, Transaction, Member, Profile } from '../lib/supabase';
+import { supabase, Member, Profile } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowUpCircle, ArrowDownCircle, DollarSign, Search, Calendar } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, DollarSign, Search } from 'lucide-react';
 
 export default function TransactionManagement() {
   const { profile } = useAuth();
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [members, setMembers] = useState<(Member & { profiles: Profile })[]>([]);
+  const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -16,7 +16,7 @@ export default function TransactionManagement() {
   }, []);
 
   const loadTransactions = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('transactions')
       .select(`
         *,
@@ -25,15 +25,17 @@ export default function TransactionManagement() {
       `)
       .order('transaction_date', { ascending: false });
 
+    if (error) console.error(error);
     setTransactions(data || []);
   };
 
   const loadMembers = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('members')
       .select('*, profiles(*)')
       .eq('status', 'active');
 
+    if (error) console.error(error);
     setMembers(data || []);
   };
 
@@ -53,22 +55,23 @@ export default function TransactionManagement() {
       setLoading(true);
 
       try {
-        const member = members.find(m => m.id === formData.member_id);
-        if (!member) throw new Error('Member not found');
+        const member = members.find((m) => m.id === formData.member_id);
+        if (!member || !member.profiles) throw new Error('Member not found');
 
         const amount = parseFloat(formData.amount);
-        const balanceBefore = Number(member.account_balance);
+        if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
 
+        const balanceBefore = Number(member.account_balance ?? 0);
         let balanceAfter: number;
+
         if (formData.transaction_type === 'deposit' || formData.transaction_type === 'contribution') {
           balanceAfter = balanceBefore + amount;
         } else {
-          if (amount > balanceBefore) {
-            throw new Error('Insufficient balance');
-          }
+          if (amount > balanceBefore) throw new Error('Insufficient balance');
           balanceAfter = balanceBefore - amount;
         }
 
+        // Insert transaction
         const { error: txError } = await supabase.from('transactions').insert({
           member_id: formData.member_id,
           transaction_type: formData.transaction_type,
@@ -81,9 +84,10 @@ export default function TransactionManagement() {
 
         if (txError) throw txError;
 
+        // Update member balance & contributions
         const updates: any = { account_balance: balanceAfter };
         if (formData.transaction_type === 'contribution') {
-          updates.total_contributions = Number(member.total_contributions) + amount;
+          updates.total_contributions = (Number(member.total_contributions) || 0) + amount;
         }
 
         const { error: updateError } = await supabase
@@ -93,6 +97,7 @@ export default function TransactionManagement() {
 
         if (updateError) throw updateError;
 
+        // Add notification
         await supabase.from('notifications').insert({
           member_id: formData.member_id,
           type: formData.transaction_type,
@@ -131,9 +136,9 @@ export default function TransactionManagement() {
                 required
               >
                 <option value="">Select member</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.profiles.full_name} - {member.member_number} (Balance: ${Number(member.account_balance).toLocaleString()})
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.profiles?.full_name || '-'} - {m.member_number} (Balance: ${Number(m.account_balance ?? 0).toLocaleString()})
                   </option>
                 ))}
               </select>
@@ -197,9 +202,9 @@ export default function TransactionManagement() {
     );
   };
 
-  const filteredTransactions = transactions.filter(tx =>
-    tx.members?.profiles?.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tx.members?.member_number.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredTransactions = transactions.filter((tx) =>
+    (tx.members?.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+    (tx.members?.member_number?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
   return (
@@ -248,7 +253,7 @@ export default function TransactionManagement() {
                     {new Date(tx.transaction_date).toLocaleString()}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    {tx.members?.profiles?.full_name}
+                    {tx.members?.profiles?.full_name || '-'}
                     <div className="text-xs text-gray-500">{tx.members?.member_number}</div>
                   </td>
                   <td className="px-6 py-4">
@@ -269,7 +274,9 @@ export default function TransactionManagement() {
                   <td className="px-6 py-4 text-sm font-semibold text-[#008080]">
                     ${Number(tx.balance_after).toLocaleString()}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{tx.profiles?.full_name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {tx['profiles!transactions_recorded_by_fkey']?.full_name || '-'}
+                  </td>
                 </tr>
               ))}
             </tbody>
