@@ -21,7 +21,7 @@ export default function TransactionManagement() {
       .from('transactions')
       .select(`
         *,
-        members!transactions_member_id_fkey(*, profiles(*)),
+        members!transactions_member_id_fkey(*, profiles(full_name)),
         profiles!transactions_recorded_by_fkey(full_name)
       `)
       .order('transaction_date', { ascending: false });
@@ -34,8 +34,7 @@ export default function TransactionManagement() {
     setLoadingMembers(true);
     const { data, error } = await supabase
       .from('members')
-      .select('*, profiles(*)')
-      //.eq('status', 'active') // optional: remove if filtering out members
+      .select('id, profiles(full_name), account_balance') // fetch only the id, full_name, balance
       .order('created_at', { ascending: false });
 
     if (error) console.error('Members load error:', error);
@@ -75,7 +74,6 @@ export default function TransactionManagement() {
           balanceAfter = balanceBefore - amount;
         }
 
-        // Insert transaction
         const { error: txError } = await supabase.from('transactions').insert({
           member_id: formData.member_id,
           transaction_type: formData.transaction_type,
@@ -88,7 +86,6 @@ export default function TransactionManagement() {
 
         if (txError) throw txError;
 
-        // Update member balance & contributions
         const updates: any = { account_balance: balanceAfter };
         if (formData.transaction_type === 'contribution') {
           updates.total_contributions = (Number(member.total_contributions) || 0) + amount;
@@ -128,8 +125,7 @@ export default function TransactionManagement() {
                 <option value="">Select member</option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {/* Display full name + member number */}
-                    {m.profiles?.full_name || 'No Name'} - {m.member_number} (Balance: ${Number(m.account_balance ?? 0).toLocaleString()})
+                    {m.profiles?.full_name || 'No Name'}
                   </option>
                 ))}
               </select>
@@ -256,4 +252,5 @@ export default function TransactionManagement() {
     </div>
   );
 }
+
 
