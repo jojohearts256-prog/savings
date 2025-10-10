@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member, Profile } from '../lib/supabase';
-import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, XCircle } from 'lucide-react';
+import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle } from 'lucide-react';
 
 export default function MemberManagement() {
-  const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
+  const [members, setMembers] = useState<(Member & { profiles: Profile | null; showActions?: boolean })[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -68,7 +68,6 @@ export default function MemberManagement() {
 
         setSuccess(true);
 
-        // Automatically close modal and reload members after 2 seconds
         setTimeout(() => {
           setShowAddModal(false);
           loadMembers();
@@ -240,12 +239,8 @@ export default function MemberManagement() {
               {filteredMembers.map((member) => (
                 <tr key={member.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{member.member_number}</td>
-                  <td className="px-6 py-4 text-sm text-gray-800">
-                    {member.profiles?.full_name || member.full_name || '-'}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {member.profiles?.email || member.email || '-'}
-                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-800">{member.profiles?.full_name || member.full_name || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.email || member.email || '-'}</td>
                   <td className="px-6 py-4 text-sm font-semibold text-[#008080]">
                     ${Number(member.account_balance).toLocaleString()}
                   </td>
@@ -262,11 +257,44 @@ export default function MemberManagement() {
                       {member.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 relative">
                     <div className="flex gap-2">
-                      <button className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMembers((prev) =>
+                            prev.map((m) =>
+                              m.id === member.id ? { ...m, showActions: !m.showActions } : m
+                            )
+                          );
+                        }}
+                        className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition"
+                      >
                         <Eye className="w-4 h-4" />
                       </button>
+
+                      {member.showActions && (
+                        <div className="absolute right-0 top-full mt-2 w-40 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
+                          <button
+                            onClick={() => alert(`Showing details for ${member.full_name || member.profiles?.full_name}`)}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                          >
+                            Details
+                          </button>
+                          <button
+                            onClick={() => alert(`Editing ${member.full_name || member.profiles?.full_name}`)}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => alert(`Deleting ${member.full_name || member.profiles?.full_name}`)}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </td>
                 </tr>
