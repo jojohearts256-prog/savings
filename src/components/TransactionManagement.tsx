@@ -16,7 +16,6 @@ export default function TransactionManagement() {
     loadMembers();
   }, []);
 
-  // Load all transactions
   const loadTransactions = async () => {
     const { data, error } = await supabase
       .from('transactions')
@@ -31,13 +30,12 @@ export default function TransactionManagement() {
     setTransactions(data || []);
   };
 
-  // Load active members only
   const loadMembers = async () => {
     setLoadingMembers(true);
     const { data, error } = await supabase
       .from('members')
       .select('*, profiles(*)')
-      .eq('status', 'active')   // Active members only
+      //.eq('status', 'active') // optional: remove if filtering out members
       .order('created_at', { ascending: false });
 
     if (error) console.error('Members load error:', error);
@@ -45,7 +43,6 @@ export default function TransactionManagement() {
     setLoadingMembers(false);
   };
 
-  // Add Transaction Modal
   const AddTransactionModal = () => {
     const [formData, setFormData] = useState({
       member_id: '',
@@ -79,7 +76,7 @@ export default function TransactionManagement() {
         }
 
         // Insert transaction
-        const { data: newTx, error: txError } = await supabase.from('transactions').insert({
+        const { error: txError } = await supabase.from('transactions').insert({
           member_id: formData.member_id,
           transaction_type: formData.transaction_type,
           amount,
@@ -87,7 +84,7 @@ export default function TransactionManagement() {
           balance_after: balanceAfter,
           description: formData.description,
           recorded_by: profile?.id,
-        }).select().single();
+        });
 
         if (txError) throw txError;
 
@@ -104,25 +101,8 @@ export default function TransactionManagement() {
 
         if (updateError) throw updateError;
 
-        // Add notification (optional)
-        await supabase.from('notifications').insert({
-          member_id: formData.member_id,
-          type: formData.transaction_type,
-          title: `${formData.transaction_type.charAt(0).toUpperCase() + formData.transaction_type.slice(1)} Processed`,
-          message: `Your ${formData.transaction_type} of $${amount} has been processed. New balance: $${balanceAfter}`,
-        });
-
-        // Update transactions and members live
-        setTransactions((prev) => [newTx, ...prev]);
-        setMembers((prev) =>
-          prev.map((m) =>
-            m.id === member.id
-              ? { ...m, account_balance: balanceAfter, total_contributions: updates.total_contributions ?? m.total_contributions }
-              : m
-          )
-        );
-
         setShowAddModal(false);
+        loadTransactions();
       } catch (err: any) {
         setError(err.message || 'Failed to record transaction');
       } finally {
@@ -144,7 +124,6 @@ export default function TransactionManagement() {
                 onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
                 required
-                disabled={loadingMembers}
               >
                 <option value="">Select member</option>
                 {members.map((m) => (
