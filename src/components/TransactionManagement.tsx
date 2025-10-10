@@ -9,6 +9,7 @@ export default function TransactionManagement() {
   const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   useEffect(() => {
     loadTransactions();
@@ -25,18 +26,21 @@ export default function TransactionManagement() {
       `)
       .order('transaction_date', { ascending: false });
 
-    if (error) console.error(error);
+    if (error) console.error('Transaction load error:', error);
     setTransactions(data || []);
   };
 
   const loadMembers = async () => {
+    setLoadingMembers(true);
     const { data, error } = await supabase
       .from('members')
       .select('*, profiles(*)')
-      .eq('status', 'active');
+      //.eq('status', 'active') // optional: remove if filtering out members
+      .order('created_at', { ascending: false });
 
-    if (error) console.error(error);
+    if (error) console.error('Members load error:', error);
     setMembers(data || []);
+    setLoadingMembers(false);
   };
 
   const AddTransactionModal = () => {
@@ -55,8 +59,8 @@ export default function TransactionManagement() {
       setLoading(true);
 
       try {
-        const member = members.find((m) => m.id === formData.member_id);
-        if (!member || !member.profiles) throw new Error('Member not found');
+        const member = members.find((m) => String(m.id) === String(formData.member_id));
+        if (!member) throw new Error('Member not found');
 
         const amount = parseFloat(formData.amount);
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
@@ -97,17 +101,8 @@ export default function TransactionManagement() {
 
         if (updateError) throw updateError;
 
-        // Add notification
-        await supabase.from('notifications').insert({
-          member_id: formData.member_id,
-          type: formData.transaction_type,
-          title: `${formData.transaction_type.charAt(0).toUpperCase() + formData.transaction_type.slice(1)} Processed`,
-          message: `Your ${formData.transaction_type} of $${amount} has been processed. New balance: $${balanceAfter}`,
-        });
-
         setShowAddModal(false);
         loadTransactions();
-        loadMembers();
       } catch (err: any) {
         setError(err.message || 'Failed to record transaction');
       } finally {
@@ -119,12 +114,7 @@ export default function TransactionManagement() {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl p-6 max-w-md w-full">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Record Transaction</h2>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
-              {error}
-            </div>
-          )}
+          {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">{error}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -181,18 +171,10 @@ export default function TransactionManagement() {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50"
-              >
+              <button type="submit" disabled={loading || loadingMembers} className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50">
                 {loading ? 'Recording...' : 'Record Transaction'}
               </button>
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
-              >
+              <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">
                 Cancel
               </button>
             </div>
@@ -211,10 +193,7 @@ export default function TransactionManagement() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Transaction Management</h2>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl"
-        >
+        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl">
           <DollarSign className="w-5 h-5" />
           New Transaction
         </button>
@@ -249,34 +228,22 @@ export default function TransactionManagement() {
             <tbody className="divide-y divide-gray-200">
               {filteredTransactions.map((tx) => (
                 <tr key={tx.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {new Date(tx.transaction_date).toLocaleString()}
-                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{new Date(tx.transaction_date).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">
                     {tx.members?.profiles?.full_name || '-'}
                     <div className="text-xs text-gray-500">{tx.members?.member_number}</div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      {tx.transaction_type === 'withdrawal' ? (
-                        <ArrowDownCircle className="w-4 h-4 text-red-500" />
-                      ) : (
-                        <ArrowUpCircle className="w-4 h-4 text-green-500" />
-                      )}
+                      {tx.transaction_type === 'withdrawal' ? <ArrowDownCircle className="w-4 h-4 text-red-500" /> : <ArrowUpCircle className="w-4 h-4 text-green-500" />}
                       <span className="text-sm capitalize">{tx.transaction_type}</span>
                     </div>
                   </td>
-                  <td className={`px-6 py-4 text-sm font-semibold ${
-                    tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'
-                  }`}>
+                  <td className={`px-6 py-4 text-sm font-semibold ${tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'}`}>
                     {tx.transaction_type === 'withdrawal' ? '-' : '+'}${Number(tx.amount).toLocaleString()}
                   </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-[#008080]">
-                    ${Number(tx.balance_after).toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {tx['profiles!transactions_recorded_by_fkey']?.full_name || '-'}
-                  </td>
+                  <td className="px-6 py-4 text-sm font-semibold text-[#008080]">${Number(tx.balance_after).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{tx['profiles!transactions_recorded_by_fkey']?.full_name || '-'}</td>
                 </tr>
               ))}
             </tbody>
