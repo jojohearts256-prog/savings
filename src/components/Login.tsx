@@ -24,10 +24,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-gradient-to-br from-[#E0F7FA] to-[#B3E5FC] overflow-hidden relative">
       {/* Left side: Login Form */}
-      <div className="w-full md:w-1/2 flex items-center justify-center bg-white">
-        <div className="p-8 w-full max-w-md">
+      <div className="w-full md:w-1/2 flex items-center justify-center px-4">
+        <div className="p-10 w-full max-w-lg bg-white rounded-3xl shadow-2xl transform transition duration-1000 animate-slide-fade">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#008080] to-[#ADD8E6] mb-4">
               <Lock className="w-8 h-8 text-white" />
@@ -77,7 +77,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 btn-primary text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition hover:scale-105"
+              className="w-full py-3 btn-primary text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition transform hover:scale-105"
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
@@ -89,18 +89,57 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right side: Graphics / Floating Text */}
-      <div className="hidden md:flex w-1/2 bg-gradient-to-br from-[#ADD8E6] to-[#00BFFF] relative overflow-hidden">
-        <div className="absolute top-10 left-10 text-white font-bold text-4xl tracking-wide animate-float">
+      {/* Right side: Floating Graphics and Text */}
+      <div className="hidden md:flex w-1/2 relative overflow-hidden">
+        <div className="absolute top-12 left-12 text-white font-bold text-4xl tracking-wide animate-float">
           Welcome to <br /> Our System
         </div>
-        <div className="absolute bottom-20 right-10 text-white text-lg animate-float-slow">
+        <div className="absolute bottom-24 right-12 text-white text-lg animate-float-slow">
           Secure, Professional & Modern
         </div>
-        {/* Add floating circles for design */}
-        <div className="absolute -top-20 -left-20 w-72 h-72 bg-white opacity-10 rounded-full animate-spin-slow"></div>
-        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-white opacity-10 rounded-full animate-spin-slow-reverse"></div>
+
+        {/* Floating circles */}
+        <div className="absolute -top-24 -left-24 w-80 h-80 bg-pink-200 opacity-20 rounded-full animate-spin-slow"></div>
+        <div className="absolute -bottom-28 -right-28 w-96 h-96 bg-white opacity-10 rounded-full animate-spin-slow-reverse"></div>
+        <div className="absolute top-40 right-32 text-pink-300 text-xl animate-float-slow">
+          Easy & Fast
+        </div>
+        <div className="absolute bottom-40 left-28 text-white text-lg animate-float">
+          Reliable & Modern
+        </div>
       </div>
+
+      {/* Tailwind animation classes */}
+      <style>
+        {`
+          @keyframes slideFade {
+            0% { opacity: 0; transform: translateX(-50px); }
+            100% { opacity: 1; transform: translateX(0); }
+          }
+          .animate-slide-fade {
+            animation: slideFade 1s ease-out forwards;
+          }
+
+          @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+          }
+          .animate-float { animation: float 4s ease-in-out infinite; }
+
+          @keyframes floatSlow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+          }
+          .animate-float-slow { animation: floatSlow 6s ease-in-out infinite; }
+
+          @keyframes spinSlow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          .animate-spin-slow { animation: spinSlow 30s linear infinite; }
+          .animate-spin-slow-reverse { animation: spinSlow 40s linear reverse infinite; }
+        `}
+      </style>
     </div>
   );
 }
