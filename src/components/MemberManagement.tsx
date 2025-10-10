@@ -3,8 +3,9 @@ import { supabase, Member, Profile } from '../lib/supabase';
 import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle } from 'lucide-react';
 
 export default function MemberManagement() {
-  const [members, setMembers] = useState<(Member & { profiles: Profile | null; showActions?: boolean })[]>([]);
+  const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState<Member | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,16 +23,11 @@ export default function MemberManagement() {
 
   const filteredMembers = members.filter(
     (m) =>
-      (m.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ??
-        m.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ??
-        false) ||
+      (m.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (m.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
       m.member_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (m.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ??
-        m.email?.toLowerCase().includes(searchTerm.toLowerCase()) ??
-        false) ||
-      (m.profiles?.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ??
-        m.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ??
-        false)
+      (m.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (m.profiles?.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
   const AddMemberModal = () => {
@@ -169,72 +165,73 @@ export default function MemberManagement() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl card-shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member #</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Name</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Phone</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Balance</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
+      <div className="bg-white rounded-2xl card-shadow overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member #</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Name</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Phone</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Balance</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {filteredMembers.map((member) => (
+              <tr key={member.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 text-sm font-medium text-gray-800">{member.member_number}</td>
+                <td className="px-6 py-4 text-sm text-gray-800">{member.profiles?.full_name || member.full_name || '-'}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.email || member.email || '-'}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.phone || member.phone || '-'}</td>
+                <td className="px-6 py-4 text-sm font-semibold text-[#008080]">${Number(member.account_balance).toLocaleString()}</td>
+                <td className="px-6 py-4">
+                  <span className={`status-badge ${
+                    member.status === 'active' ? 'bg-green-100 text-green-800' :
+                    member.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>{member.status}</span>
+                </td>
+                <td className="px-6 py-4 flex gap-2">
+                  <button onClick={() => setShowDetailsModal(member)} className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition">
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => alert('Edit ' + (member.profiles?.full_name || member.full_name))} className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => deleteMember(member.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredMembers.map((member) => (
-                <tr key={member.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-800">{member.member_number}</td>
-                  <td className="px-6 py-4 text-sm text-gray-800">{member.profiles?.full_name || member.full_name || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.email || member.email || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.phone || member.phone || '-'}</td>
-                  <td className="px-6 py-4 text-sm font-semibold text-[#008080]">${Number(member.account_balance).toLocaleString()}</td>
-                  <td className="px-6 py-4">
-                    <span className={`status-badge ${
-                        member.status === 'active' ? 'bg-green-100 text-green-800' :
-                        member.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>{member.status}</span>
-                  </td>
-                  <td className="px-6 py-4 relative">
-                    <div className="flex gap-2">
-                      <button onClick={(e) => {
-                        e.stopPropagation();
-                        setMembers((prev) =>
-                          prev.map((m) => m.id === member.id ? { ...m, showActions: !m.showActions } : m)
-                        );
-                      }} className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition">
-                        <Eye className="w-4 h-4" />
-                      </button>
-
-                      {member.showActions && (
-                        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
-                          <div className="p-3 text-sm text-gray-700 space-y-1">
-                            <p><strong>Name:</strong> {member.profiles?.full_name || member.full_name || '-'}</p>
-                            <p><strong>Email:</strong> {member.profiles?.email || member.email || '-'}</p>
-                            <p><strong>Phone:</strong> {member.profiles?.phone || member.phone || '-'}</p>
-                            <p><strong>ID Number:</strong> {member.profiles?.id_number || member.id_number || '-'}</p>
-                            <p><strong>DOB:</strong> {member.profiles?.date_of_birth || member.date_of_birth || '-'}</p>
-                            <p><strong>Address:</strong> {member.profiles?.address || member.address || '-'}</p>
-                          </div>
-                          <div className="border-t border-gray-200">
-                            <button onClick={() => alert(`Editing ${member.full_name || member.profiles?.full_name}`)} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"><Edit2 className="inline w-4 h-4 mr-2"/> Edit</button>
-                            <button onClick={() => deleteMember(member.id)} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"><Trash2 className="inline w-4 h-4 mr-2"/> Delete</button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {showAddModal && <AddMemberModal />}
+
+      {/* Details Modal */}
+      {showDetailsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 relative">
+            <h2 className="text-xl font-bold mb-4">Member Details</h2>
+            <div className="space-y-2 text-gray-700">
+              <p><strong>Full Name:</strong> {showDetailsModal.profiles?.full_name || showDetailsModal.full_name || '-'}</p>
+              <p><strong>Email:</strong> {showDetailsModal.profiles?.email || showDetailsModal.email || '-'}</p>
+              <p><strong>Phone:</strong> {showDetailsModal.profiles?.phone || showDetailsModal.phone || '-'}</p>
+              <p><strong>ID Number:</strong> {showDetailsModal.profiles?.id_number || showDetailsModal.id_number || '-'}</p>
+              <p><strong>Date of Birth:</strong> {showDetailsModal.profiles?.date_of_birth || showDetailsModal.date_of_birth || '-'}</p>
+              <p><strong>Address:</strong> {showDetailsModal.profiles?.address || showDetailsModal.address || '-'}</p>
+              <p><strong>Member Number:</strong> {showDetailsModal.member_number}</p>
+              <p><strong>Balance:</strong> ${Number(showDetailsModal.account_balance).toLocaleString()}</p>
+              <p><strong>Status:</strong> {showDetailsModal.status}</p>
+            </div>
+            <button onClick={() => setShowDetailsModal(null)} className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 font-bold text-xl">&times;</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
