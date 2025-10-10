@@ -1,7 +1,15 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member, Transaction, Loan } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, DollarSign, TrendingUp, CreditCard, LogOut, UserPlus, FileText, Bell } from 'lucide-react';
+import {
+  Users,
+  DollarSign,
+  TrendingUp,
+  CreditCard,
+  LogOut,
+  FileText,
+  Bell,
+} from 'lucide-react';
 import MemberManagement from './MemberManagement';
 import TransactionManagement from './TransactionManagement';
 import LoanManagement from './LoanManagement';
@@ -30,18 +38,29 @@ export default function AdminDashboard() {
     ]);
 
     const totalMembers = membersRes.data?.length || 0;
-    const totalBalance = membersRes.data?.reduce((sum, m) => sum + Number(m.account_balance), 0) || 0;
-    const pendingLoans = loansRes.data?.filter(l => l.status === 'pending').length || 0;
-    const totalLoans = loansRes.data?.reduce((sum, l) => sum + Number(l.outstanding_balance || 0), 0) || 0;
+    const totalBalance =
+      membersRes.data?.reduce(
+        (sum, m) => sum + Number(m.account_balance),
+        0
+      ) || 0;
+    const pendingLoans =
+      loansRes.data?.filter((l) => l.status === 'pending').length || 0;
+    const totalLoans =
+      loansRes.data?.reduce(
+        (sum, l) => sum + Number(l.outstanding_balance || 0),
+        0
+      ) || 0;
 
     setStats({ totalMembers, totalBalance, totalLoans, pendingLoans });
   };
 
-  // Modern card component with hover animation
+  // Modern stat card
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
-    <div className="bg-gradient-to-br from-white/80 to-gray-100 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:-translate-y-2 hover:shadow-2xl">
+    <div className="bg-gradient-to-br from-white/80 to-gray-100 rounded-2xl p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-3xl">
       <div className="flex items-center justify-between mb-4">
-        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center transition-transform duration-300 hover:scale-110`}>
+        <div
+          className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow-lg`}
+        >
           <Icon className="w-6 h-6 text-white" />
         </div>
       </div>
@@ -53,25 +72,34 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Navbar */}
-      <nav className="bg-gradient-to-r from-[#008080] to-[#00A3A3] shadow-md">
+      <nav className="bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
+            {/* Logo + Title */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#008080] to-[#ADD8E6] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
                 <Users className="w-6 h-6 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-white">Savings Group</h1>
+              <h1 className="text-xl font-bold text-white tracking-wide">
+                SmartSave Admin
+              </h1>
             </div>
+
+            {/* Profile + Logout */}
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-sm font-medium text-white">{profile?.full_name}</p>
-                <p className="text-xs text-white/80 capitalize">{profile?.role}</p>
+                <p className="text-sm font-medium text-white">
+                  {profile?.full_name}
+                </p>
+                <p className="text-xs text-white/80 capitalize">
+                  {profile?.role}
+                </p>
               </div>
               <button
                 onClick={() => signOut()}
-                className="p-2 bg-white/20 hover:bg-red-600/20 rounded-xl transition-all duration-300 hover:scale-105"
+                className="p-2 bg-white/20 hover:bg-red-500/30 rounded-xl transition-all duration-300 hover:scale-110 shadow-md hover:shadow-lg"
               >
-                <LogOut className="w-5 h-5 text-white hover:text-red-600" />
+                <LogOut className="w-5 h-5 text-white" />
               </button>
             </div>
           </div>
@@ -96,9 +124,9 @@ export default function AdminDashboard() {
                   onClick={() => setActiveTab(id as Tab)}
                   className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-all duration-300 ${
                     activeTab === id
-                      ? 'border-[#008080] text-[#008080]'
-                      : 'border-transparent text-gray-600 hover:text-[#00A3A3] hover:border-[#00A3A3]'
-                  }`}
+                      ? 'border-[#007B8A] text-[#007B8A]'
+                      : 'border-transparent text-gray-600 hover:text-[#D8468C] hover:border-[#D8468C]'
+                  } hover:scale-105`}
                 >
                   <Icon className="w-4 h-4" />
                   {label}
@@ -108,7 +136,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Active Tab */}
+        {/* Active Tab Content */}
         {activeTab === 'dashboard' && (
           <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Overview</h2>
@@ -117,25 +145,25 @@ export default function AdminDashboard() {
                 icon={Users}
                 label="Total Members"
                 value={stats.totalMembers}
-                color="from-[#008080] to-[#00A3A3]"
+                color="from-[#007B8A] to-[#00BFFF]"
               />
               <StatCard
                 icon={DollarSign}
                 label="Total Balance"
                 value={`$${stats.totalBalance.toLocaleString()}`}
-                color="from-[#ADD8E6] to-[#87CEEB]"
+                color="from-[#00BFFF] to-[#D8468C]"
               />
               <StatCard
                 icon={CreditCard}
                 label="Outstanding Loans"
                 value={`$${stats.totalLoans.toLocaleString()}`}
-                color="from-[#008080] to-[#ADD8E6]"
+                color="from-[#007B8A] to-[#D8468C]"
               />
               <StatCard
                 icon={Bell}
                 label="Pending Loans"
                 value={stats.pendingLoans}
-                color="from-[#00A3A3] to-[#ADD8E6]"
+                color="from-[#D8468C] to-[#00BFFF]"
               />
             </div>
           </div>
