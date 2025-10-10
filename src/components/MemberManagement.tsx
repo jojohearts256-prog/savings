@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member, Profile } from '../lib/supabase';
-import { UserPlus, Search, Eye, CheckCircle } from 'lucide-react';
+import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, XCircle } from 'lucide-react';
 
 export default function MemberManagement() {
   const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
@@ -22,9 +22,13 @@ export default function MemberManagement() {
 
   const filteredMembers = members.filter(
     (m) =>
-      (m.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (m.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ??
+        m.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ??
+        false) ||
       m.member_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (m.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+      (m.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ??
+        m.email?.toLowerCase().includes(searchTerm.toLowerCase()) ??
+        false)
   );
 
   const AddMemberModal = () => {
@@ -46,42 +50,32 @@ export default function MemberManagement() {
       setLoading(true);
 
       try {
-        // 1️⃣ Create profile
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            full_name: formData.full_name,
-            email: formData.email,
-            phone: formData.phone,
-            id_number: formData.id_number,
-          })
-          .select()
-          .single();
-
-        if (profileError) throw profileError;
-
-        // 2️⃣ Create member with profile_id
-        const { error: memberError } = await supabase.from('members').insert({
-          profile_id: profileData.id,
-          member_number: `MBR-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
-          status: 'active',
-          account_balance: 0,
-          address: formData.address,
-          date_of_birth: formData.date_of_birth,
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            ...formData,
+            role: 'member',
+            member_data: { address: formData.address, date_of_birth: formData.date_of_birth },
+          }),
         });
 
-        if (memberError) throw memberError;
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error);
 
         setSuccess(true);
 
-        // Reload members and close modal
+        // Automatically close modal and reload members after 2 seconds
         setTimeout(() => {
           setShowAddModal(false);
           loadMembers();
           setSuccess(false);
-        }, 1500);
+        }, 2000);
       } catch (err: any) {
-        setError(err.message || 'Failed to add member');
+        setError(err.message || 'Failed to register member');
       } finally {
         setLoading(false);
       }
@@ -246,8 +240,12 @@ export default function MemberManagement() {
               {filteredMembers.map((member) => (
                 <tr key={member.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{member.member_number}</td>
-                  <td className="px-6 py-4 text-sm text-gray-800">{member.profiles?.full_name || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.email || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-800">
+                    {member.profiles?.full_name || member.full_name || '-'}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {member.profiles?.email || member.email || '-'}
+                  </td>
                   <td className="px-6 py-4 text-sm font-semibold text-[#008080]">
                     ${Number(member.account_balance).toLocaleString()}
                   </td>
