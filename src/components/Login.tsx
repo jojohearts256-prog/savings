@@ -24,7 +24,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-[#00A1A1] via-[#ADD8E6] to-[#D94F91]">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-[#008C8C] via-[#ADD8E6] to-[#C93C83]">
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
@@ -32,7 +32,7 @@ export default function Login() {
         className="bg-white/90 backdrop-blur-md rounded-3xl shadow-xl p-8 w-full max-w-sm"
       >
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00A1A1] to-[#D94F91] mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#008C8C] to-[#C93C83] mb-4">
             <Lock className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
@@ -61,7 +61,7 @@ export default function Login() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#00A1A1] focus:border-transparent outline-none transition"
+                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008C8C] focus:border-transparent outline-none transition"
                 placeholder="Enter your email"
                 required
               />
@@ -78,7 +78,7 @@ export default function Login() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#00A1A1] focus:border-transparent outline-none transition"
+                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008C8C] focus:border-transparent outline-none transition"
                 placeholder="Enter your password"
                 required
               />
@@ -88,7 +88,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-gradient-to-r from-[#00A1A1] to-[#D94F91] text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-gradient-to-r from-[#008C8C] to-[#C93C83] text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
@@ -101,4 +101,5 @@ export default function Login() {
     </div>
   );
 }
+
 
