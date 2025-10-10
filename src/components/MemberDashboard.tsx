@@ -106,7 +106,7 @@ export default function MemberDashboard() {
                 step="0.01"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#007B8A] focus:border-transparent outline-none"
                 required
               />
             </div>
@@ -116,7 +116,7 @@ export default function MemberDashboard() {
               <select
                 value={formData.repayment_period}
                 onChange={(e) => setFormData({ ...formData, repayment_period: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#007B8A] focus:border-transparent outline-none"
               >
                 <option value="3">3 Months</option>
                 <option value="6">6 Months</option>
@@ -131,7 +131,7 @@ export default function MemberDashboard() {
               <textarea
                 value={formData.reason}
                 onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#007B8A] focus:border-transparent outline-none"
                 rows={3}
                 required
               />
@@ -163,19 +163,20 @@ export default function MemberDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200">
+      {/* Navbar with new gradient */}
+      <nav className="bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#008080] to-[#ADD8E6] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
                 <DollarSign className="w-6 h-6 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-gray-800">My Account</h1>
+              <h1 className="text-xl font-bold text-white tracking-wide">My Account</h1>
             </div>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-xl transition"
+                className="relative p-2 text-white hover:text-[#D8468C] hover:bg-white/20 rounded-xl transition-transform duration-300 hover:scale-105"
               >
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
@@ -185,12 +186,12 @@ export default function MemberDashboard() {
                 )}
               </button>
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-800">{profile?.full_name}</p>
-                <p className="text-xs text-gray-600">{member?.member_number}</p>
+                <p className="text-sm font-medium text-white">{profile?.full_name}</p>
+                <p className="text-xs text-white/80">{member?.member_number}</p>
               </div>
               <button
                 onClick={() => signOut()}
-                className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
+                className="p-2 text-white hover:text-red-600 hover:bg-white/20 rounded-xl transition-transform duration-300 hover:scale-105"
               >
                 <LogOut className="w-5 h-5" />
               </button>
@@ -229,35 +230,36 @@ export default function MemberDashboard() {
         </div>
       )}
 
+      {/* Rest of content remains unchanged */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-2xl p-6 card-shadow-hover">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#008080] to-[#00A3A3] flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#00BFFF] flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-white" />
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-1">Account Balance</p>
-            <h3 className="text-3xl font-bold text-[#008080]">
+            <h3 className="text-3xl font-bold text-[#007B8A]">
               ${member ? Number(member.account_balance).toLocaleString() : '0'}
             </h3>
           </div>
 
           <div className="bg-white rounded-2xl p-6 card-shadow-hover">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#ADD8E6] to-[#87CEEB] flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00BFFF] to-[#D8468C] flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-1">Total Contributions</p>
-            <h3 className="text-3xl font-bold text-[#008080]">
+            <h3 className="text-3xl font-bold text-[#007B8A]">
               ${member ? Number(member.total_contributions).toLocaleString() : '0'}
             </h3>
           </div>
 
           <div className="bg-white rounded-2xl p-6 card-shadow-hover">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#008080] to-[#ADD8E6] flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] flex items-center justify-center">
                 <CreditCard className="w-6 h-6 text-white" />
               </div>
             </div>
@@ -268,6 +270,7 @@ export default function MemberDashboard() {
           </div>
         </div>
 
+        {/* Rest of content unchanged */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div className="bg-white rounded-2xl card-shadow p-6">
             <div className="flex justify-between items-center mb-4">
@@ -329,7 +332,7 @@ export default function MemberDashboard() {
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Amount: ${Number(loan.amount_approved || loan.amount_requested).toLocaleString()}</span>
                       {loan.outstanding_balance !== null && (
-                        <span className="font-semibold text-[#008080]">
+                        <span className="font-semibold text-[#007B8A]">
                           Outstanding: ${Number(loan.outstanding_balance).toLocaleString()}
                         </span>
                       )}
