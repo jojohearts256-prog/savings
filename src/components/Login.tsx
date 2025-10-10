@@ -24,17 +24,25 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-[#007B8A] via-[#00BFFF] to-[#D8468C] overflow-hidden">
+    <div
+      className="min-h-screen flex overflow-hidden"
+      style={{
+        background:
+          'linear-gradient(110deg, #007B8A 0%, #00BFFF 45%, #D8468C 75%, #ffffff 95%)',
+      }}
+    >
       {/* Left side: Login Form */}
       <div className="w-full md:w-1/2 flex items-center justify-center px-6 relative z-10">
-        <div className="p-10 w-full max-w-md rounded-2xl shadow-2xl bg-white/15 backdrop-blur-lg animate-slide-in border border-white/20">
+        <div className="p-10 w-full max-w-md rounded-2xl shadow-2xl bg-white/20 backdrop-blur-xl animate-slide-in border border-white/30">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] mb-4 shadow-md">
               <Lock className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white mb-1">SmartSave Portal</h1>
+            <h1 className="text-3xl font-bold text-white mb-1">
+              SmartSave Management
+            </h1>
             <p className="text-gray-100/90">
-              Empowering Your Future Through Smarter Savings
+              Transforming Group Savings into Shared Success
             </p>
           </div>
 
@@ -47,14 +55,16 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-white mb-2">Email</label>
+              <label className="block text-sm font-medium text-white mb-2">
+                Email
+              </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-200" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/20 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
+                  className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/30 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
                   placeholder="Enter your email"
                   required
                 />
@@ -62,14 +72,16 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white mb-2">Password</label>
+              <label className="block text-sm font-medium text-white mb-2">
+                Password
+              </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-200" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/20 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
+                  className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/30 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
                   placeholder="Enter your password"
                   required
                 />
@@ -91,16 +103,17 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right side (visual extension of gradient, seamless) */}
+      {/* Right side visuals */}
       <div className="hidden md:flex w-1/2 items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-[#00BFFF]/60 to-white/10"></div>
+        {/* Gradient overlay for smooth transition */}
+        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-[#00BFFF]/40 to-white/40"></div>
 
         {/* Floating text */}
-        <div className="absolute top-20 left-14 text-white font-bold text-4xl tracking-wide animate-fade-float">
+        <div className="absolute top-20 left-14 text-white font-bold text-4xl tracking-wide animate-fade-float drop-shadow-lg">
           Grow. Save. <br /> Prosper Together.
         </div>
         <div className="absolute bottom-24 right-10 text-white text-lg animate-fade-float-slow">
-          Your Financial Growth Starts Here.
+          Empowering Financial Growth Digitally.
         </div>
 
         {/* Floating circles */}
@@ -112,19 +125,15 @@ export default function Login() {
       <style>{`
         @keyframes float {
           0%, 100% { transform: translateY(0); opacity: 1; }
-          50% { transform: translateY(-10px); opacity: 0.8; }
-        }
-        @keyframes float-slow {
-          0%, 100% { transform: translateY(0); opacity: 1; }
-          50% { transform: translateY(-15px); opacity: 0.7; }
+          50% { transform: translateY(-10px); opacity: 0.85; }
         }
         @keyframes fade-float {
           0%, 100% { transform: translateY(0); opacity: 1; }
-          50% { transform: translateY(-12px); opacity: 0.6; }
+          50% { transform: translateY(-12px); opacity: 0.7; }
         }
         @keyframes fade-float-slow {
           0%, 100% { transform: translateY(0); opacity: 1; }
-          50% { transform: translateY(-16px); opacity: 0.6; }
+          50% { transform: translateY(-16px); opacity: 0.7; }
         }
         @keyframes spin-slow {
           from { transform: rotate(0deg); }
@@ -147,5 +156,3 @@ export default function Login() {
     </div>
   );
 }
-
-
