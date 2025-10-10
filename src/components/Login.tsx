@@ -24,16 +24,16 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-[#E0F7FA] to-[#B3E5FC] overflow-hidden relative">
+    <div className="min-h-screen flex bg-gradient-to-br from-[#005f73] via-[#0a9396] to-[#94d2bd] overflow-hidden relative">
       {/* Left side: Login Form */}
-      <div className="w-full md:w-1/2 flex items-center justify-center px-4">
+      <div className="w-full md:w-1/2 flex items-center justify-center px-4 relative z-10">
         <div className="p-10 w-full max-w-lg bg-white rounded-3xl shadow-2xl transform transition duration-1000 animate-slide-fade">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#008080] to-[#ADD8E6] mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#008080] to-[#006d77] mb-4">
               <Lock className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back</h1>
-            <p className="text-gray-600">Sign in to your account</p>
+            <p className="text-gray-600">Access your savings dashboard securely</p>
           </div>
 
           {error && (
@@ -77,7 +77,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 btn-primary text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition transform hover:scale-105"
+              className="w-full py-3 bg-gradient-to-r from-[#0a9396] to-[#0077b6] text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition transform hover:scale-105 shadow-lg"
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
@@ -89,27 +89,30 @@ export default function Login() {
         </div>
       </div>
 
+      {/* Curved Divider */}
+      <div className="hidden md:block absolute top-0 left-1/2 transform -translate-x-1/2 w-[200%] h-full bg-white/10 rounded-l-[60%]"></div>
+
       {/* Right side: Floating Graphics and Text */}
-      <div className="hidden md:flex w-1/2 relative overflow-hidden">
-        <div className="absolute top-12 left-12 text-white font-bold text-4xl tracking-wide animate-float">
-          Welcome to <br /> Our System
+      <div className="hidden md:flex w-1/2 relative overflow-hidden bg-gradient-to-br from-[#006d77] via-[#0081a7] to-[#00b4d8]">
+        <div className="absolute top-16 left-12 text-white font-bold text-4xl tracking-wide animate-float">
+          Empowering <br /> Smart Savings
         </div>
         <div className="absolute bottom-24 right-12 text-white text-lg animate-float-slow">
-          Secure, Professional & Modern
+          Manage, Track & Grow with Confidence
         </div>
 
         {/* Floating circles */}
-        <div className="absolute -top-24 -left-24 w-80 h-80 bg-pink-200 opacity-20 rounded-full animate-spin-slow"></div>
+        <div className="absolute -top-24 -left-24 w-80 h-80 bg-pink-300 opacity-20 rounded-full animate-spin-slow"></div>
         <div className="absolute -bottom-28 -right-28 w-96 h-96 bg-white opacity-10 rounded-full animate-spin-slow-reverse"></div>
-        <div className="absolute top-40 right-32 text-pink-300 text-xl animate-float-slow">
-          Easy & Fast
+        <div className="absolute top-40 right-32 text-pink-200 text-xl animate-float-slow">
+          Reliable. Secure. Simple.
         </div>
         <div className="absolute bottom-40 left-28 text-white text-lg animate-float">
-          Reliable & Modern
+          A Better Way to Save
         </div>
       </div>
 
-      {/* Tailwind animation classes */}
+      {/* Animations */}
       <style>
         {`
           @keyframes slideFade {
