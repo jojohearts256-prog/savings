@@ -12,10 +12,11 @@ export default function MemberManagement() {
     loadMembers();
   }, []);
 
+  // Load members with joined profiles
   const loadMembers = async () => {
     const { data } = await supabase
       .from('members')
-      .select('*, profiles(*)')
+      .select('*, profiles(*)') // join profiles on profile_id
       .order('created_at', { ascending: false });
     setMembers(data || []);
   };
@@ -27,6 +28,7 @@ export default function MemberManagement() {
       (m.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
+  // Add Member Modal
   const AddMemberModal = () => {
     const [formData, setFormData] = useState({
       email: '',
@@ -46,25 +48,47 @@ export default function MemberManagement() {
       setLoading(true);
 
       try {
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            ...formData,
-            role: 'member',
-            member_data: { address: formData.address, date_of_birth: formData.date_of_birth },
-          }),
+        // 1️⃣ Create user via Supabase Auth
+        const { data: userData, error: signUpError } = await supabase.auth.admin.createUser({
+          email: formData.email,
+          password: formData.password,
         });
+        if (signUpError) throw signUpError;
 
-        const result = await response.json();
-        if (!result.success) throw new Error(result.error);
+        const userId = userData.user?.id;
+        if (!userId) throw new Error('Failed to get new user ID');
+
+        // 2️⃣ Insert profile
+        await supabase.from('profiles').insert([
+          {
+            id: userId,
+            full_name: formData.full_name,
+            email: formData.email,
+            role: 'member',
+            phone: formData.phone,
+            id_number: formData.id_number,
+          },
+        ]);
+
+        // 3️⃣ Insert member with profile_id
+        await supabase.from('members').insert([
+          {
+            profile_id: userId, // link member to profile
+            member_number: `MBR-${formData.email.slice(0, 5)}-${Math.random().toString(36).slice(-4)}`,
+            full_name: formData.full_name,
+            email: formData.email,
+            status: 'active',
+            account_balance: 0,
+            created_at: new Date(),
+            updated_at: new Date(),
+            address: formData.address,
+            date_of_birth: formData.date_of_birth,
+          },
+        ]);
 
         setSuccess(true);
 
-        // Automatically close modal and reload members after 2 seconds
+        // Automatically close modal and reload members
         setTimeout(() => {
           setShowAddModal(false);
           loadMembers();
