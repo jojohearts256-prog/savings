@@ -128,7 +128,8 @@ export default function TransactionManagement() {
                 <option value="">Select member</option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.profiles?.full_name || '-'} - {m.member_number} (Balance: ${Number(m.account_balance ?? 0).toLocaleString()})
+                    {/* Display full name + member number */}
+                    {m.profiles?.full_name || 'No Name'} - {m.member_number} (Balance: ${Number(m.account_balance ?? 0).toLocaleString()})
                   </option>
                 ))}
               </select>
