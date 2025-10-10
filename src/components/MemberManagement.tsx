@@ -3,7 +3,7 @@ import { supabase, Member, Profile } from '../lib/supabase';
 import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, XCircle } from 'lucide-react';
 
 export default function MemberManagement() {
-  const [members, setMembers] = useState<(Member & { profiles: Profile })[]>([]);
+  const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,14 +17,14 @@ export default function MemberManagement() {
       .from('members')
       .select('*, profiles(*)')
       .order('created_at', { ascending: false });
-
     setMembers(data || []);
   };
 
-  const filteredMembers = members.filter(m =>
-    m.profiles.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.member_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.profiles.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredMembers = members.filter(
+    (m) =>
+      (m.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      m.member_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (m.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
   const AddMemberModal = () => {
@@ -46,32 +46,25 @@ export default function MemberManagement() {
       setLoading(true);
 
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({
-              ...formData,
-              role: 'member',
-              member_data: {
-                address: formData.address,
-                date_of_birth: formData.date_of_birth,
-              },
-            }),
-          }
-        );
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            ...formData,
+            role: 'member',
+            member_data: { address: formData.address, date_of_birth: formData.date_of_birth },
+          }),
+        });
 
         const result = await response.json();
-
-        if (!result.success) {
-          throw new Error(result.error);
-        }
+        if (!result.success) throw new Error(result.error);
 
         setSuccess(true);
+
+        // Automatically close modal and reload members after 2 seconds
         setTimeout(() => {
           setShowAddModal(false);
           loadMembers();
@@ -97,8 +90,7 @@ export default function MemberManagement() {
 
           {success && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 flex items-center gap-2">
-              <CheckCircle className="w-5 h-5" />
-              Member registered successfully!
+              <CheckCircle className="w-5 h-5" /> Member registered successfully!
             </div>
           )}
 
@@ -210,8 +202,7 @@ export default function MemberManagement() {
           onClick={() => setShowAddModal(true)}
           className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl"
         >
-          <UserPlus className="w-5 h-5" />
-          Add Member
+          <UserPlus className="w-5 h-5" /> Add Member
         </button>
       </div>
 
@@ -245,17 +236,21 @@ export default function MemberManagement() {
               {filteredMembers.map((member) => (
                 <tr key={member.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{member.member_number}</td>
-                  <td className="px-6 py-4 text-sm text-gray-800">{member.profiles.full_name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{member.profiles.email}</td>
+                  <td className="px-6 py-4 text-sm text-gray-800">{member.profiles?.full_name || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.email || '-'}</td>
                   <td className="px-6 py-4 text-sm font-semibold text-[#008080]">
                     ${Number(member.account_balance).toLocaleString()}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`status-badge ${
-                      member.status === 'active' ? 'bg-green-100 text-green-800' :
-                      member.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
+                    <span
+                      className={`status-badge ${
+                        member.status === 'active'
+                          ? 'bg-green-100 text-green-800'
+                          : member.status === 'inactive'
+                          ? 'bg-gray-100 text-gray-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {member.status}
                     </span>
                   </td>
