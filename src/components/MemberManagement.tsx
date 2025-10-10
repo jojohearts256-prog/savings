@@ -28,6 +28,9 @@ export default function MemberManagement() {
       m.member_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (m.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ??
         m.email?.toLowerCase().includes(searchTerm.toLowerCase()) ??
+        false) ||
+      (m.profiles?.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ??
+        m.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ??
         false)
   );
 
@@ -59,7 +62,12 @@ export default function MemberManagement() {
           body: JSON.stringify({
             ...formData,
             role: 'member',
-            member_data: { address: formData.address, date_of_birth: formData.date_of_birth },
+            member_data: { 
+              address: formData.address, 
+              date_of_birth: formData.date_of_birth,
+              phone: formData.phone,
+              id_number: formData.id_number
+            },
           }),
         });
 
@@ -85,109 +93,47 @@ export default function MemberManagement() {
         <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Add New Member</h2>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 flex items-center gap-2">
-              <CheckCircle className="w-5 h-5" /> Member registered successfully!
-            </div>
-          )}
+          {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">{error}</div>}
+          {success && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 flex items-center gap-2"><CheckCircle className="w-5 h-5" /> Member registered successfully!</div>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  value={formData.full_name}
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                  required
-                />
+                <input type="text" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none" required />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                  required
-                />
+                <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none" required />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                  required
-                  minLength={6}
-                />
+                <input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none" required minLength={6} />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                />
+                <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none" />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">ID Number</label>
-                <input
-                  type="text"
-                  value={formData.id_number}
-                  onChange={(e) => setFormData({ ...formData, id_number: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                  required
-                />
+                <input type="text" value={formData.id_number} onChange={(e) => setFormData({ ...formData, id_number: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none" required />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-                <input
-                  type="date"
-                  value={formData.date_of_birth}
-                  onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                />
+                <input type="date" value={formData.date_of_birth} onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none" />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-              <textarea
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                rows={2}
-              />
+              <textarea value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none" rows={2} />
             </div>
 
             <div className="flex gap-3 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50"
-              >
+              <button type="submit" disabled={loading} className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50">
                 {loading ? 'Adding...' : 'Add Member'}
               </button>
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
-              >
+              <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">
                 Cancel
               </button>
             </div>
@@ -197,14 +143,21 @@ export default function MemberManagement() {
     );
   };
 
+  const deleteMember = async (memberId: string) => {
+    const confirmDelete = confirm('Are you sure you want to delete this member?');
+    if (!confirmDelete) return;
+    setLoading(true);
+    const { error } = await supabase.from('members').delete().eq('id', memberId);
+    if (error) alert('Failed to delete member: ' + error.message);
+    loadMembers();
+    setLoading(false);
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Member Management</h2>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl"
-        >
+        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl">
           <UserPlus className="w-5 h-5" /> Add Member
         </button>
       </div>
@@ -212,13 +165,7 @@ export default function MemberManagement() {
       <div className="mb-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search members..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-          />
+          <input type="text" placeholder="Search members..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none" />
         </div>
       </div>
 
@@ -230,6 +177,7 @@ export default function MemberManagement() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member #</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Name</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Phone</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Balance</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
@@ -241,58 +189,40 @@ export default function MemberManagement() {
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{member.member_number}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">{member.profiles?.full_name || member.full_name || '-'}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.email || member.email || '-'}</td>
-                  <td className="px-6 py-4 text-sm font-semibold text-[#008080]">
-                    ${Number(member.account_balance).toLocaleString()}
-                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.phone || member.phone || '-'}</td>
+                  <td className="px-6 py-4 text-sm font-semibold text-[#008080]">${Number(member.account_balance).toLocaleString()}</td>
                   <td className="px-6 py-4">
-                    <span
-                      className={`status-badge ${
-                        member.status === 'active'
-                          ? 'bg-green-100 text-green-800'
-                          : member.status === 'inactive'
-                          ? 'bg-gray-100 text-gray-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {member.status}
-                    </span>
+                    <span className={`status-badge ${
+                        member.status === 'active' ? 'bg-green-100 text-green-800' :
+                        member.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>{member.status}</span>
                   </td>
                   <td className="px-6 py-4 relative">
                     <div className="flex gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMembers((prev) =>
-                            prev.map((m) =>
-                              m.id === member.id ? { ...m, showActions: !m.showActions } : m
-                            )
-                          );
-                        }}
-                        className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition"
-                      >
+                      <button onClick={(e) => {
+                        e.stopPropagation();
+                        setMembers((prev) =>
+                          prev.map((m) => m.id === member.id ? { ...m, showActions: !m.showActions } : m)
+                        );
+                      }} className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition">
                         <Eye className="w-4 h-4" />
                       </button>
 
                       {member.showActions && (
-                        <div className="absolute right-0 top-full mt-2 w-40 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
-                          <button
-                            onClick={() => alert(`Showing details for ${member.full_name || member.profiles?.full_name}`)}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-                          >
-                            Details
-                          </button>
-                          <button
-                            onClick={() => alert(`Editing ${member.full_name || member.profiles?.full_name}`)}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => alert(`Deleting ${member.full_name || member.profiles?.full_name}`)}
-                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                          >
-                            Delete
-                          </button>
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
+                          <div className="p-3 text-sm text-gray-700 space-y-1">
+                            <p><strong>Name:</strong> {member.profiles?.full_name || member.full_name || '-'}</p>
+                            <p><strong>Email:</strong> {member.profiles?.email || member.email || '-'}</p>
+                            <p><strong>Phone:</strong> {member.profiles?.phone || member.phone || '-'}</p>
+                            <p><strong>ID Number:</strong> {member.profiles?.id_number || member.id_number || '-'}</p>
+                            <p><strong>DOB:</strong> {member.profiles?.date_of_birth || member.date_of_birth || '-'}</p>
+                            <p><strong>Address:</strong> {member.profiles?.address || member.address || '-'}</p>
+                          </div>
+                          <div className="border-t border-gray-200">
+                            <button onClick={() => alert(`Editing ${member.full_name || member.profiles?.full_name}`)} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"><Edit2 className="inline w-4 h-4 mr-2"/> Edit</button>
+                            <button onClick={() => deleteMember(member.id)} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"><Trash2 className="inline w-4 h-4 mr-2"/> Delete</button>
+                          </div>
                         </div>
                       )}
                     </div>
