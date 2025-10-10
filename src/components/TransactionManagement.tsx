@@ -21,7 +21,7 @@ export default function TransactionManagement() {
       .from('transactions')
       .select(`
         *,
-        members!transactions_member_id_fkey(*, profiles(*)),
+        members!transactions_member_id_fkey(*, profiles(full_name)),
         profiles!transactions_recorded_by_fkey(full_name)
       `)
       .order('transaction_date', { ascending: false });
@@ -34,7 +34,7 @@ export default function TransactionManagement() {
     setLoadingMembers(true);
     const { data, error } = await supabase
       .from('members')
-      .select('*, profiles(*)')
+      .select('id, profiles(full_name), account_balance') // fetch only the id, full_name, balance
       .order('created_at', { ascending: false });
 
     if (error) console.error('Members load error:', error);
@@ -74,7 +74,6 @@ export default function TransactionManagement() {
           balanceAfter = balanceBefore - amount;
         }
 
-        // Insert transaction
         const { error: txError } = await supabase.from('transactions').insert({
           member_id: formData.member_id,
           transaction_type: formData.transaction_type,
@@ -87,7 +86,6 @@ export default function TransactionManagement() {
 
         if (txError) throw txError;
 
-        // Update member balance & contributions
         const updates: any = { account_balance: balanceAfter };
         if (formData.transaction_type === 'contribution') {
           updates.total_contributions = (Number(member.total_contributions) || 0) + amount;
@@ -184,8 +182,8 @@ export default function TransactionManagement() {
   };
 
   const filteredTransactions = transactions.filter((tx) =>
-    (tx['members!transactions_member_id_fkey']?.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-    (tx['members!transactions_member_id_fkey']?.member_number?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+    (tx.members?.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+    (tx.members?.member_number?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
   return (
@@ -229,7 +227,8 @@ export default function TransactionManagement() {
                 <tr key={tx.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(tx.transaction_date).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    {tx['members!transactions_member_id_fkey']?.profiles?.full_name || '-'}
+                    {tx.members?.profiles?.full_name || '-'}
+                    <div className="text-xs text-gray-500">{tx.members?.member_number}</div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
