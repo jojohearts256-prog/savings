@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member, Profile } from '../lib/supabase';
-import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, XCircle } from 'lucide-react';
+import { UserPlus, Search, Eye, CheckCircle } from 'lucide-react';
 
 export default function MemberManagement() {
   const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
@@ -12,11 +12,10 @@ export default function MemberManagement() {
     loadMembers();
   }, []);
 
-  // Load members with joined profiles
   const loadMembers = async () => {
     const { data } = await supabase
       .from('members')
-      .select('*, profiles(*)') // join profiles on profile_id
+      .select('*, profiles(*)')
       .order('created_at', { ascending: false });
     setMembers(data || []);
   };
@@ -28,7 +27,6 @@ export default function MemberManagement() {
       (m.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
-  // Add Member Modal
   const AddMemberModal = () => {
     const [formData, setFormData] = useState({
       email: '',
@@ -48,54 +46,42 @@ export default function MemberManagement() {
       setLoading(true);
 
       try {
-        // 1️⃣ Create user via Supabase Auth
-        const { data: userData, error: signUpError } = await supabase.auth.admin.createUser({
-          email: formData.email,
-          password: formData.password,
-        });
-        if (signUpError) throw signUpError;
-
-        const userId = userData.user?.id;
-        if (!userId) throw new Error('Failed to get new user ID');
-
-        // 2️⃣ Insert profile
-        await supabase.from('profiles').insert([
-          {
-            id: userId,
+        // 1️⃣ Create profile
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .insert({
             full_name: formData.full_name,
             email: formData.email,
-            role: 'member',
             phone: formData.phone,
             id_number: formData.id_number,
-          },
-        ]);
+          })
+          .select()
+          .single();
 
-        // 3️⃣ Insert member with profile_id
-        await supabase.from('members').insert([
-          {
-            profile_id: userId, // link member to profile
-            member_number: `MBR-${formData.email.slice(0, 5)}-${Math.random().toString(36).slice(-4)}`,
-            full_name: formData.full_name,
-            email: formData.email,
-            status: 'active',
-            account_balance: 0,
-            created_at: new Date(),
-            updated_at: new Date(),
-            address: formData.address,
-            date_of_birth: formData.date_of_birth,
-          },
-        ]);
+        if (profileError) throw profileError;
+
+        // 2️⃣ Create member with profile_id
+        const { error: memberError } = await supabase.from('members').insert({
+          profile_id: profileData.id,
+          member_number: `MBR-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+          status: 'active',
+          account_balance: 0,
+          address: formData.address,
+          date_of_birth: formData.date_of_birth,
+        });
+
+        if (memberError) throw memberError;
 
         setSuccess(true);
 
-        // Automatically close modal and reload members
+        // Reload members and close modal
         setTimeout(() => {
           setShowAddModal(false);
           loadMembers();
           setSuccess(false);
-        }, 2000);
+        }, 1500);
       } catch (err: any) {
-        setError(err.message || 'Failed to register member');
+        setError(err.message || 'Failed to add member');
       } finally {
         setLoading(false);
       }
