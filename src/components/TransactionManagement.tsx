@@ -6,7 +6,7 @@ import { ArrowUpCircle, ArrowDownCircle, DollarSign, Search } from 'lucide-react
 export default function TransactionManagement() {
   const { profile } = useAuth();
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
+  const [members, setMembers] = useState<any[]>([]); // now using any to include full_name directly
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -22,7 +22,7 @@ export default function TransactionManagement() {
       .from('transactions')
       .select(`
         *,
-        members!transactions_member_id_fkey(*, profiles(full_name)),
+        members!transactions_member_id_fkey(*, full_name, member_number),
         profiles!transactions_recorded_by_fkey(full_name)
       `)
       .order('transaction_date', { ascending: false });
@@ -31,58 +31,28 @@ export default function TransactionManagement() {
     setTransactions(data || []);
   };
 
-  // === REPLACED loadMembers: explicit fetch + merge (robust, read-only) ===
+  // simplified: read full_name directly from members table
   const loadMembers = async () => {
     setLoadingMembers(true);
     try {
-      // 1) fetch members (ensure this includes the FK column; here it's `profile_id`)
-      const { data: membersData, error: membersError } = await supabase
+      const { data, error } = await supabase
         .from('members')
-        .select('id, account_balance, profile_id, total_contributions, member_number, created_at')
+        .select('id, account_balance, full_name, member_number, total_contributions, created_at')
         .order('created_at', { ascending: false });
 
-      if (membersError) throw membersError;
-      if (!membersData || membersData.length === 0) {
+      if (error) {
+        console.error('Members load error:', error);
         setMembers([]);
-        setLoadingMembers(false);
-        return;
+      } else {
+        setMembers(data || []);
       }
-
-      // 2) gather profile ids present on member rows
-      const profileIds = Array.from(new Set(membersData.map((m: any) => m.profile_id).filter(Boolean)));
-
-      // 3) fetch profiles for those ids
-      let profilesData: any[] = [];
-      if (profileIds.length > 0) {
-        const { data: pData, error: pError } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', profileIds);
-        if (pError) throw pError;
-        profilesData = pData || [];
-      }
-
-      // 4) map and merge (profiles will be null if not found / not readable)
-      const profilesMap = profilesData.reduce((acc: any, p: any) => {
-        acc[p.id] = p;
-        return acc;
-      }, {});
-
-      const merged = membersData.map((m: any) => ({
-        ...m,
-        profiles: m.profile_id ? profilesMap[m.profile_id] ?? null : null,
-      }));
-
-      console.log('loaded members (merged):', merged); // quick debug
-      setMembers(merged);
-    } catch (err: any) {
-      console.error('loadMembers error:', err);
+    } catch (err) {
+      console.error('Members load error (unexpected):', err);
       setMembers([]);
     } finally {
       setLoadingMembers(false);
     }
   };
-  // === end replacement ===
 
   const AddTransactionModal = () => {
     const [formData, setFormData] = useState({
@@ -130,7 +100,7 @@ export default function TransactionManagement() {
 
         const updates: any = { account_balance: balanceAfter };
         if (formData.transaction_type === 'contribution') {
-          updates.total_contributions = (Number((member as any).total_contributions) || 0) + amount;
+          updates.total_contributions = (Number(member.total_contributions) || 0) + amount;
         }
 
         const { error: updateError } = await supabase
@@ -167,8 +137,7 @@ export default function TransactionManagement() {
                 <option value="">Select member</option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {/* fallback so user can still identify members */}
-                    {m.profiles?.full_name || (m as any).member_number || (m as any).profile_id || String(m.id).slice(0, 8)}
+                    {m.full_name || m.member_number || String(m.id).slice(0, 8)}
                   </option>
                 ))}
               </select>
@@ -225,7 +194,7 @@ export default function TransactionManagement() {
   };
 
   const filteredTransactions = transactions.filter((tx) =>
-    (tx.members?.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+    (tx.members?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
     (tx.members?.member_number?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
@@ -270,7 +239,7 @@ export default function TransactionManagement() {
                 <tr key={tx.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(tx.transaction_date).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    {tx.members?.profiles?.full_name || '-'}
+                    {tx.members?.full_name || '-'}
                     <div className="text-xs text-gray-500">{tx.members?.member_number}</div>
                   </td>
                   <td className="px-6 py-4">
