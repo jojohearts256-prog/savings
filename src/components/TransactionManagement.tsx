@@ -16,16 +16,14 @@ export default function TransactionManagement() {
   useEffect(() => {
     loadTransactions();
     loadMembers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load transactions with member profile and recorded_by profile
   const loadTransactions = async () => {
     const { data, error } = await supabase
       .from('transactions')
       .select(`
         *,
-        members!transactions_member_id_fkey(*, profiles(full_name, member_number)),
+        members!transactions_member_id_fkey(*, profiles(full_name)),
         profiles!transactions_recorded_by_fkey(full_name)
       `)
       .order('transaction_date', { ascending: false });
@@ -34,7 +32,6 @@ export default function TransactionManagement() {
     setTransactions(data || []);
   };
 
-  // Load members with their profiles
   const loadMembers = async () => {
     setLoadingMembers(true);
     try {
@@ -44,6 +41,11 @@ export default function TransactionManagement() {
         .order('created_at', { ascending: false });
 
       if (membersError) throw membersError;
+      if (!membersData || membersData.length === 0) {
+        setMembers([]);
+        setLoadingMembers(false);
+        return;
+      }
 
       const profileIds = Array.from(new Set(membersData.map((m: any) => m.profile_id).filter(Boolean)));
 
@@ -76,7 +78,6 @@ export default function TransactionManagement() {
     }
   };
 
-  // Modal for adding a transaction
   const AddTransactionModal = () => {
     const [formData, setFormData] = useState({
       member_id: '',
@@ -109,7 +110,7 @@ export default function TransactionManagement() {
           balanceAfter = balanceBefore - amount;
         }
 
-        const { error: txError } = await supabase.from('transactions').insert({
+        const { data: txData, error: txError } = await supabase.from('transactions').insert({
           member_id: formData.member_id,
           transaction_type: formData.transaction_type,
           amount,
@@ -117,7 +118,7 @@ export default function TransactionManagement() {
           balance_after: balanceAfter,
           description: formData.description,
           recorded_by: profile?.id,
-        });
+        }).select().single();
 
         if (txError) throw txError;
 
@@ -134,12 +135,9 @@ export default function TransactionManagement() {
         if (updateError) throw updateError;
 
         setShowAddModal(false);
-        await loadTransactions();
-
-        // Automatically show receipt after transaction
-        const lastTx = transactions.find((t) => t.member_id === formData.member_id && t.amount === amount);
-        setSelectedTransaction(lastTx || null);
-        setShowReceiptModal(true);
+        loadTransactions();
+        setSelectedTransaction(txData);
+        setShowReceiptModal(true); // Open receipt modal after transaction
       } catch (err: any) {
         setError(err.message || 'Failed to record transaction');
       } finally {
@@ -221,82 +219,99 @@ export default function TransactionManagement() {
     );
   };
 
-  // Receipt modal
+  // === Professional Bank-style Receipt Modal ===
   const ReceiptModal = () => {
     if (!selectedTransaction) return null;
 
+    const tx = selectedTransaction;
+    const member = tx.members;
+
     const handlePrint = () => {
-      const tx = selectedTransaction;
-      const member = tx.members;
-
-      const printWindow = window.open('', '_blank', 'width=600,height=800');
-      if (!printWindow) return;
-
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Transaction Receipt</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
-              .receipt { max-width: 500px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-              .header { text-align: center; margin-bottom: 20px; }
-              .header h1 { margin: 0; color: #008080; }
-              .header p { margin: 2px 0; color: #555; font-size: 14px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-              th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-              th { background-color: #f0f0f0; }
-              .total { font-weight: bold; color: #008080; }
-              .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #555; }
-            </style>
-          </head>
-          <body>
-            <div class="receipt">
-              <div class="header">
-                <h1>My Savings System</h1>
-                <p>Transaction Receipt</p>
-                <p>${new Date(tx.transaction_date).toLocaleString()}</p>
+      const printContent = document.getElementById('receipt-content')?.innerHTML;
+      if (printContent) {
+        const w = window.open('', '', 'width=600,height=800');
+        w?.document.write(`
+          <html>
+            <head>
+              <title>Receipt</title>
+              <style>
+                body { font-family: 'Arial', sans-serif; padding: 20px; background: #f5f5f5; }
+                .receipt { max-width: 500px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                .header { text-align: center; margin-bottom: 20px; }
+                .header h1 { margin: 0; color: #008080; }
+                .header p { margin: 2px 0; color: #555; font-size: 14px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                th { background-color: #f0f0f0; }
+                .total { font-weight: bold; color: #008080; }
+                .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #555; }
+              </style>
+            </head>
+            <body>
+              <div class="receipt">
+                ${printContent}
               </div>
-              <table>
-                <tbody>
-                  <tr><th>Member</th><td>${member?.profiles?.full_name || '-'}</td></tr>
-                  <tr><th>Member Number</th><td>${member?.member_number || '-'}</td></tr>
-                  <tr><th>Transaction Type</th><td>${tx.transaction_type}</td></tr>
-                  <tr><th>Amount</th><td>$${Number(tx.amount).toLocaleString()}</td></tr>
-                  <tr><th>Balance Before</th><td>$${Number(tx.balance_before).toLocaleString()}</td></tr>
-                  <tr><th>Balance After</th><td class="total">$${Number(tx.balance_after).toLocaleString()}</td></tr>
-                  <tr><th>Description</th><td>${tx.description || '-'}</td></tr>
-                  <tr><th>Recorded By</th><td>${tx['profiles!transactions_recorded_by_fkey']?.full_name || '-'}</td></tr>
-                </tbody>
-              </table>
-              <div class="footer">Thank you for using My Savings System!</div>
-            </div>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
+            </body>
+          </html>
+        `);
+        w?.document.close();
+        w?.focus();
+        w?.print();
+      }
     };
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Transaction Receipt</h2>
-          <div className="mb-6 p-4 border rounded-xl bg-gray-50">
-            <p><strong>Member:</strong> {selectedTransaction.members?.profiles?.full_name}</p>
-            <p><strong>Member Number:</strong> {selectedTransaction.members?.member_number}</p>
-            <p><strong>Transaction Type:</strong> {selectedTransaction.transaction_type}</p>
-            <p><strong>Amount:</strong> ${Number(selectedTransaction.amount).toLocaleString()}</p>
-            <p><strong>Balance After:</strong> ${Number(selectedTransaction.balance_after).toLocaleString()}</p>
-            <p><strong>Description:</strong> {selectedTransaction.description || '-'}</p>
+          <div id="receipt-content" className="text-sm text-gray-800">
+            <div className="header">
+              <h1>My Savings System</h1>
+              <p>Transaction Receipt</p>
+              <p>{new Date(tx.transaction_date).toLocaleString()}</p>
+            </div>
+            <table>
+              <tbody>
+                <tr>
+                  <th>Member</th>
+                  <td>{member?.profiles?.full_name || '-'}</td>
+                </tr>
+                <tr>
+                  <th>Member Number</th>
+                  <td>{member?.member_number}</td>
+                </tr>
+                <tr>
+                  <th>Transaction Type</th>
+                  <td>{tx.transaction_type}</td>
+                </tr>
+                <tr>
+                  <th>Amount</th>
+                  <td>${Number(tx.amount).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <th>Balance Before</th>
+                  <td>${Number(tx.balance_before).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <th>Balance After</th>
+                  <td className="total">${Number(tx.balance_after).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <th>Description</th>
+                  <td>{tx.description || '-'}</td>
+                </tr>
+                <tr>
+                  <th>Recorded By</th>
+                  <td>{tx['profiles!transactions_recorded_by_fkey']?.full_name || '-'}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div className="footer">
+              Thank you for using our service!
+            </div>
           </div>
-          <div className="flex gap-3">
-            <button onClick={handlePrint} className="flex-1 py-2 btn-primary text-white font-medium rounded-xl">
-              Print / Download
-            </button>
-            <button onClick={() => setShowReceiptModal(false)} className="flex-1 py-2 border border-gray-300 rounded-xl">
-              Close
-            </button>
+          <div className="flex gap-3 pt-4">
+            <button onClick={handlePrint} className="flex-1 py-2 btn-primary text-white font-medium rounded-xl">Print / Download</button>
+            <button onClick={() => setShowReceiptModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">Cancel</button>
           </div>
         </div>
       </div>
@@ -364,8 +379,11 @@ export default function TransactionManagement() {
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-[#008080]">${Number(tx.balance_after).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{tx['profiles!transactions_recorded_by_fkey']?.full_name || '-'}</td>
-                  <td className="px-6 py-4 text-sm">
-                    <button onClick={() => { setSelectedTransaction(tx); setShowReceiptModal(true); }} className="flex items-center gap-1 text-blue-600 hover:underline">
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => { setSelectedTransaction(tx); setShowReceiptModal(true); }}
+                      className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700"
+                    >
                       <Printer className="w-4 h-4" /> Print
                     </button>
                   </td>
