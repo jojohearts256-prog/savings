@@ -219,7 +219,7 @@ export default function TransactionManagement() {
     );
   };
 
-  // === Receipt Modal ===
+  // === Professional Bank-style Receipt Modal ===
   const ReceiptModal = () => {
     if (!selectedTransaction) return null;
 
@@ -235,15 +235,22 @@ export default function TransactionManagement() {
             <head>
               <title>Receipt</title>
               <style>
-                body { font-family: Arial, sans-serif; padding: 20px; }
-                h2 { text-align: center; color: #008080; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; }
+                body { font-family: 'Arial', sans-serif; padding: 20px; background: #f5f5f5; }
+                .receipt { max-width: 500px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                .header { text-align: center; margin-bottom: 20px; }
+                .header h1 { margin: 0; color: #008080; }
+                .header p { margin: 2px 0; color: #555; font-size: 14px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                th { background-color: #f0f0f0; }
+                .total { font-weight: bold; color: #008080; }
+                .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #555; }
               </style>
             </head>
             <body>
-              ${printContent}
+              <div class="receipt">
+                ${printContent}
+              </div>
             </body>
           </html>
         `);
@@ -256,17 +263,51 @@ export default function TransactionManagement() {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Transaction Receipt</h2>
           <div id="receipt-content" className="text-sm text-gray-800">
-            <p><strong>Member:</strong> {member?.profiles?.full_name || '-'}</p>
-            <p><strong>Member Number:</strong> {member?.member_number}</p>
-            <p><strong>Transaction Type:</strong> {tx.transaction_type}</p>
-            <p><strong>Amount:</strong> ${Number(tx.amount).toLocaleString()}</p>
-            <p><strong>Balance Before:</strong> ${Number(tx.balance_before).toLocaleString()}</p>
-            <p><strong>Balance After:</strong> ${Number(tx.balance_after).toLocaleString()}</p>
-            <p><strong>Description:</strong> {tx.description || '-'}</p>
-            <p><strong>Date:</strong> {new Date(tx.transaction_date).toLocaleString()}</p>
-            <p><strong>Recorded By:</strong> {tx['profiles!transactions_recorded_by_fkey']?.full_name || '-'}</p>
+            <div className="header">
+              <h1>My Savings System</h1>
+              <p>Transaction Receipt</p>
+              <p>{new Date(tx.transaction_date).toLocaleString()}</p>
+            </div>
+            <table>
+              <tbody>
+                <tr>
+                  <th>Member</th>
+                  <td>{member?.profiles?.full_name || '-'}</td>
+                </tr>
+                <tr>
+                  <th>Member Number</th>
+                  <td>{member?.member_number}</td>
+                </tr>
+                <tr>
+                  <th>Transaction Type</th>
+                  <td>{tx.transaction_type}</td>
+                </tr>
+                <tr>
+                  <th>Amount</th>
+                  <td>${Number(tx.amount).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <th>Balance Before</th>
+                  <td>${Number(tx.balance_before).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <th>Balance After</th>
+                  <td className="total">${Number(tx.balance_after).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <th>Description</th>
+                  <td>{tx.description || '-'}</td>
+                </tr>
+                <tr>
+                  <th>Recorded By</th>
+                  <td>{tx['profiles!transactions_recorded_by_fkey']?.full_name || '-'}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div className="footer">
+              Thank you for using our service!
+            </div>
           </div>
           <div className="flex gap-3 pt-4">
             <button onClick={handlePrint} className="flex-1 py-2 btn-primary text-white font-medium rounded-xl">Print / Download</button>
