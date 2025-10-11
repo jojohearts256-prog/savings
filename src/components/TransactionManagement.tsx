@@ -14,6 +14,7 @@ export default function TransactionManagement() {
   useEffect(() => {
     loadTransactions();
     loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadTransactions = async () => {
@@ -30,17 +31,58 @@ export default function TransactionManagement() {
     setTransactions(data || []);
   };
 
+  // === REPLACED loadMembers: explicit fetch + merge (robust, read-only) ===
   const loadMembers = async () => {
     setLoadingMembers(true);
-    const { data, error } = await supabase
-      .from('members')
-      .select('id, profiles(full_name), account_balance') // fetch only the id, full_name, balance
-      .order('created_at', { ascending: false });
+    try {
+      // 1) fetch members (ensure this includes the FK column; here it's `profile_id`)
+      const { data: membersData, error: membersError } = await supabase
+        .from('members')
+        .select('id, account_balance, profile_id, total_contributions, member_number, created_at')
+        .order('created_at', { ascending: false });
 
-    if (error) console.error('Members load error:', error);
-    setMembers(data || []);
-    setLoadingMembers(false);
+      if (membersError) throw membersError;
+      if (!membersData || membersData.length === 0) {
+        setMembers([]);
+        setLoadingMembers(false);
+        return;
+      }
+
+      // 2) gather profile ids present on member rows
+      const profileIds = Array.from(new Set(membersData.map((m: any) => m.profile_id).filter(Boolean)));
+
+      // 3) fetch profiles for those ids
+      let profilesData: any[] = [];
+      if (profileIds.length > 0) {
+        const { data: pData, error: pError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', profileIds);
+        if (pError) throw pError;
+        profilesData = pData || [];
+      }
+
+      // 4) map and merge (profiles will be null if not found / not readable)
+      const profilesMap = profilesData.reduce((acc: any, p: any) => {
+        acc[p.id] = p;
+        return acc;
+      }, {});
+
+      const merged = membersData.map((m: any) => ({
+        ...m,
+        profiles: m.profile_id ? profilesMap[m.profile_id] ?? null : null,
+      }));
+
+      console.log('loaded members (merged):', merged); // quick debug
+      setMembers(merged);
+    } catch (err: any) {
+      console.error('loadMembers error:', err);
+      setMembers([]);
+    } finally {
+      setLoadingMembers(false);
+    }
   };
+  // === end replacement ===
 
   const AddTransactionModal = () => {
     const [formData, setFormData] = useState({
@@ -88,7 +130,7 @@ export default function TransactionManagement() {
 
         const updates: any = { account_balance: balanceAfter };
         if (formData.transaction_type === 'contribution') {
-          updates.total_contributions = (Number(member.total_contributions) || 0) + amount;
+          updates.total_contributions = (Number((member as any).total_contributions) || 0) + amount;
         }
 
         const { error: updateError } = await supabase
@@ -125,7 +167,8 @@ export default function TransactionManagement() {
                 <option value="">Select member</option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.profiles?.full_name || 'No Name'}
+                    {/* fallback so user can still identify members */}
+                    {m.profiles?.full_name || (m as any).member_number || (m as any).profile_id || String(m.id).slice(0, 8)}
                   </option>
                 ))}
               </select>
@@ -252,5 +295,3 @@ export default function TransactionManagement() {
     </div>
   );
 }
-
-
