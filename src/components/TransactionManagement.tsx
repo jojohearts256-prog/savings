@@ -1,20 +1,21 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member, Profile } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowUpCircle, ArrowDownCircle, DollarSign, Search } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, DollarSign, Search, Printer } from 'lucide-react';
 
 export default function TransactionManagement() {
   const { profile } = useAuth();
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [members, setMembers] = useState<any[]>([]); // now using any to include full_name directly
+  const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingMembers, setLoadingMembers] = useState(false);
 
   useEffect(() => {
     loadTransactions();
     loadMembers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadTransactions = async () => {
@@ -22,7 +23,7 @@ export default function TransactionManagement() {
       .from('transactions')
       .select(`
         *,
-        members!transactions_member_id_fkey(*, full_name, member_number),
+        members!transactions_member_id_fkey(*, profiles(full_name)),
         profiles!transactions_recorded_by_fkey(full_name)
       `)
       .order('transaction_date', { ascending: false });
@@ -31,23 +32,46 @@ export default function TransactionManagement() {
     setTransactions(data || []);
   };
 
-  // simplified: read full_name directly from members table
   const loadMembers = async () => {
     setLoadingMembers(true);
     try {
-      const { data, error } = await supabase
+      const { data: membersData, error: membersError } = await supabase
         .from('members')
-        .select('id, account_balance, full_name, member_number, total_contributions, created_at')
+        .select('id, account_balance, profile_id, total_contributions, member_number, created_at')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Members load error:', error);
+      if (membersError) throw membersError;
+      if (!membersData || membersData.length === 0) {
         setMembers([]);
-      } else {
-        setMembers(data || []);
+        setLoadingMembers(false);
+        return;
       }
-    } catch (err) {
-      console.error('Members load error (unexpected):', err);
+
+      const profileIds = Array.from(new Set(membersData.map((m: any) => m.profile_id).filter(Boolean)));
+
+      let profilesData: any[] = [];
+      if (profileIds.length > 0) {
+        const { data: pData, error: pError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', profileIds);
+        if (pError) throw pError;
+        profilesData = pData || [];
+      }
+
+      const profilesMap = profilesData.reduce((acc: any, p: any) => {
+        acc[p.id] = p;
+        return acc;
+      }, {});
+
+      const merged = membersData.map((m: any) => ({
+        ...m,
+        profiles: m.profile_id ? profilesMap[m.profile_id] ?? null : null,
+      }));
+
+      setMembers(merged);
+    } catch (err: any) {
+      console.error('loadMembers error:', err);
       setMembers([]);
     } finally {
       setLoadingMembers(false);
@@ -86,7 +110,7 @@ export default function TransactionManagement() {
           balanceAfter = balanceBefore - amount;
         }
 
-        const { error: txError } = await supabase.from('transactions').insert({
+        const { data: txData, error: txError } = await supabase.from('transactions').insert({
           member_id: formData.member_id,
           transaction_type: formData.transaction_type,
           amount,
@@ -94,7 +118,7 @@ export default function TransactionManagement() {
           balance_after: balanceAfter,
           description: formData.description,
           recorded_by: profile?.id,
-        });
+        }).select().single();
 
         if (txError) throw txError;
 
@@ -112,6 +136,8 @@ export default function TransactionManagement() {
 
         setShowAddModal(false);
         loadTransactions();
+        setSelectedTransaction(txData);
+        setShowReceiptModal(true); // Open receipt modal after transaction
       } catch (err: any) {
         setError(err.message || 'Failed to record transaction');
       } finally {
@@ -137,7 +163,7 @@ export default function TransactionManagement() {
                 <option value="">Select member</option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.full_name || m.member_number || String(m.id).slice(0, 8)}
+                    {m.profiles?.full_name || (m as any).member_number || String(m.id).slice(0, 8)}
                   </option>
                 ))}
               </select>
@@ -193,8 +219,66 @@ export default function TransactionManagement() {
     );
   };
 
+  // === Receipt Modal ===
+  const ReceiptModal = () => {
+    if (!selectedTransaction) return null;
+
+    const tx = selectedTransaction;
+    const member = tx.members;
+
+    const handlePrint = () => {
+      const printContent = document.getElementById('receipt-content')?.innerHTML;
+      if (printContent) {
+        const w = window.open('', '', 'width=600,height=800');
+        w?.document.write(`
+          <html>
+            <head>
+              <title>Receipt</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                h2 { text-align: center; color: #008080; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+              </style>
+            </head>
+            <body>
+              ${printContent}
+            </body>
+          </html>
+        `);
+        w?.document.close();
+        w?.focus();
+        w?.print();
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Transaction Receipt</h2>
+          <div id="receipt-content" className="text-sm text-gray-800">
+            <p><strong>Member:</strong> {member?.profiles?.full_name || '-'}</p>
+            <p><strong>Member Number:</strong> {member?.member_number}</p>
+            <p><strong>Transaction Type:</strong> {tx.transaction_type}</p>
+            <p><strong>Amount:</strong> ${Number(tx.amount).toLocaleString()}</p>
+            <p><strong>Balance Before:</strong> ${Number(tx.balance_before).toLocaleString()}</p>
+            <p><strong>Balance After:</strong> ${Number(tx.balance_after).toLocaleString()}</p>
+            <p><strong>Description:</strong> {tx.description || '-'}</p>
+            <p><strong>Date:</strong> {new Date(tx.transaction_date).toLocaleString()}</p>
+            <p><strong>Recorded By:</strong> {tx['profiles!transactions_recorded_by_fkey']?.full_name || '-'}</p>
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button onClick={handlePrint} className="flex-1 py-2 btn-primary text-white font-medium rounded-xl">Print / Download</button>
+            <button onClick={() => setShowReceiptModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">Cancel</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const filteredTransactions = transactions.filter((tx) =>
-    (tx.members?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+    (tx.members?.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
     (tx.members?.member_number?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
@@ -232,6 +316,7 @@ export default function TransactionManagement() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Amount</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Balance After</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Recorded By</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Receipt</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -239,7 +324,7 @@ export default function TransactionManagement() {
                 <tr key={tx.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(tx.transaction_date).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    {tx.members?.full_name || '-'}
+                    {tx.members?.profiles?.full_name || '-'}
                     <div className="text-xs text-gray-500">{tx.members?.member_number}</div>
                   </td>
                   <td className="px-6 py-4">
@@ -253,6 +338,14 @@ export default function TransactionManagement() {
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-[#008080]">${Number(tx.balance_after).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{tx['profiles!transactions_recorded_by_fkey']?.full_name || '-'}</td>
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => { setSelectedTransaction(tx); setShowReceiptModal(true); }}
+                      className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700"
+                    >
+                      <Printer className="w-4 h-4" /> Print
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -261,6 +354,7 @@ export default function TransactionManagement() {
       </div>
 
       {showAddModal && <AddTransactionModal />}
+      {showReceiptModal && <ReceiptModal />}
     </div>
   );
 }
