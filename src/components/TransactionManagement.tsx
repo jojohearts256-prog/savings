@@ -139,7 +139,7 @@ export default function TransactionManagement() {
         setShowAddModal(false);
         await loadTransactions();
         setSelectedTransaction(txData);
-        setShowReceiptModal(true); // Open receipt modal after transaction
+        setShowReceiptModal(true);
       } catch (err: any) {
         setError(err.message || 'Failed to record transaction');
       } finally {
@@ -226,7 +226,7 @@ export default function TransactionManagement() {
     if (!selectedTransaction) return null;
 
     const tx = selectedTransaction;
-    const member = tx.member; // <- use flattened member
+    const member = tx.member;
 
     const handlePrint = () => {
       const printContent = document.getElementById('receipt-content')?.innerHTML;
@@ -307,9 +307,7 @@ export default function TransactionManagement() {
                 </tr>
               </tbody>
             </table>
-            <div className="footer">
-              Thank you for using our service!
-            </div>
+            <div className="footer">Thank you for using our service!</div>
           </div>
           <div className="flex gap-3 pt-4">
             <button onClick={handlePrint} className="flex-1 py-2 btn-primary text-white font-medium rounded-xl">Print / Download</button>
@@ -401,3 +399,4 @@ export default function TransactionManagement() {
     </div>
   );
 }
+
