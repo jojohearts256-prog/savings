@@ -53,7 +53,6 @@ export default function TransactionManagement() {
     }
   };
 
-  // Helper to create a printable, styled HTML receipt string
   const createReceiptHtml = (opts: {
     receiptId: string;
     transaction: any;
@@ -65,7 +64,6 @@ export default function TransactionManagement() {
     const recordedBy = opts.recordedByName || 'System';
     const dateStr = new Date(t.transaction_date || t.created_at || Date.now()).toLocaleString();
 
-    // Inline styles so the print window looks consistent
     return `
 <!doctype html>
 <html>
@@ -179,8 +177,8 @@ export default function TransactionManagement() {
           balanceAfter = balanceBefore - amount;
         }
 
-        // 1) Insert transaction and get the inserted row back
-        const { data: insertedTxArr, error: txError } = await supabase
+        // Insert transaction and get row back
+        const { data: insertedTx, error: txError } = await supabase
           .from('transactions')
           .insert({
             member_id: formData.member_id,
@@ -195,9 +193,8 @@ export default function TransactionManagement() {
           .single();
 
         if (txError) throw txError;
-        const insertedTx = insertedTxArr; // single row
 
-        // 2) Update member balance (same as before)
+        // Update member balance
         const updates: any = { account_balance: balanceAfter };
         if (formData.transaction_type === 'contribution') {
           updates.total_contributions = (Number(member.total_contributions) || 0) + amount;
@@ -210,7 +207,7 @@ export default function TransactionManagement() {
 
         if (updateError) throw updateError;
 
-        // 3) Create receipt HTML and persist it in receipts table
+        // Create receipt HTML and save
         const tempReceiptId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
         const receiptHtml = createReceiptHtml({
           receiptId: tempReceiptId,
@@ -219,38 +216,24 @@ export default function TransactionManagement() {
           recordedByName: (profile as any)?.full_name || null,
         });
 
-        const { data: receiptInsert, error: receiptError } = await supabase
-          .from('receipts')
-          .insert({
-            transaction_id: insertedTx.id,
-            member_id: formData.member_id,
-            receipt_html: receiptHtml,
-          })
-          .select()
-          .single();
+        await supabase.from('receipts').insert({
+          transaction_id: insertedTx.id,
+          member_id: formData.member_id,
+          receipt_html: receiptHtml,
+        });
 
-        if (receiptError) {
-          // not fatal: we still can show print view, but log it
-          console.error('receipt save error', receiptError);
-        }
-
-        // 4) Open print window with the receipt HTML so user can print/save as PDF immediately
+        // Print receipt immediately
         const printWindow = window.open('', '_blank', 'noopener,noreferrer');
         if (printWindow) {
           printWindow.document.open();
           printWindow.document.write(receiptHtml);
           printWindow.document.close();
-          // Wait for content to render then trigger print
           printWindow.onload = () => {
             printWindow.focus();
             printWindow.print();
           };
-        } else {
-          console.warn('Could not open print window (popup blocked?)');
-          // optionally show the receipt in-app instead
         }
 
-        // 5) Done: close modal and refresh
         setShowAddModal(false);
         loadTransactions();
         loadMembers();
