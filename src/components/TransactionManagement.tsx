@@ -6,7 +6,7 @@ import { ArrowUpCircle, ArrowDownCircle, DollarSign, Search } from 'lucide-react
 export default function TransactionManagement() {
   const { profile } = useAuth();
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [members, setMembers] = useState<any[]>([]); // now using any to include full_name directly
+  const [members, setMembers] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -31,7 +31,6 @@ export default function TransactionManagement() {
     setTransactions(data || []);
   };
 
-  // simplified: read full_name directly from members table
   const loadMembers = async () => {
     setLoadingMembers(true);
     try {
@@ -52,6 +51,100 @@ export default function TransactionManagement() {
     } finally {
       setLoadingMembers(false);
     }
+  };
+
+  // Helper to create a printable, styled HTML receipt string
+  const createReceiptHtml = (opts: {
+    receiptId: string;
+    transaction: any;
+    member: any;
+    recordedByName?: string | null;
+  }) => {
+    const t = opts.transaction;
+    const m = opts.member;
+    const recordedBy = opts.recordedByName || 'System';
+    const dateStr = new Date(t.transaction_date || t.created_at || Date.now()).toLocaleString();
+
+    // Inline styles so the print window looks consistent
+    return `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Receipt - ${opts.receiptId}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial; color:#222; padding:24px; }
+    .receipt { max-width:800px; margin:0 auto; border:1px solid #e5e7eb; padding:24px; border-radius:12px; }
+    .brand { display:flex; align-items:center; gap:16px; margin-bottom:16px; }
+    .brand h1 { margin:0; font-size:20px; color:#0f766e; }
+    .meta { display:flex; justify-content:space-between; margin-bottom:18px; }
+    .meta .left, .meta .right { width:48%; }
+    .table { width:100%; border-collapse:collapse; margin-bottom:18px; }
+    .table th { text-align:left; color:#374151; font-size:12px; padding:8px 0; border-bottom:1px dashed #e5e7eb; }
+    .table td { padding:12px 0; font-size:16px; }
+    .amount { font-weight:700; color:#065f46; font-size:18px; }
+    .negative { color:#b91c1c; }
+    .footer { border-top:1px dashed #e5e7eb; padding-top:12px; margin-top:12px; font-size:12px; color:#6b7280; }
+    .receipt-id { font-size:12px; color:#6b7280; }
+    @media print {
+      body { padding:0; }
+      .receipt { border:none; border-radius:0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt">
+    <div class="brand">
+      <div>
+        <h1>Your Organization Name</h1>
+        <div class="receipt-id">Receipt: ${opts.receiptId}</div>
+      </div>
+    </div>
+
+    <div class="meta">
+      <div class="left">
+        <strong>Member</strong><br/>
+        ${m.full_name || m.member_number || 'Member'}<br/>
+        ${m.member_number ? `Member #${m.member_number}` : ''}<br/>
+      </div>
+      <div class="right" style="text-align:right;">
+        <strong>Date</strong><br/>
+        ${dateStr}<br/>
+        <strong>Recorded by</strong><br/>
+        ${recordedBy}
+      </div>
+    </div>
+
+    <table class="table">
+      <thead>
+        <tr><th>Description</th><th style="text-align:right">Amount</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>${t.transaction_type || 'Transaction'} — ${t.description || ''}</td>
+          <td style="text-align:right" class="${t.transaction_type === 'withdrawal' ? 'negative' : ''}">${t.transaction_type === 'withdrawal' ? '-' : '+'}$${Number(t.amount).toLocaleString()}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div>
+        <div>Balance Before: $${Number(t.balance_before || 0).toLocaleString()}</div>
+      </div>
+      <div style="text-align:right;">
+        <div>Balance After</div>
+        <div class="amount">$${Number(t.balance_after || 0).toLocaleString()}</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Thank you for using our services. This receipt was generated automatically. If you need support, contact support@example.com.
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
   };
 
   const AddTransactionModal = () => {
@@ -86,18 +179,25 @@ export default function TransactionManagement() {
           balanceAfter = balanceBefore - amount;
         }
 
-        const { error: txError } = await supabase.from('transactions').insert({
-          member_id: formData.member_id,
-          transaction_type: formData.transaction_type,
-          amount,
-          balance_before: balanceBefore,
-          balance_after: balanceAfter,
-          description: formData.description,
-          recorded_by: profile?.id,
-        });
+        // 1) Insert transaction and get the inserted row back
+        const { data: insertedTxArr, error: txError } = await supabase
+          .from('transactions')
+          .insert({
+            member_id: formData.member_id,
+            transaction_type: formData.transaction_type,
+            amount,
+            balance_before: balanceBefore,
+            balance_after: balanceAfter,
+            description: formData.description,
+            recorded_by: profile?.id,
+          })
+          .select()
+          .single();
 
         if (txError) throw txError;
+        const insertedTx = insertedTxArr; // single row
 
+        // 2) Update member balance (same as before)
         const updates: any = { account_balance: balanceAfter };
         if (formData.transaction_type === 'contribution') {
           updates.total_contributions = (Number(member.total_contributions) || 0) + amount;
@@ -110,8 +210,50 @@ export default function TransactionManagement() {
 
         if (updateError) throw updateError;
 
+        // 3) Create receipt HTML and persist it in receipts table
+        const tempReceiptId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+        const receiptHtml = createReceiptHtml({
+          receiptId: tempReceiptId,
+          transaction: insertedTx,
+          member,
+          recordedByName: (profile as any)?.full_name || null,
+        });
+
+        const { data: receiptInsert, error: receiptError } = await supabase
+          .from('receipts')
+          .insert({
+            transaction_id: insertedTx.id,
+            member_id: formData.member_id,
+            receipt_html: receiptHtml,
+          })
+          .select()
+          .single();
+
+        if (receiptError) {
+          // not fatal: we still can show print view, but log it
+          console.error('receipt save error', receiptError);
+        }
+
+        // 4) Open print window with the receipt HTML so user can print/save as PDF immediately
+        const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+        if (printWindow) {
+          printWindow.document.open();
+          printWindow.document.write(receiptHtml);
+          printWindow.document.close();
+          // Wait for content to render then trigger print
+          printWindow.onload = () => {
+            printWindow.focus();
+            printWindow.print();
+          };
+        } else {
+          console.warn('Could not open print window (popup blocked?)');
+          // optionally show the receipt in-app instead
+        }
+
+        // 5) Done: close modal and refresh
         setShowAddModal(false);
         loadTransactions();
+        loadMembers();
       } catch (err: any) {
         setError(err.message || 'Failed to record transaction');
       } finally {
