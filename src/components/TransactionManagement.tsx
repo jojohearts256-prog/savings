@@ -18,12 +18,13 @@ export default function TransactionManagement() {
     loadMembers();
   }, []);
 
+  // --- Load transactions with member info ---
   const loadTransactions = async () => {
     const { data, error } = await supabase
       .from('transactions')
       .select(`
         *,
-        members!transactions_member_id_fkey(*, profiles(full_name)),
+        members!transactions_member_id_fkey(*, profiles(id, full_name)),
         profiles!transactions_recorded_by_fkey(full_name)
       `)
       .order('transaction_date', { ascending: false });
@@ -32,44 +33,25 @@ export default function TransactionManagement() {
     setTransactions(data || []);
   };
 
+  // --- Load members with profiles directly ---
   const loadMembers = async () => {
     setLoadingMembers(true);
     try {
       const { data: membersData, error: membersError } = await supabase
         .from('members')
-        .select('id, account_balance, profile_id, total_contributions, member_number, created_at')
+        .select(`
+          id,
+          account_balance,
+          profile_id,
+          total_contributions,
+          member_number,
+          created_at,
+          profiles(id, full_name)
+        `)
         .order('created_at', { ascending: false });
 
       if (membersError) throw membersError;
-      if (!membersData || membersData.length === 0) {
-        setMembers([]);
-        setLoadingMembers(false);
-        return;
-      }
-
-      const profileIds = Array.from(new Set(membersData.map((m: any) => m.profile_id).filter(Boolean)));
-
-      let profilesData: any[] = [];
-      if (profileIds.length > 0) {
-        const { data: pData, error: pError } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', profileIds);
-        if (pError) throw pError;
-        profilesData = pData || [];
-      }
-
-      const profilesMap = profilesData.reduce((acc: any, p: any) => {
-        acc[p.id] = p;
-        return acc;
-      }, {});
-
-      const merged = membersData.map((m: any) => ({
-        ...m,
-        profiles: m.profile_id ? profilesMap[m.profile_id] ?? null : null,
-      }));
-
-      setMembers(merged);
+      setMembers(membersData || []);
     } catch (err: any) {
       console.error('loadMembers error:', err);
       setMembers([]);
@@ -78,6 +60,7 @@ export default function TransactionManagement() {
     }
   };
 
+  // --- Add Transaction Modal ---
   const AddTransactionModal = () => {
     const [formData, setFormData] = useState({
       member_id: '',
@@ -219,7 +202,7 @@ export default function TransactionManagement() {
     );
   };
 
-  // === Professional Bank-style Receipt Modal ===
+  // --- Receipt Modal ---
   const ReceiptModal = () => {
     if (!selectedTransaction) return null;
 
