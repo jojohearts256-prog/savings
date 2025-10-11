@@ -18,19 +18,38 @@ export default function TransactionManagement() {
     loadMembers();
   }, []);
 
-  // --- Load transactions with member info ---
+  // --- Load transactions with member info and flatten it ---
   const loadTransactions = async () => {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select(`
-        *,
-        members!transactions_member_id_fkey(*, profiles(id, full_name)),
-        profiles!transactions_recorded_by_fkey(full_name)
-      `)
-      .order('transaction_date', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select(`
+          *,
+          members!transactions_member_id_fkey(
+            id,
+            member_number,
+            account_balance,
+            total_contributions,
+            profile_id,
+            profiles(id, full_name)
+          ),
+          profiles!transactions_recorded_by_fkey(full_name)
+        `)
+        .order('transaction_date', { ascending: false });
 
-    if (error) console.error('Transaction load error:', error);
-    setTransactions(data || []);
+      if (error) throw error;
+
+      const flattened = (data || []).map((tx: any) => ({
+        ...tx,
+        member: tx.members || null, // Flatten member info
+        recorded_by_name: tx['profiles!transactions_recorded_by_fkey']?.full_name || '-',
+      }));
+
+      setTransactions(flattened);
+    } catch (err: any) {
+      console.error('Transaction load error:', err);
+      setTransactions([]);
+    }
   };
 
   // --- Load members with profiles directly ---
@@ -118,7 +137,7 @@ export default function TransactionManagement() {
         if (updateError) throw updateError;
 
         setShowAddModal(false);
-        loadTransactions();
+        await loadTransactions();
         setSelectedTransaction(txData);
         setShowReceiptModal(true); // Open receipt modal after transaction
       } catch (err: any) {
@@ -146,7 +165,7 @@ export default function TransactionManagement() {
                 <option value="">Select member</option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.profiles?.full_name || (m as any).member_number || String(m.id).slice(0, 8)}
+                    {m.profiles?.full_name || m.member_number || String(m.id).slice(0, 8)}
                   </option>
                 ))}
               </select>
@@ -207,7 +226,7 @@ export default function TransactionManagement() {
     if (!selectedTransaction) return null;
 
     const tx = selectedTransaction;
-    const member = tx.members;
+    const member = tx.member; // <- use flattened member
 
     const handlePrint = () => {
       const printContent = document.getElementById('receipt-content')?.innerHTML;
@@ -284,7 +303,7 @@ export default function TransactionManagement() {
                 </tr>
                 <tr>
                   <th>Recorded By</th>
-                  <td>{tx['profiles!transactions_recorded_by_fkey']?.full_name || '-'}</td>
+                  <td>{tx.recorded_by_name || '-'}</td>
                 </tr>
               </tbody>
             </table>
@@ -302,8 +321,8 @@ export default function TransactionManagement() {
   };
 
   const filteredTransactions = transactions.filter((tx) =>
-    (tx.members?.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-    (tx.members?.member_number?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+    (tx.member?.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+    (tx.member?.member_number?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
   return (
@@ -348,8 +367,8 @@ export default function TransactionManagement() {
                 <tr key={tx.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(tx.transaction_date).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    {tx.members?.profiles?.full_name || '-'}
-                    <div className="text-xs text-gray-500">{tx.members?.member_number}</div>
+                    {tx.member?.profiles?.full_name || '-'}
+                    <div className="text-xs text-gray-500">{tx.member?.member_number}</div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
@@ -361,7 +380,7 @@ export default function TransactionManagement() {
                     {tx.transaction_type === 'withdrawal' ? '-' : '+'}${Number(tx.amount).toLocaleString()}
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-[#008080]">${Number(tx.balance_after).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{tx['profiles!transactions_recorded_by_fkey']?.full_name || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{tx.recorded_by_name || '-'}</td>
                   <td className="px-6 py-4">
                     <button
                       onClick={() => { setSelectedTransaction(tx); setShowReceiptModal(true); }}
