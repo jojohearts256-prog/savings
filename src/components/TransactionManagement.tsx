@@ -18,21 +18,14 @@ export default function TransactionManagement() {
     loadMembers();
   }, []);
 
-  // --- Load transactions with member info and flatten it ---
+  // --- Load transactions with member_name and recorded_by_name ---
   const loadTransactions = async () => {
     try {
       const { data, error } = await supabase
         .from('transactions')
         .select(`
           *,
-          members!transactions_member_id_fkey(
-            id,
-            member_number,
-            account_balance,
-            total_contributions,
-            profile_id,
-            profiles(id, full_name)
-          ),
+          members!transactions_member_id_fkey(full_name, member_number, account_balance, total_contributions),
           profiles!transactions_recorded_by_fkey(full_name)
         `)
         .order('transaction_date', { ascending: false });
@@ -41,7 +34,8 @@ export default function TransactionManagement() {
 
       const flattened = (data || []).map((tx: any) => ({
         ...tx,
-        member: tx.members || null, // Flatten member info
+        member_name: tx.members?.full_name || '-',
+        member_number: tx.members?.member_number || '-',
         recorded_by_name: tx['profiles!transactions_recorded_by_fkey']?.full_name || '-',
       }));
 
@@ -52,21 +46,12 @@ export default function TransactionManagement() {
     }
   };
 
-  // --- Load members with profiles directly ---
   const loadMembers = async () => {
     setLoadingMembers(true);
     try {
       const { data: membersData, error: membersError } = await supabase
         .from('members')
-        .select(`
-          id,
-          account_balance,
-          profile_id,
-          total_contributions,
-          member_number,
-          created_at,
-          profiles(id, full_name)
-        `)
+        .select('id, full_name, member_number, account_balance, total_contributions')
         .order('created_at', { ascending: false });
 
       if (membersError) throw membersError;
@@ -112,15 +97,19 @@ export default function TransactionManagement() {
           balanceAfter = balanceBefore - amount;
         }
 
-        const { data: txData, error: txError } = await supabase.from('transactions').insert({
-          member_id: formData.member_id,
-          transaction_type: formData.transaction_type,
-          amount,
-          balance_before: balanceBefore,
-          balance_after: balanceAfter,
-          description: formData.description,
-          recorded_by: profile?.id,
-        }).select().single();
+        const { data: txData, error: txError } = await supabase
+          .from('transactions')
+          .insert({
+            member_id: formData.member_id,
+            transaction_type: formData.transaction_type,
+            amount,
+            balance_before: balanceBefore,
+            balance_after: balanceAfter,
+            description: formData.description,
+            recorded_by: profile?.id,
+          })
+          .select()
+          .single();
 
         if (txError) throw txError;
 
@@ -138,7 +127,12 @@ export default function TransactionManagement() {
 
         setShowAddModal(false);
         await loadTransactions();
-        setSelectedTransaction(txData);
+        setSelectedTransaction({
+          ...txData,
+          member_name: member.full_name,
+          member_number: member.member_number,
+          recorded_by_name: profile?.full_name || '-',
+        });
         setShowReceiptModal(true);
       } catch (err: any) {
         setError(err.message || 'Failed to record transaction');
@@ -165,7 +159,7 @@ export default function TransactionManagement() {
                 <option value="">Select member</option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.profiles?.full_name || m.member_number || String(m.id).slice(0, 8)}
+                    {m.full_name || m.member_number || String(m.id).slice(0, 8)}
                   </option>
                 ))}
               </select>
@@ -226,7 +220,6 @@ export default function TransactionManagement() {
     if (!selectedTransaction) return null;
 
     const tx = selectedTransaction;
-    const member = tx.member;
 
     const handlePrint = () => {
       const printContent = document.getElementById('receipt-content')?.innerHTML;
@@ -275,11 +268,11 @@ export default function TransactionManagement() {
               <tbody>
                 <tr>
                   <th>Member</th>
-                  <td>{member?.profiles?.full_name || '-'}</td>
+                  <td>{tx.member_name}</td>
                 </tr>
                 <tr>
                   <th>Member Number</th>
-                  <td>{member?.member_number}</td>
+                  <td>{tx.member_number}</td>
                 </tr>
                 <tr>
                   <th>Transaction Type</th>
@@ -303,7 +296,7 @@ export default function TransactionManagement() {
                 </tr>
                 <tr>
                   <th>Recorded By</th>
-                  <td>{tx.recorded_by_name || '-'}</td>
+                  <td>{tx.recorded_by_name}</td>
                 </tr>
               </tbody>
             </table>
@@ -319,8 +312,8 @@ export default function TransactionManagement() {
   };
 
   const filteredTransactions = transactions.filter((tx) =>
-    (tx.member?.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-    (tx.member?.member_number?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+    (tx.member_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+    (tx.member_number?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
   return (
@@ -365,8 +358,8 @@ export default function TransactionManagement() {
                 <tr key={tx.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(tx.transaction_date).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    {tx.member?.profiles?.full_name || '-'}
-                    <div className="text-xs text-gray-500">{tx.member?.member_number}</div>
+                    {tx.member_name}
+                    <div className="text-xs text-gray-500">{tx.member_number}</div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
@@ -378,7 +371,7 @@ export default function TransactionManagement() {
                     {tx.transaction_type === 'withdrawal' ? '-' : '+'}${Number(tx.amount).toLocaleString()}
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-[#008080]">${Number(tx.balance_after).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{tx.recorded_by_name || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{tx.recorded_by_name}</td>
                   <td className="px-6 py-4">
                     <button
                       onClick={() => { setSelectedTransaction(tx); setShowReceiptModal(true); }}
@@ -399,4 +392,3 @@ export default function TransactionManagement() {
     </div>
   );
 }
-
