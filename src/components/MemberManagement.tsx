@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member, Profile } from '../lib/supabase';
-import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, Loader } from 'lucide-react';
+import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle } from 'lucide-react';
 
 export default function MemberManagement() {
   const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
@@ -9,6 +9,7 @@ export default function MemberManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ✅ Load members when component mounts
   useEffect(() => {
     loadMembers();
   }, []);
@@ -18,6 +19,7 @@ export default function MemberManagement() {
       .from('members')
       .select('*, profiles(*)')
       .order('created_at', { ascending: false });
+
     if (error) console.error('Error loading members:', error.message);
     setMembers(data || []);
   };
@@ -51,7 +53,6 @@ export default function MemberManagement() {
       setError('');
       setSuccess(false);
       setSubmitting(true);
-      setLoading(true);
 
       try {
         const response = await fetch(
@@ -76,13 +77,15 @@ export default function MemberManagement() {
         );
 
         const result = await response.json();
+        console.log('Response from Edge Function:', result);
 
         if (!result.success) throw new Error(result.error || 'Registration failed');
 
+        await new Promise((res) => setTimeout(res, 800));
         await loadMembers();
+
         setSuccess(true);
 
-        // Auto-close modal after 2 seconds
         setTimeout(() => {
           setFormData({
             email: '',
@@ -101,7 +104,6 @@ export default function MemberManagement() {
         setError(err.message || 'Failed to register member');
       } finally {
         setSubmitting(false);
-        setLoading(false);
       }
     };
 
@@ -200,7 +202,28 @@ export default function MemberManagement() {
                 disabled={submitting}
                 className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {submitting && <Loader className="animate-spin w-5 h-5" />}
+                {submitting && (
+                  <svg
+                    className="animate-spin h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    ></path>
+                  </svg>
+                )}
                 {submitting ? 'Adding...' : 'Add Member'}
               </button>
               <button
@@ -268,11 +291,21 @@ export default function MemberManagement() {
           <tbody className="divide-y divide-gray-200">
             {filteredMembers.map((member) => (
               <tr key={member.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium text-gray-800">{member.member_number}</td>
-                <td className="px-6 py-4 text-sm text-gray-800">{member.profiles?.full_name || member.full_name || '-'}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.email || member.email || '-'}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.phone || member.phone || '-'}</td>
-                <td className="px-6 py-4 text-sm font-semibold text-[#008080]">${Number(member.account_balance).toLocaleString()}</td>
+                <td className="px-6 py-4 text-sm font-medium text-gray-800">
+                  {member.member_number}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-800">
+                  {member.profiles?.full_name || member.full_name || '-'}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  {member.profiles?.email || member.email || '-'}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  {member.profiles?.phone || member.phone || '-'}
+                </td>
+                <td className="px-6 py-4 text-sm font-semibold text-[#008080]">
+                  ${Number(member.account_balance).toLocaleString()}
+                </td>
                 <td className="px-6 py-4">
                   <span
                     className={`status-badge ${
@@ -294,7 +327,9 @@ export default function MemberManagement() {
                     <Eye className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => alert('Edit ' + (member.profiles?.full_name || member.full_name))}
+                    onClick={() =>
+                      alert('Edit ' + (member.profiles?.full_name || member.full_name))
+                    }
                     className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -319,15 +354,42 @@ export default function MemberManagement() {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 relative">
             <h2 className="text-xl font-bold mb-4">Member Details</h2>
             <div className="space-y-2 text-gray-700">
-              <p><strong>Full Name:</strong> {showDetailsModal.profiles?.full_name || showDetailsModal.full_name || '-'}</p>
-              <p><strong>Email:</strong> {showDetailsModal.profiles?.email || showDetailsModal.email || '-'}</p>
-              <p><strong>Phone:</strong> {showDetailsModal.profiles?.phone || showDetailsModal.phone || '-'}</p>
-              <p><strong>ID Number:</strong> {showDetailsModal.profiles?.id_number || showDetailsModal.id_number || '-'}</p>
-              <p><strong>Date of Birth:</strong> {showDetailsModal.profiles?.date_of_birth || showDetailsModal.date_of_birth || '-'}</p>
-              <p><strong>Address:</strong> {showDetailsModal.profiles?.address || showDetailsModal.address || '-'}</p>
-              <p><strong>Member Number:</strong> {showDetailsModal.member_number}</p>
-              <p><strong>Balance:</strong> ${Number(showDetailsModal.account_balance).toLocaleString()}</p>
-              <p><strong>Status:</strong> {showDetailsModal.status}</p>
+              <p>
+                <strong>Full Name:</strong>{' '}
+                {showDetailsModal.profiles?.full_name || showDetailsModal.full_name || '-'}
+              </p>
+              <p>
+                <strong>Email:</strong>{' '}
+                {showDetailsModal.profiles?.email || showDetailsModal.email || '-'}
+              </p>
+              <p>
+                <strong>Phone:</strong>{' '}
+                {showDetailsModal.profiles?.phone || showDetailsModal.phone || '-'}
+              </p>
+              <p>
+                <strong>ID Number:</strong>{' '}
+                {showDetailsModal.profiles?.id_number || showDetailsModal.id_number || '-'}
+              </p>
+              <p>
+                <strong>Date of Birth:</strong>{' '}
+                {showDetailsModal.profiles?.date_of_birth ||
+                  showDetailsModal.date_of_birth ||
+                  '-'}
+              </p>
+              <p>
+                <strong>Address:</strong>{' '}
+                {showDetailsModal.profiles?.address || showDetailsModal.address || '-'}
+              </p>
+              <p>
+                <strong>Member Number:</strong> {showDetailsModal.member_number}
+              </p>
+              <p>
+                <strong>Balance:</strong> $
+                {Number(showDetailsModal.account_balance).toLocaleString()}
+              </p>
+              <p>
+                <strong>Status:</strong> {showDetailsModal.status}
+              </p>
             </div>
             <button
               onClick={() => setShowDetailsModal(null)}
