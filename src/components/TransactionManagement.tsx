@@ -152,8 +152,8 @@ export default function TransactionManagement() {
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-lg">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Record Transaction</h2>
+        <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Record Transaction</h2>
           {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">{error}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -167,14 +167,14 @@ export default function TransactionManagement() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
               />
               {memberSearch && filteredMembers.length > 0 && (
-                <ul className="absolute z-50 bg-white border border-gray-200 mt-1 w-full max-h-40 overflow-auto rounded-xl shadow-lg">
+                <ul className="absolute z-50 bg-white border border-gray-200 mt-1 w-full max-h-44 overflow-auto rounded-xl shadow-lg">
                   {filteredMembers.map((m) => (
                     <li
                       key={m.id}
-                      className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                      className="px-4 py-2 hover:bg-[#f0f8f8] cursor-pointer transition-colors"
                       onClick={() => handleSelectMember(m)}
                     >
-                      {m.full_name} ({m.member_number})
+                      {m.full_name} <span className="text-xs text-gray-500">({m.member_number})</span>
                     </li>
                   ))}
                 </ul>
@@ -186,7 +186,7 @@ export default function TransactionManagement() {
               <select
                 value={formData.transaction_type}
                 onChange={(e) => setFormData({ ...formData, transaction_type: e.target.value as any })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none bg-[#f9f9f9]"
               >
                 <option value="deposit">Deposit</option>
                 <option value="withdrawal">Withdrawal</option>
@@ -218,7 +218,7 @@ export default function TransactionManagement() {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <button type="submit" disabled={loading || loadingMembers} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50 hover:bg-[#006666] transition-colors">
+              <button type="submit" disabled={loading || loadingMembers} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors shadow-md">
                 {loading ? 'Recording...' : 'Record Transaction'}
               </button>
               <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors">
@@ -234,6 +234,7 @@ export default function TransactionManagement() {
   // --- Receipt Modal ---
   const ReceiptModal = () => {
     if (!selectedTransaction) return null;
+
     const tx = selectedTransaction;
 
     const handlePrint = () => {
@@ -246,7 +247,7 @@ export default function TransactionManagement() {
               <title>Receipt</title>
               <style>
                 body { font-family: 'Arial', sans-serif; padding: 20px; background: #f5f5f5; }
-                .receipt { max-width: 500px; margin: auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+                .receipt { max-width: 500px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
                 .header { text-align: center; margin-bottom: 20px; }
                 .header h1 { margin: 0; color: #008080; }
                 .header p { margin: 2px 0; color: #555; font-size: 14px; }
@@ -272,7 +273,7 @@ export default function TransactionManagement() {
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-lg">
+        <div className="bg-white rounded-2xl p-6 max-w-md w-full">
           <div id="receipt-content" className="text-sm text-gray-800">
             <div className="header">
               <h1>My Savings System</h1>
@@ -281,25 +282,45 @@ export default function TransactionManagement() {
             </div>
             <table>
               <tbody>
-                <tr><th>Member</th><td>{tx.member_name}</td></tr>
-                <tr><th>Member Number</th><td>{tx.member_number}</td></tr>
-                <tr><th>Transaction Type</th><td>{tx.transaction_type}</td></tr>
-                <tr><th>Amount</th><td>${Number(tx.amount).toLocaleString()}</td></tr>
-                <tr><th>Balance Before</th><td>${Number(tx.balance_before).toLocaleString()}</td></tr>
-                <tr><th>Balance After</th><td className="total">${Number(tx.balance_after).toLocaleString()}</td></tr>
-                <tr><th>Description</th><td>{tx.description || '-'}</td></tr>
-                <tr><th>Recorded By</th><td>{tx.recorded_by_name}</td></tr>
+                <tr>
+                  <th>Member</th>
+                  <td>{tx.member_name}</td>
+                </tr>
+                <tr>
+                  <th>Member Number</th>
+                  <td>{tx.member_number}</td>
+                </tr>
+                <tr>
+                  <th>Transaction Type</th>
+                  <td>{tx.transaction_type}</td>
+                </tr>
+                <tr>
+                  <th>Amount</th>
+                  <td>${Number(tx.amount).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <th>Balance Before</th>
+                  <td>${Number(tx.balance_before).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <th>Balance After</th>
+                  <td className="total">${Number(tx.balance_after).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <th>Description</th>
+                  <td>{tx.description || '-'}</td>
+                </tr>
+                <tr>
+                  <th>Recorded By</th>
+                  <td>{tx.recorded_by_name}</td>
+                </tr>
               </tbody>
             </table>
             <div className="footer">Thank you for using our service!</div>
           </div>
           <div className="flex gap-3 pt-4">
-            <button onClick={handlePrint} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl hover:shadow-md transition-shadow">
-              Print / Download
-            </button>
-            <button onClick={() => setShowReceiptModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors">
-              Cancel
-            </button>
+            <button onClick={handlePrint} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors">Print / Download</button>
+            <button onClick={() => setShowReceiptModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">Cancel</button>
           </div>
         </div>
       </div>
@@ -312,30 +333,29 @@ export default function TransactionManagement() {
   );
 
   return (
-    <div>
+    <div className="p-4">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Transaction Management</h2>
         <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors">
-          <DollarSign className="w-5 h-5" /> New Transaction
+          <DollarSign className="w-5 h-5" />
+          New Transaction
         </button>
       </div>
 
-      <div className="mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search transactions..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-          />
-        </div>
+      <div className="mb-4 relative">
+        <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search transactions..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+        />
       </div>
 
-      <div className="bg-white rounded-3xl shadow overflow-hidden">
+      <div className="bg-white rounded-2xl card-shadow overflow-hidden shadow-md">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-max">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Date</th>
@@ -349,18 +369,15 @@ export default function TransactionManagement() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredTransactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-gray-50 cursor-pointer transition-colors">
+                <tr key={tx.id} className="hover:bg-[#f0f8f8] transition-colors cursor-pointer">
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(tx.transaction_date).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">
                     {tx.member_name}
-                    <div className="text-xs text-gray-500">{tx.member_number}</div>
+                    <div className="text-xs text-gray-500 italic">{tx.member_number}</div>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      {tx.transaction_type === 'withdrawal' ? <ArrowDownCircle className="w-5 h-5 text-red-500" /> : <ArrowUpCircle className="w-5 h-5 text-green-500" />}
-                      <span className="text-sm capitalize">{tx.transaction_type}</span>
-                      {tx.description && <Info className="w-4 h-4 text-gray-400 cursor-help" title={tx.description} />}
-                    </div>
+                  <td className="px-6 py-4 flex items-center gap-2">
+                    {tx.transaction_type === 'withdrawal' ? <ArrowDownCircle className="w-5 h-5 text-red-500" /> : <ArrowUpCircle className="w-5 h-5 text-green-500" />}
+                    <span className="text-sm capitalize">{tx.transaction_type}</span>
                   </td>
                   <td className={`px-6 py-4 text-sm font-semibold ${tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'}`}>
                     {tx.transaction_type === 'withdrawal' ? '-' : '+'}${Number(tx.amount).toLocaleString()}
@@ -387,3 +404,4 @@ export default function TransactionManagement() {
     </div>
   );
 }
+
