@@ -18,7 +18,6 @@ export default function TransactionManagement() {
     loadMembers();
   }, []);
 
-  // --- Load transactions with member_name and recorded_by_name ---
   const loadTransactions = async () => {
     try {
       const { data, error } = await supabase
@@ -72,8 +71,13 @@ export default function TransactionManagement() {
       amount: '',
       description: '',
     });
+    const [memberSearch, setMemberSearch] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const filteredMembers = members.filter((m) =>
+      m.full_name.toLowerCase().includes(memberSearch.toLowerCase())
+    );
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -144,12 +148,23 @@ export default function TransactionManagement() {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Record Transaction</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Record Transaction</h2>
           {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">{error}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Member</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search Member</label>
+              <input
+                type="text"
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                placeholder="Type member name..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Member</label>
               <select
                 value={formData.member_id}
                 onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
@@ -157,9 +172,9 @@ export default function TransactionManagement() {
                 required
               >
                 <option value="">Select member</option>
-                {members.map((m) => (
+                {filteredMembers.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.full_name || m.member_number || String(m.id).slice(0, 8)}
+                    {m.full_name} ({m.member_number})
                   </option>
                 ))}
               </select>
