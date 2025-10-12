@@ -18,23 +18,30 @@ export default function TransactionManagement() {
     loadMembers();
   }, []);
 
-  // --- Load transactions with member_name and recorded_by_name ---
+  // --- Load transactions with member info and flatten ---
   const loadTransactions = async () => {
     try {
       const { data, error } = await supabase
         .from('transactions')
         .select(`
           *,
-          members!transactions_member_id_fkey(full_name, member_number, account_balance, total_contributions),
+          members!transactions_member_id_fkey(
+            id,
+            member_number,
+            account_balance,
+            total_contributions,
+            profiles(id, full_name)
+          ),
           profiles!transactions_recorded_by_fkey(full_name)
         `)
         .order('transaction_date', { ascending: false });
 
       if (error) throw error;
 
+      // Flatten the data
       const flattened = (data || []).map((tx: any) => ({
         ...tx,
-        member_name: tx.members?.full_name || '-',
+        member_name: tx.members?.profiles?.full_name || tx.members?.member_number || '-',
         member_number: tx.members?.member_number || '-',
         recorded_by_name: tx['profiles!transactions_recorded_by_fkey']?.full_name || '-',
       }));
@@ -46,12 +53,21 @@ export default function TransactionManagement() {
     }
   };
 
+  // --- Load members with profiles ---
   const loadMembers = async () => {
     setLoadingMembers(true);
     try {
       const { data: membersData, error: membersError } = await supabase
         .from('members')
-        .select('id, full_name, member_number, account_balance, total_contributions')
+        .select(`
+          id,
+          account_balance,
+          profile_id,
+          total_contributions,
+          member_number,
+          created_at,
+          profiles(id, full_name)
+        `)
         .order('created_at', { ascending: false });
 
       if (membersError) throw membersError;
@@ -97,19 +113,15 @@ export default function TransactionManagement() {
           balanceAfter = balanceBefore - amount;
         }
 
-        const { data: txData, error: txError } = await supabase
-          .from('transactions')
-          .insert({
-            member_id: formData.member_id,
-            transaction_type: formData.transaction_type,
-            amount,
-            balance_before: balanceBefore,
-            balance_after: balanceAfter,
-            description: formData.description,
-            recorded_by: profile?.id,
-          })
-          .select()
-          .single();
+        const { data: txData, error: txError } = await supabase.from('transactions').insert({
+          member_id: formData.member_id,
+          transaction_type: formData.transaction_type,
+          amount,
+          balance_before: balanceBefore,
+          balance_after: balanceAfter,
+          description: formData.description,
+          recorded_by: profile?.id,
+        }).select().single();
 
         if (txError) throw txError;
 
@@ -125,14 +137,17 @@ export default function TransactionManagement() {
 
         if (updateError) throw updateError;
 
-        setShowAddModal(false);
-        await loadTransactions();
-        setSelectedTransaction({
+        // Flatten the newly added transaction immediately
+        const flattenedTx = {
           ...txData,
-          member_name: member.full_name,
-          member_number: member.member_number,
+          member_name: member.profiles?.full_name || member.member_number || '-',
+          member_number: member.member_number || '-',
           recorded_by_name: profile?.full_name || '-',
-        });
+        };
+
+        setShowAddModal(false);
+        setTransactions((prev) => [flattenedTx, ...prev]);
+        setSelectedTransaction(flattenedTx);
         setShowReceiptModal(true);
       } catch (err: any) {
         setError(err.message || 'Failed to record transaction');
@@ -146,7 +161,6 @@ export default function TransactionManagement() {
         <div className="bg-white rounded-2xl p-6 max-w-md w-full">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Record Transaction</h2>
           {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">{error}</div>}
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Member</label>
@@ -159,7 +173,7 @@ export default function TransactionManagement() {
                 <option value="">Select member</option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.full_name || m.member_number || String(m.id).slice(0, 8)}
+                    {m.profiles?.full_name || m.member_number || String(m.id).slice(0, 8)}
                   </option>
                 ))}
               </select>
