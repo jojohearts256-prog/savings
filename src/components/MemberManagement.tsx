@@ -9,15 +9,18 @@ export default function MemberManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ✅ Load members when component mounts
   useEffect(() => {
     loadMembers();
   }, []);
 
   const loadMembers = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('members')
       .select('*, profiles(*)')
       .order('created_at', { ascending: false });
+
+    if (error) console.error('Error loading members:', error.message);
     setMembers(data || []);
   };
 
@@ -30,6 +33,7 @@ export default function MemberManagement() {
       (m.profiles?.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
+  // ✅ Modal for adding new members
   const AddMemberModal = () => {
     const [formData, setFormData] = useState({
       email: '',
@@ -46,47 +50,46 @@ export default function MemberManagement() {
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setError('');
+      setSuccess(false);
       setLoading(true);
 
       try {
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            ...formData,
-            role: 'member',
-            member_data: {
-              address: formData.address,
-              date_of_birth: formData.date_of_birth,
-              phone: formData.phone,
-              id_number: formData.id_number,
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             },
-          }),
-        });
+            body: JSON.stringify({
+              ...formData,
+              role: 'member',
+              member_data: {
+                address: formData.address,
+                date_of_birth: formData.date_of_birth,
+                phone: formData.phone,
+                id_number: formData.id_number,
+              },
+            }),
+          }
+        );
 
         const result = await response.json();
-        if (!result.success) throw new Error(result.error);
+        console.log('Response from Edge Function:', result); // 👈 Added for debugging
 
-        // Fetch the newly created member
-        const profileId = result.profile_id;
-        if (profileId) {
-          const { data: newMember, error: memberError } = await supabase
-            .from('members')
-            .select('*, profiles(*)')
-            .eq('profile_id', profileId)
-            .single();
+        if (!result.success) throw new Error(result.error || 'Registration failed');
 
-          if (!memberError && newMember) {
-            setMembers(prev => [newMember, ...prev]);
-          }
-        }
+        // ✅ Small wait to ensure Supabase finishes inserting
+        await new Promise((res) => setTimeout(res, 800));
 
+        // ✅ Re-fetch all members (ensures instant update)
+        await loadMembers();
+
+        // ✅ Show success message
         setSuccess(true);
 
-        // Reset form after short delay and close modal
+        // ✅ Auto close modal after 2 seconds
         setTimeout(() => {
           setFormData({
             email: '',
@@ -97,11 +100,11 @@ export default function MemberManagement() {
             address: '',
             date_of_birth: '',
           });
-          setShowAddModal(false);
           setSuccess(false);
+          setShowAddModal(false);
         }, 2000);
-
       } catch (err: any) {
+        console.error('Registration error:', err.message);
         setError(err.message || 'Failed to register member');
       } finally {
         setLoading(false);
@@ -225,7 +228,7 @@ export default function MemberManagement() {
     setLoading(true);
     const { error } = await supabase.from('members').delete().eq('id', memberId);
     if (error) alert('Failed to delete member: ' + error.message);
-    else setMembers(prev => prev.filter(m => m.id !== memberId));
+    else setMembers((prev) => prev.filter((m) => m.id !== memberId));
     setLoading(false);
   };
 
@@ -233,7 +236,10 @@ export default function MemberManagement() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Member Management</h2>
-        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl">
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl"
+        >
           <UserPlus className="w-5 h-5" /> Add Member
         </button>
       </div>
@@ -267,26 +273,53 @@ export default function MemberManagement() {
           <tbody className="divide-y divide-gray-200">
             {filteredMembers.map((member) => (
               <tr key={member.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium text-gray-800">{member.member_number}</td>
-                <td className="px-6 py-4 text-sm text-gray-800">{member.profiles?.full_name || member.full_name || '-'}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.email || member.email || '-'}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.phone || member.phone || '-'}</td>
-                <td className="px-6 py-4 text-sm font-semibold text-[#008080]">${Number(member.account_balance).toLocaleString()}</td>
+                <td className="px-6 py-4 text-sm font-medium text-gray-800">
+                  {member.member_number}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-800">
+                  {member.profiles?.full_name || member.full_name || '-'}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  {member.profiles?.email || member.email || '-'}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  {member.profiles?.phone || member.phone || '-'}
+                </td>
+                <td className="px-6 py-4 text-sm font-semibold text-[#008080]">
+                  ${Number(member.account_balance).toLocaleString()}
+                </td>
                 <td className="px-6 py-4">
-                  <span className={`status-badge ${
-                    member.status === 'active' ? 'bg-green-100 text-green-800' :
-                    member.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>{member.status}</span>
+                  <span
+                    className={`status-badge ${
+                      member.status === 'active'
+                        ? 'bg-green-100 text-green-800'
+                        : member.status === 'inactive'
+                        ? 'bg-gray-100 text-gray-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}
+                  >
+                    {member.status}
+                  </span>
                 </td>
                 <td className="px-6 py-4 flex gap-2">
-                  <button onClick={() => setShowDetailsModal(member)} className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition">
+                  <button
+                    onClick={() => setShowDetailsModal(member)}
+                    className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition"
+                  >
                     <Eye className="w-4 h-4" />
                   </button>
-                  <button onClick={() => alert('Edit ' + (member.profiles?.full_name || member.full_name))} className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition">
+                  <button
+                    onClick={() =>
+                      alert('Edit ' + (member.profiles?.full_name || member.full_name))
+                    }
+                    className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition"
+                  >
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button onClick={() => deleteMember(member.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition">
+                  <button
+                    onClick={() => deleteMember(member.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                  >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </td>
@@ -303,17 +336,49 @@ export default function MemberManagement() {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 relative">
             <h2 className="text-xl font-bold mb-4">Member Details</h2>
             <div className="space-y-2 text-gray-700">
-              <p><strong>Full Name:</strong> {showDetailsModal.profiles?.full_name || showDetailsModal.full_name || '-'}</p>
-              <p><strong>Email:</strong> {showDetailsModal.profiles?.email || showDetailsModal.email || '-'}</p>
-              <p><strong>Phone:</strong> {showDetailsModal.profiles?.phone || showDetailsModal.phone || '-'}</p>
-              <p><strong>ID Number:</strong> {showDetailsModal.profiles?.id_number || showDetailsModal.id_number || '-'}</p>
-              <p><strong>Date of Birth:</strong> {showDetailsModal.profiles?.date_of_birth || showDetailsModal.date_of_birth || '-'}</p>
-              <p><strong>Address:</strong> {showDetailsModal.profiles?.address || showDetailsModal.address || '-'}</p>
-              <p><strong>Member Number:</strong> {showDetailsModal.member_number}</p>
-              <p><strong>Balance:</strong> ${Number(showDetailsModal.account_balance).toLocaleString()}</p>
-              <p><strong>Status:</strong> {showDetailsModal.status}</p>
+              <p>
+                <strong>Full Name:</strong>{' '}
+                {showDetailsModal.profiles?.full_name || showDetailsModal.full_name || '-'}
+              </p>
+              <p>
+                <strong>Email:</strong>{' '}
+                {showDetailsModal.profiles?.email || showDetailsModal.email || '-'}
+              </p>
+              <p>
+                <strong>Phone:</strong>{' '}
+                {showDetailsModal.profiles?.phone || showDetailsModal.phone || '-'}
+              </p>
+              <p>
+                <strong>ID Number:</strong>{' '}
+                {showDetailsModal.profiles?.id_number || showDetailsModal.id_number || '-'}
+              </p>
+              <p>
+                <strong>Date of Birth:</strong>{' '}
+                {showDetailsModal.profiles?.date_of_birth ||
+                  showDetailsModal.date_of_birth ||
+                  '-'}
+              </p>
+              <p>
+                <strong>Address:</strong>{' '}
+                {showDetailsModal.profiles?.address || showDetailsModal.address || '-'}
+              </p>
+              <p>
+                <strong>Member Number:</strong> {showDetailsModal.member_number}
+              </p>
+              <p>
+                <strong>Balance:</strong> $
+                {Number(showDetailsModal.account_balance).toLocaleString()}
+              </p>
+              <p>
+                <strong>Status:</strong> {showDetailsModal.status}
+              </p>
             </div>
-            <button onClick={() => setShowDetailsModal(null)} className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 font-bold text-xl">&times;</button>
+            <button
+              onClick={() => setShowDetailsModal(null)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 font-bold text-xl"
+            >
+              &times;
+            </button>
           </div>
         </div>
       )}
