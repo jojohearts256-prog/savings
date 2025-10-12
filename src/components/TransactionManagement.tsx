@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member, Profile } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowUpCircle, ArrowDownCircle, DollarSign, Search, Printer } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, DollarSign, Search, Printer, Info } from 'lucide-react';
 
 export default function TransactionManagement() {
   const { profile } = useAuth();
@@ -63,6 +63,7 @@ export default function TransactionManagement() {
     }
   };
 
+  // --- Add Transaction Modal ---
   const AddTransactionModal = () => {
     const [formData, setFormData] = useState({
       member_id: '',
@@ -217,10 +218,10 @@ export default function TransactionManagement() {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <button type="submit" disabled={loading || loadingMembers} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50">
+              <button type="submit" disabled={loading || loadingMembers} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50 hover:bg-[#006666] transition-colors">
                 {loading ? 'Recording...' : 'Record Transaction'}
               </button>
-              <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">
+              <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
             </div>
@@ -230,6 +231,7 @@ export default function TransactionManagement() {
     );
   };
 
+  // --- Receipt Modal ---
   const ReceiptModal = () => {
     if (!selectedTransaction) return null;
     const tx = selectedTransaction;
@@ -279,45 +281,25 @@ export default function TransactionManagement() {
             </div>
             <table>
               <tbody>
-                <tr>
-                  <th>Member</th>
-                  <td>{tx.member_name}</td>
-                </tr>
-                <tr>
-                  <th>Member Number</th>
-                  <td>{tx.member_number}</td>
-                </tr>
-                <tr>
-                  <th>Transaction Type</th>
-                  <td>{tx.transaction_type}</td>
-                </tr>
-                <tr>
-                  <th>Amount</th>
-                  <td>${Number(tx.amount).toLocaleString()}</td>
-                </tr>
-                <tr>
-                  <th>Balance Before</th>
-                  <td>${Number(tx.balance_before).toLocaleString()}</td>
-                </tr>
-                <tr>
-                  <th>Balance After</th>
-                  <td className="total">${Number(tx.balance_after).toLocaleString()}</td>
-                </tr>
-                <tr>
-                  <th>Description</th>
-                  <td>{tx.description || '-'}</td>
-                </tr>
-                <tr>
-                  <th>Recorded By</th>
-                  <td>{tx.recorded_by_name}</td>
-                </tr>
+                <tr><th>Member</th><td>{tx.member_name}</td></tr>
+                <tr><th>Member Number</th><td>{tx.member_number}</td></tr>
+                <tr><th>Transaction Type</th><td>{tx.transaction_type}</td></tr>
+                <tr><th>Amount</th><td>${Number(tx.amount).toLocaleString()}</td></tr>
+                <tr><th>Balance Before</th><td>${Number(tx.balance_before).toLocaleString()}</td></tr>
+                <tr><th>Balance After</th><td className="total">${Number(tx.balance_after).toLocaleString()}</td></tr>
+                <tr><th>Description</th><td>{tx.description || '-'}</td></tr>
+                <tr><th>Recorded By</th><td>{tx.recorded_by_name}</td></tr>
               </tbody>
             </table>
             <div className="footer">Thank you for using our service!</div>
           </div>
           <div className="flex gap-3 pt-4">
-            <button onClick={handlePrint} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl">Print / Download</button>
-            <button onClick={() => setShowReceiptModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">Cancel</button>
+            <button onClick={handlePrint} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl hover:shadow-md transition-shadow">
+              Print / Download
+            </button>
+            <button onClick={() => setShowReceiptModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
           </div>
         </div>
       </div>
@@ -333,9 +315,8 @@ export default function TransactionManagement() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Transaction Management</h2>
-        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl">
-          <DollarSign className="w-5 h-5" />
-          New Transaction
+        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors">
+          <DollarSign className="w-5 h-5" /> New Transaction
         </button>
       </div>
 
@@ -368,7 +349,7 @@ export default function TransactionManagement() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredTransactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-gray-50">
+                <tr key={tx.id} className="hover:bg-gray-50 cursor-pointer transition-colors">
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(tx.transaction_date).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">
                     {tx.member_name}
@@ -376,8 +357,9 @@ export default function TransactionManagement() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      {tx.transaction_type === 'withdrawal' ? <ArrowDownCircle className="w-4 h-4 text-red-500" /> : <ArrowUpCircle className="w-4 h-4 text-green-500" />}
+                      {tx.transaction_type === 'withdrawal' ? <ArrowDownCircle className="w-5 h-5 text-red-500" /> : <ArrowUpCircle className="w-5 h-5 text-green-500" />}
                       <span className="text-sm capitalize">{tx.transaction_type}</span>
+                      {tx.description && <Info className="w-4 h-4 text-gray-400 cursor-help" title={tx.description} />}
                     </div>
                   </td>
                   <td className={`px-6 py-4 text-sm font-semibold ${tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'}`}>
@@ -388,7 +370,7 @@ export default function TransactionManagement() {
                   <td className="px-6 py-4">
                     <button
                       onClick={() => { setSelectedTransaction(tx); setShowReceiptModal(true); }}
-                      className="flex items-center gap-1 px-3 py-1 bg-[#008080] text-white rounded-xl text-sm hover:bg-[#006666]"
+                      className="flex items-center gap-1 px-3 py-1 bg-[#008080] text-white rounded-xl text-sm hover:bg-[#006666] transition-colors"
                     >
                       <Printer className="w-4 h-4" /> Print
                     </button>
