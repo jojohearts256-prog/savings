@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member, Profile } from '../lib/supabase';
-import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle } from 'lucide-react';
+import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, Loader } from 'lucide-react';
 
 export default function MemberManagement() {
   const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
@@ -9,7 +9,6 @@ export default function MemberManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // ✅ Load members when component mounts
   useEffect(() => {
     loadMembers();
   }, []);
@@ -19,7 +18,6 @@ export default function MemberManagement() {
       .from('members')
       .select('*, profiles(*)')
       .order('created_at', { ascending: false });
-
     if (error) console.error('Error loading members:', error.message);
     setMembers(data || []);
   };
@@ -46,11 +44,13 @@ export default function MemberManagement() {
     });
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setError('');
       setSuccess(false);
+      setSubmitting(true);
       setLoading(true);
 
       try {
@@ -76,20 +76,13 @@ export default function MemberManagement() {
         );
 
         const result = await response.json();
-        console.log('Response from Edge Function:', result); // 👈 Added for debugging
 
         if (!result.success) throw new Error(result.error || 'Registration failed');
 
-        // ✅ Small wait to ensure Supabase finishes inserting
-        await new Promise((res) => setTimeout(res, 800));
-
-        // ✅ Re-fetch all members (ensures instant update)
         await loadMembers();
-
-        // ✅ Show success message
         setSuccess(true);
 
-        // ✅ Auto close modal after 2 seconds
+        // Auto-close modal after 2 seconds
         setTimeout(() => {
           setFormData({
             email: '',
@@ -107,6 +100,7 @@ export default function MemberManagement() {
         console.error('Registration error:', err.message);
         setError(err.message || 'Failed to register member');
       } finally {
+        setSubmitting(false);
         setLoading(false);
       }
     };
@@ -203,10 +197,11 @@ export default function MemberManagement() {
             <div className="flex gap-3 pt-4">
               <button
                 type="submit"
-                disabled={loading}
-                className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50"
+                disabled={submitting}
+                className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {loading ? 'Adding...' : 'Add Member'}
+                {submitting && <Loader className="animate-spin w-5 h-5" />}
+                {submitting ? 'Adding...' : 'Add Member'}
               </button>
               <button
                 type="button"
@@ -273,21 +268,11 @@ export default function MemberManagement() {
           <tbody className="divide-y divide-gray-200">
             {filteredMembers.map((member) => (
               <tr key={member.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium text-gray-800">
-                  {member.member_number}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-800">
-                  {member.profiles?.full_name || member.full_name || '-'}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">
-                  {member.profiles?.email || member.email || '-'}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">
-                  {member.profiles?.phone || member.phone || '-'}
-                </td>
-                <td className="px-6 py-4 text-sm font-semibold text-[#008080]">
-                  ${Number(member.account_balance).toLocaleString()}
-                </td>
+                <td className="px-6 py-4 text-sm font-medium text-gray-800">{member.member_number}</td>
+                <td className="px-6 py-4 text-sm text-gray-800">{member.profiles?.full_name || member.full_name || '-'}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.email || member.email || '-'}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">{member.profiles?.phone || member.phone || '-'}</td>
+                <td className="px-6 py-4 text-sm font-semibold text-[#008080]">${Number(member.account_balance).toLocaleString()}</td>
                 <td className="px-6 py-4">
                   <span
                     className={`status-badge ${
@@ -309,9 +294,7 @@ export default function MemberManagement() {
                     <Eye className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() =>
-                      alert('Edit ' + (member.profiles?.full_name || member.full_name))
-                    }
+                    onClick={() => alert('Edit ' + (member.profiles?.full_name || member.full_name))}
                     className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -336,42 +319,15 @@ export default function MemberManagement() {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 relative">
             <h2 className="text-xl font-bold mb-4">Member Details</h2>
             <div className="space-y-2 text-gray-700">
-              <p>
-                <strong>Full Name:</strong>{' '}
-                {showDetailsModal.profiles?.full_name || showDetailsModal.full_name || '-'}
-              </p>
-              <p>
-                <strong>Email:</strong>{' '}
-                {showDetailsModal.profiles?.email || showDetailsModal.email || '-'}
-              </p>
-              <p>
-                <strong>Phone:</strong>{' '}
-                {showDetailsModal.profiles?.phone || showDetailsModal.phone || '-'}
-              </p>
-              <p>
-                <strong>ID Number:</strong>{' '}
-                {showDetailsModal.profiles?.id_number || showDetailsModal.id_number || '-'}
-              </p>
-              <p>
-                <strong>Date of Birth:</strong>{' '}
-                {showDetailsModal.profiles?.date_of_birth ||
-                  showDetailsModal.date_of_birth ||
-                  '-'}
-              </p>
-              <p>
-                <strong>Address:</strong>{' '}
-                {showDetailsModal.profiles?.address || showDetailsModal.address || '-'}
-              </p>
-              <p>
-                <strong>Member Number:</strong> {showDetailsModal.member_number}
-              </p>
-              <p>
-                <strong>Balance:</strong> $
-                {Number(showDetailsModal.account_balance).toLocaleString()}
-              </p>
-              <p>
-                <strong>Status:</strong> {showDetailsModal.status}
-              </p>
+              <p><strong>Full Name:</strong> {showDetailsModal.profiles?.full_name || showDetailsModal.full_name || '-'}</p>
+              <p><strong>Email:</strong> {showDetailsModal.profiles?.email || showDetailsModal.email || '-'}</p>
+              <p><strong>Phone:</strong> {showDetailsModal.profiles?.phone || showDetailsModal.phone || '-'}</p>
+              <p><strong>ID Number:</strong> {showDetailsModal.profiles?.id_number || showDetailsModal.id_number || '-'}</p>
+              <p><strong>Date of Birth:</strong> {showDetailsModal.profiles?.date_of_birth || showDetailsModal.date_of_birth || '-'}</p>
+              <p><strong>Address:</strong> {showDetailsModal.profiles?.address || showDetailsModal.address || '-'}</p>
+              <p><strong>Member Number:</strong> {showDetailsModal.member_number}</p>
+              <p><strong>Balance:</strong> ${Number(showDetailsModal.account_balance).toLocaleString()}</p>
+              <p><strong>Status:</strong> {showDetailsModal.status}</p>
             </div>
             <button
               onClick={() => setShowDetailsModal(null)}
