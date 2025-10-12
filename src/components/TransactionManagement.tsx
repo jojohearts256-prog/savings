@@ -63,7 +63,6 @@ export default function TransactionManagement() {
     }
   };
 
-  // --- Add Transaction Modal ---
   const AddTransactionModal = () => {
     const [formData, setFormData] = useState({
       member_id: '',
@@ -78,6 +77,11 @@ export default function TransactionManagement() {
     const filteredMembers = members.filter((m) =>
       m.full_name.toLowerCase().includes(memberSearch.toLowerCase())
     );
+
+    const handleSelectMember = (member: Member) => {
+      setFormData({ ...formData, member_id: String(member.id) });
+      setMemberSearch(member.full_name);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -147,37 +151,33 @@ export default function TransactionManagement() {
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+        <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-lg">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Record Transaction</h2>
           {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">{error}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search Member</label>
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Member</label>
               <input
                 type="text"
                 value={memberSearch}
                 onChange={(e) => setMemberSearch(e.target.value)}
-                placeholder="Type member name..."
+                placeholder="Search member..."
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Select Member</label>
-              <select
-                value={formData.member_id}
-                onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                required
-              >
-                <option value="">Select member</option>
-                {filteredMembers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.full_name} ({m.member_number})
-                  </option>
-                ))}
-              </select>
+              {memberSearch && filteredMembers.length > 0 && (
+                <ul className="absolute z-50 bg-white border border-gray-200 mt-1 w-full max-h-40 overflow-auto rounded-xl shadow-lg">
+                  {filteredMembers.map((m) => (
+                    <li
+                      key={m.id}
+                      className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                      onClick={() => handleSelectMember(m)}
+                    >
+                      {m.full_name} ({m.member_number})
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div>
@@ -217,7 +217,7 @@ export default function TransactionManagement() {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <button type="submit" disabled={loading || loadingMembers} className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50">
+              <button type="submit" disabled={loading || loadingMembers} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50">
                 {loading ? 'Recording...' : 'Record Transaction'}
               </button>
               <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">
@@ -230,10 +230,8 @@ export default function TransactionManagement() {
     );
   };
 
-  // --- Receipt Modal ---
   const ReceiptModal = () => {
     if (!selectedTransaction) return null;
-
     const tx = selectedTransaction;
 
     const handlePrint = () => {
@@ -246,7 +244,7 @@ export default function TransactionManagement() {
               <title>Receipt</title>
               <style>
                 body { font-family: 'Arial', sans-serif; padding: 20px; background: #f5f5f5; }
-                .receipt { max-width: 500px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                .receipt { max-width: 500px; margin: auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
                 .header { text-align: center; margin-bottom: 20px; }
                 .header h1 { margin: 0; color: #008080; }
                 .header p { margin: 2px 0; color: #555; font-size: 14px; }
@@ -272,7 +270,7 @@ export default function TransactionManagement() {
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+        <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-lg">
           <div id="receipt-content" className="text-sm text-gray-800">
             <div className="header">
               <h1>My Savings System</h1>
@@ -318,7 +316,7 @@ export default function TransactionManagement() {
             <div className="footer">Thank you for using our service!</div>
           </div>
           <div className="flex gap-3 pt-4">
-            <button onClick={handlePrint} className="flex-1 py-2 btn-primary text-white font-medium rounded-xl">Print / Download</button>
+            <button onClick={handlePrint} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl">Print / Download</button>
             <button onClick={() => setShowReceiptModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">Cancel</button>
           </div>
         </div>
@@ -335,7 +333,7 @@ export default function TransactionManagement() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Transaction Management</h2>
-        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl">
+        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl">
           <DollarSign className="w-5 h-5" />
           New Transaction
         </button>
@@ -354,7 +352,7 @@ export default function TransactionManagement() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl card-shadow overflow-hidden">
+      <div className="bg-white rounded-3xl shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -390,7 +388,7 @@ export default function TransactionManagement() {
                   <td className="px-6 py-4">
                     <button
                       onClick={() => { setSelectedTransaction(tx); setShowReceiptModal(true); }}
-                      className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700"
+                      className="flex items-center gap-1 px-3 py-1 bg-[#008080] text-white rounded-xl text-sm hover:bg-[#006666]"
                     >
                       <Printer className="w-4 h-4" /> Print
                     </button>
