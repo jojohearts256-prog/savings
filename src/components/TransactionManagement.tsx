@@ -25,7 +25,7 @@ export default function TransactionManagement() {
         .select(`
           *,
           members!transactions_member_id_fkey(full_name, member_number, account_balance, total_contributions),
-          profiles!transactions_recorded_by_fkey(full_name)
+          recorded_by:profiles!transactions_recorded_by_fkey(full_name)
         `)
         .order('transaction_date', { ascending: false });
 
@@ -35,7 +35,7 @@ export default function TransactionManagement() {
         ...tx,
         member_name: tx.members?.full_name || '-',
         member_number: tx.members?.member_number || '-',
-        recorded_by_name: tx['profiles!transactions_recorded_by_fkey']?.full_name || '-',
+        recorded_by_name: tx.recorded_by?.full_name || '-',
       }));
 
       setTransactions(flattened);
@@ -404,4 +404,3 @@ export default function TransactionManagement() {
     </div>
   );
 }
-
