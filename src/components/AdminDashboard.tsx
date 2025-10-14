@@ -64,7 +64,7 @@ export default function AdminDashboard() {
 
   const particlesLoaded = useCallback(async (container: Container | undefined) => {}, []);
 
-  // Stat card component with floating animation and counting numbers
+  // Stat card component with floating animation
   const StatCard = ({ icon: Icon, label, value, index }: any) => (
     <div
       className="bg-white/90 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 animate-float"
@@ -72,13 +72,13 @@ export default function AdminDashboard() {
     >
       <div className="flex items-center justify-between mb-4">
         <div
-          className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] via-[#00BFFF] to-[#D8468C] flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow"
+          className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow"
         >
           <Icon className="w-6 h-6 text-white" />
         </div>
       </div>
       <h3 className="text-2xl font-bold text-gray-900 mb-1">
-        <CountUp end={value} duration={1.5} separator="," />
+        {typeof value === 'number' ? <CountUp end={value} duration={1.5} separator="," /> : value}
       </h3>
       <p className="text-sm text-gray-600">{label}</p>
     </div>
@@ -98,7 +98,7 @@ export default function AdminDashboard() {
           background: { color: { value: 'transparent' } },
           particles: {
             number: { value: 40, density: { enable: true, area: 800 } },
-            color: { value: ['#007B8A', '#00BFFF', '#D8468C'] },
+            color: { value: ['#071A3F', '#007B8A', '#D8468C'] },
             shape: { type: 'circle' },
             opacity: {
               value: 0.7,
@@ -123,7 +123,7 @@ export default function AdminDashboard() {
           <div className="flex justify-between items-center h-16">
             {/* Logo + Title */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#007B8A] via-[#00BFFF] to-[#D8468C] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
                 <Users className="w-6 h-6 text-white" />
               </div>
               <h1 className="text-xl font-bold text-white tracking-wide">
@@ -170,7 +170,7 @@ export default function AdminDashboard() {
                   onClick={() => setActiveTab(id as Tab)}
                   className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-all duration-300 ${
                     activeTab === id
-                      ? 'border-[#007B8A] text-[#007B8A]'
+                      ? 'border-[#071A3F] text-[#071A3F]'
                       : 'border-transparent text-gray-600 hover:text-[#D8468C] hover:border-[#D8468C]'
                   } hover:scale-105`}
                 >
@@ -185,7 +185,7 @@ export default function AdminDashboard() {
         {/* Active Tab Content */}
         {activeTab === 'dashboard' && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Overview</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 animate-fade-in">Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               <StatCard
                 icon={Users}
@@ -221,13 +221,19 @@ export default function AdminDashboard() {
         {activeTab === 'reports' && <Reports />}
       </div>
 
-      {/* Floating animation */}
+      {/* Animations */}
       <style>{`
         @keyframes float {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-10px); }
         }
         .animate-float { animation: float 6s ease-in-out infinite; }
+
+        @keyframes fadeIn {
+          0% { opacity: 0; transform: translateY(10px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fadeIn 1s ease-out forwards; }
       `}</style>
     </div>
   );
