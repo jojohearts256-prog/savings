@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Lock, Mail, AlertCircle } from 'lucide-react';
+import Particles from 'react-tsparticles';
+import type { Engine, Container } from 'tsparticles-engine';
+import { loadFull } from 'tsparticles';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -22,6 +25,14 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  const particlesInit = useCallback(async (engine: Engine) => {
+    await loadFull(engine);
+  }, []);
+
+  const particlesLoaded = useCallback(async (container: Container | undefined) => {
+    return;
+  }, []);
 
   return (
     <div
@@ -103,50 +114,60 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right side visuals */}
+      {/* Right side: Particles + Visuals */}
       <div className="hidden md:flex w-1/2 items-center justify-center relative overflow-hidden">
-        {/* Gradient overlay for smooth transition */}
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-[#00BFFF]/40 to-white/40"></div>
+        <Particles
+          id="tsparticles-right"
+          init={particlesInit}
+          loaded={particlesLoaded}
+          style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}
+          options={{
+            fullScreen: { enable: false },
+            fpsLimit: 60,
+            particles: {
+              number: { value: 40, density: { enable: true, area: 800 } },
+              color: { value: ['#00BFFF', '#007B8A', '#D8468C'] },
+              shape: { type: 'circle' },
+              opacity: { value: 0.7, random: { enable: true, minimumValue: 0.4 } },
+              size: { value: { min: 2, max: 8 }, random: true },
+              move: {
+                enable: true,
+                speed: 0.8,
+                direction: 'none',
+                random: true,
+                straight: false,
+                outModes: { default: 'out' }
+              },
+              links: { enable: true, distance: 140, color: '#00BFFF', opacity: 0.08, width: 1 }
+            },
+            interactivity: {
+              events: { onHover: { enable: true, mode: 'repulse' }, onClick: { enable: true, mode: 'push' } },
+              modes: { repulse: { distance: 100 }, push: { quantity: 4 } }
+            },
+            detectRetina: true
+          }}
+        />
 
         {/* Floating text */}
-        <div className="absolute top-20 left-14 text-white font-bold text-4xl tracking-wide animate-fade-float drop-shadow-lg">
+        <div className="absolute top-20 left-14 text-white font-bold text-4xl tracking-wide z-20 drop-shadow-lg animate-fade-float">
           Grow. Save. <br /> Prosper Together.
         </div>
-        <div className="absolute bottom-24 right-10 text-white text-lg animate-fade-float-slow">
+        <div className="absolute bottom-24 right-10 text-white text-lg z-20 animate-fade-float-slow">
           Empowering Financial Growth Digitally.
         </div>
 
-        {/* Floating circles */}
-        <div className="absolute -top-24 -left-24 w-80 h-80 bg-white/15 opacity-25 rounded-full animate-spin-slow"></div>
-        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-white/15 opacity-25 rounded-full animate-spin-slow-reverse"></div>
+        {/* Soft spinning circles */}
+        <div className="absolute -top-24 -left-24 w-80 h-80 bg-white/15 opacity-25 rounded-full animate-spin-slow z-5"></div>
+        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-white/15 opacity-25 rounded-full animate-spin-slow-reverse z-5"></div>
       </div>
 
       {/* Animations */}
       <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0); opacity: 1; }
-          50% { transform: translateY(-10px); opacity: 0.85; }
-        }
-        @keyframes fade-float {
-          0%, 100% { transform: translateY(0); opacity: 1; }
-          50% { transform: translateY(-12px); opacity: 0.7; }
-        }
-        @keyframes fade-float-slow {
-          0%, 100% { transform: translateY(0); opacity: 1; }
-          50% { transform: translateY(-16px); opacity: 0.7; }
-        }
-        @keyframes spin-slow {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes spin-slow-reverse {
-          from { transform: rotate(360deg); }
-          to { transform: rotate(0deg); }
-        }
-        @keyframes slide-in {
-          from { opacity: 0; transform: translateX(-40px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
+        @keyframes fade-float { 0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-12px);opacity:0.7} }
+        @keyframes fade-float-slow { 0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-16px);opacity:0.7} }
+        @keyframes spin-slow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes spin-slow-reverse { from{transform:rotate(360deg)} to{transform:rotate(0deg)} }
+        @keyframes slide-in { from{opacity:0;transform:translateX(-40px)} to{opacity:1;transform:translateX(0)} }
         .animate-fade-float { animation: fade-float 6s ease-in-out infinite; }
         .animate-fade-float-slow { animation: fade-float-slow 8s ease-in-out infinite; }
         .animate-spin-slow { animation: spin-slow 25s linear infinite; }
