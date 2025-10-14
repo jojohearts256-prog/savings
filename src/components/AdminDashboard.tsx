@@ -118,9 +118,9 @@ export default function AdminDashboard() {
       />
 
       {/* Navbar */}
-      <nav className="relative z-10 bg-gradient-to-r from-[#071A3F] via-[#007B8A] to-[#D8468C] shadow-lg">
+      <nav className="relative z-20 bg-gradient-to-r from-[#071A3F] via-[#007B8A] to-[#D8468C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex justify-between items-center h-16 relative z-20">
             {/* Logo + Title */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
@@ -132,14 +132,10 @@ export default function AdminDashboard() {
             </div>
 
             {/* Profile + Logout */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 relative z-20">
               <div className="text-right">
-                <p className="text-sm font-medium text-white">
-                  {profile?.full_name}
-                </p>
-                <p className="text-xs text-white/80 capitalize">
-                  {profile?.role}
-                </p>
+                <p className="text-sm font-medium text-white">{profile?.full_name}</p>
+                <p className="text-xs text-white/80 capitalize">{profile?.role}</p>
               </div>
               <button
                 onClick={() => signOut()}
@@ -187,30 +183,10 @@ export default function AdminDashboard() {
           <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-6 animate-fade-in">Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              <StatCard
-                icon={Users}
-                label="Total Members"
-                value={stats.totalMembers}
-                index={0}
-              />
-              <StatCard
-                icon={DollarSign}
-                label="Total Balance"
-                value={stats.totalBalance}
-                index={1}
-              />
-              <StatCard
-                icon={CreditCard}
-                label="Outstanding Loans"
-                value={stats.totalLoans}
-                index={2}
-              />
-              <StatCard
-                icon={Bell}
-                label="Pending Loans"
-                value={stats.pendingLoans}
-                index={3}
-              />
+              <StatCard icon={Users} label="Total Members" value={stats.totalMembers} index={0} />
+              <StatCard icon={DollarSign} label="Total Balance" value={stats.totalBalance} index={1} />
+              <StatCard icon={CreditCard} label="Outstanding Loans" value={stats.totalLoans} index={2} />
+              <StatCard icon={Bell} label="Pending Loans" value={stats.pendingLoans} index={3} />
             </div>
           </div>
         )}
