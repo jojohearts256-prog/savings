@@ -54,9 +54,12 @@ export default function AdminDashboard() {
     setStats({ totalMembers, totalBalance, totalLoans, pendingLoans });
   };
 
-  // Modern stat card
-  const StatCard = ({ icon: Icon, label, value, color }: any) => (
-    <div className="bg-gradient-to-br from-white/80 to-gray-100 rounded-2xl p-6 shadow-lg transition-all duration-500 hover:-translate-y-3 hover:scale-105 hover:shadow-2xl animate-float">
+  // Modern stat card with floating animation
+  const StatCard = ({ icon: Icon, label, value, color, index }: any) => (
+    <div
+      className={`bg-gradient-to-br ${color} rounded-2xl p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-3xl animate-float`}
+      style={{ animationDelay: `${index * 0.2}s` }}
+    >
       <div className="flex items-center justify-between mb-4">
         <div
           className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow-lg`}
@@ -64,20 +67,20 @@ export default function AdminDashboard() {
           <Icon className="w-6 h-6 text-white" />
         </div>
       </div>
-      <h3 className="text-2xl font-bold text-gray-800 mb-1">{value}</h3>
-      <p className="text-sm text-gray-600">{label}</p>
+      <h3 className="text-2xl font-bold text-white mb-1">{value}</h3>
+      <p className="text-sm text-white/90">{label}</p>
     </div>
   );
 
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Navbar */}
-      <nav className="bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] shadow-lg">
+      <nav className="bg-gradient-to-r from-[#004366] to-[#005f99] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo + Title */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#004366] to-[#005f99] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
                 <Users className="w-6 h-6 text-white" />
               </div>
               <h1 className="text-xl font-bold text-white tracking-wide">
@@ -124,8 +127,8 @@ export default function AdminDashboard() {
                   onClick={() => setActiveTab(id as Tab)}
                   className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-all duration-300 ${
                     activeTab === id
-                      ? 'border-[#007B8A] text-[#007B8A]'
-                      : 'border-transparent text-gray-600 hover:text-[#D8468C] hover:border-[#D8468C]'
+                      ? 'border-[#004366] text-[#004366]'
+                      : 'border-transparent text-gray-600 hover:text-[#005f99] hover:border-[#005f99]'
                   } hover:scale-105`}
                 >
                   <Icon className="w-4 h-4" />
@@ -145,25 +148,29 @@ export default function AdminDashboard() {
                 icon={Users}
                 label="Total Members"
                 value={stats.totalMembers}
-                color="from-[#007B8A] to-[#00BFFF]"
+                color="from-[#004366] to-[#005f99]"
+                index={0}
               />
               <StatCard
                 icon={DollarSign}
                 label="Total Balance"
                 value={`$${stats.totalBalance.toLocaleString()}`}
-                color="from-[#007B8A] to-[#00BFFF]"
+                color="from-[#004366] to-[#005f99]"
+                index={1}
               />
               <StatCard
                 icon={CreditCard}
                 label="Outstanding Loans"
                 value={`$${stats.totalLoans.toLocaleString()}`}
-                color="from-[#007B8A] to-[#00BFFF]"
+                color="from-[#004366] to-[#005f99]"
+                index={2}
               />
               <StatCard
                 icon={Bell}
                 label="Pending Loans"
                 value={stats.pendingLoans}
-                color="from-[#007B8A] to-[#00BFFF]"
+                color="from-[#004366] to-[#005f99]"
+                index={3}
               />
             </div>
           </div>
@@ -175,6 +182,7 @@ export default function AdminDashboard() {
         {activeTab === 'reports' && <Reports />}
       </div>
 
+      {/* Floating Animation */}
       <style>{`
         @keyframes float {
           0%, 100% { transform: translateY(0); }
