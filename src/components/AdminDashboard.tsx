@@ -17,6 +17,7 @@ import Reports from './Reports';
 import Particles from 'react-tsparticles';
 import type { Engine, Container } from 'tsparticles-engine';
 import { loadFull } from 'tsparticles';
+import CountUp from 'react-countup';
 
 type Tab = 'dashboard' | 'members' | 'transactions' | 'loans' | 'reports';
 
@@ -63,21 +64,23 @@ export default function AdminDashboard() {
 
   const particlesLoaded = useCallback(async (container: Container | undefined) => {}, []);
 
-  // Stat card component with floating animation
+  // Stat card component with floating animation and counting numbers
   const StatCard = ({ icon: Icon, label, value, index }: any) => (
     <div
-      className="bg-gradient-to-br from-[#007B8A] via-[#00BFFF] to-[#D8468C] rounded-2xl p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-3xl animate-float"
+      className="bg-white/90 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 animate-float"
       style={{ animationDelay: `${index * 0.2}s` }}
     >
       <div className="flex items-center justify-between mb-4">
         <div
-          className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] via-[#00BFFF] to-[#D8468C] flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow-lg"
+          className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] via-[#00BFFF] to-[#D8468C] flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow"
         >
           <Icon className="w-6 h-6 text-white" />
         </div>
       </div>
-      <h3 className="text-2xl font-bold text-white mb-1">{value}</h3>
-      <p className="text-sm text-white/90">{label}</p>
+      <h3 className="text-2xl font-bold text-gray-900 mb-1">
+        <CountUp end={value} duration={1.5} separator="," />
+      </h3>
+      <p className="text-sm text-gray-600">{label}</p>
     </div>
   );
 
@@ -115,7 +118,7 @@ export default function AdminDashboard() {
       />
 
       {/* Navbar */}
-      <nav className="relative z-10 bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] shadow-lg">
+      <nav className="relative z-10 bg-gradient-to-r from-[#071A3F] via-[#007B8A] to-[#D8468C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo + Title */}
@@ -193,13 +196,13 @@ export default function AdminDashboard() {
               <StatCard
                 icon={DollarSign}
                 label="Total Balance"
-                value={`$${stats.totalBalance.toLocaleString()}`}
+                value={stats.totalBalance}
                 index={1}
               />
               <StatCard
                 icon={CreditCard}
                 label="Outstanding Loans"
-                value={`$${stats.totalLoans.toLocaleString()}`}
+                value={stats.totalLoans}
                 index={2}
               />
               <StatCard
