@@ -56,7 +56,7 @@ export default function AdminDashboard() {
 
   // Modern stat card
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
-    <div className="bg-gradient-to-br from-white/80 to-gray-100 rounded-2xl p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-3xl">
+    <div className="bg-gradient-to-br from-white/80 to-gray-100 rounded-2xl p-6 shadow-lg transition-all duration-500 hover:-translate-y-3 hover:scale-105 hover:shadow-2xl animate-float">
       <div className="flex items-center justify-between mb-4">
         <div
           className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow-lg`}
@@ -151,19 +151,19 @@ export default function AdminDashboard() {
                 icon={DollarSign}
                 label="Total Balance"
                 value={`$${stats.totalBalance.toLocaleString()}`}
-                color="from-[#00BFFF] to-[#D8468C]"
+                color="from-[#007B8A] to-[#00BFFF]"
               />
               <StatCard
                 icon={CreditCard}
                 label="Outstanding Loans"
                 value={`$${stats.totalLoans.toLocaleString()}`}
-                color="from-[#007B8A] to-[#D8468C]"
+                color="from-[#007B8A] to-[#00BFFF]"
               />
               <StatCard
                 icon={Bell}
                 label="Pending Loans"
                 value={stats.pendingLoans}
-                color="from-[#D8468C] to-[#00BFFF]"
+                color="from-[#007B8A] to-[#00BFFF]"
               />
             </div>
           </div>
@@ -174,6 +174,14 @@ export default function AdminDashboard() {
         {activeTab === 'loans' && <LoanManagement />}
         {activeTab === 'reports' && <Reports />}
       </div>
+
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+      `}</style>
     </div>
   );
 }
