@@ -35,7 +35,7 @@ export default function Login() {
   }, []);
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center">
+    <div className="min-h-screen relative flex">
       {/* Background Image */}
       <div
         className="absolute inset-0 bg-cover bg-center"
@@ -78,80 +78,103 @@ export default function Login() {
         }}
       />
 
-      {/* Login Form */}
-      <div className="relative z-10 p-10 w-full max-w-md rounded-3xl shadow-2xl bg-[#0D1B3D]/90 backdrop-blur-xl animate-slide-in">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] mb-4 shadow-md">
-            <Lock className="w-8 h-8 text-white" />
+      {/* Login Form on Left */}
+      <div className="relative z-10 w-full md:w-1/2 flex items-center justify-start px-12">
+        <div className="p-10 w-full max-w-md rounded-3xl bg-[#0D1B3D]/90 backdrop-blur-xl shadow-2xl animate-slide-in">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] mb-4 shadow-md">
+              <Lock className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-1">
+              SmartSave Management
+            </h1>
+            <p className="text-gray-200/90">
+              Transforming Group Savings into Shared Success
+            </p>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-1">
-            SmartSave Management
-          </h1>
-          <p className="text-gray-200/90">
-            Transforming Group Savings into Shared Success
-          </p>
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-100/30 border border-red-200/50 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-200 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-100">{error}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-200" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/20 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
+                  placeholder="Enter your email"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-200" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/20 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
+                  placeholder="Enter your password"
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-gradient-to-r from-[#007B8A] to-[#D8468C] text-white font-semibold rounded-xl shadow-md hover:scale-105 transition-transform duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center text-sm text-gray-200">
+            <p>Contact your administrator for login credentials</p>
+          </div>
         </div>
+      </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-100/30 border border-red-200/50 rounded-xl flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-200 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-100">{error}</p>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-white mb-2">
-              Email
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-200" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/20 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
-                placeholder="Enter your email"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-white mb-2">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-200" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/20 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
-                placeholder="Enter your password"
-                required
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-gradient-to-r from-[#007B8A] to-[#D8468C] text-white font-semibold rounded-xl shadow-md hover:scale-105 transition-transform duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center text-sm text-gray-200">
-          <p>Contact your administrator for login credentials</p>
+      {/* Motivational Text on Right */}
+      <div className="hidden md:flex w-1/2 items-center justify-center relative px-12">
+        <div className="text-white z-10">
+          <h2 className="text-4xl font-bold mb-4 drop-shadow-lg animate-fade-float">
+            Grow. Save. Prosper Together.
+          </h2>
+          <p className="text-lg mb-2 animate-fade-float-slow">
+            Empowering Financial Growth Digitally.
+          </p>
+          <p className="text-lg mb-2 animate-fade-float-slow">
+            Every Coin Counts! Start Saving Today.
+          </p>
+          <p className="text-lg mb-2 animate-fade-float-slow">
+            Turn Group Savings into Shared Success.
+          </p>
+          <p className="text-lg mb-2 animate-fade-float-slow">
+            Small Steps. Big Future.
+          </p>
         </div>
       </div>
 
       {/* Animations */}
       <style>{`
         @keyframes slide-in { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes fade-float { 0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-12px);opacity:0.7} }
+        @keyframes fade-float-slow { 0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-16px);opacity:0.7} }
         .animate-slide-in { animation: slide-in 0.8s ease forwards; }
+        .animate-fade-float { animation: fade-float 6s ease-in-out infinite; }
+        .animate-fade-float-slow { animation: fade-float-slow 8s ease-in-out infinite; }
       `}</style>
     </div>
   );
