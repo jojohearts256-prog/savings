@@ -149,19 +149,19 @@ export default function Login() {
       {/* Motivational Text on Right */}
       <div className="hidden md:flex w-1/2 items-center justify-center relative px-12">
         <div className="relative z-10 p-6 rounded-xl bg-black/40">
-          <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-xl animate-slide-fade-1 float-text">
+          <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-xl animate-slide-fade-1 float-text-1">
             Grow. Save. Prosper Together.
           </h2>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-2 float-text">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-2 float-text-2">
             Empowering Financial Growth Digitally.
           </p>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-3 float-text">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-3 float-text-3">
             Every Coin Counts! Start Saving Today.
           </p>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-4 float-text">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-4 float-text-4">
             Turn Group Savings into Shared Success.
           </p>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-5 float-text">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-5 float-text-5">
             Small Steps. Big Future.
           </p>
         </div>
@@ -181,11 +181,14 @@ export default function Login() {
         .animate-slide-fade-4 { animation: slide-fade 0.8s ease forwards; animation-delay: 1.0s; }
         .animate-slide-fade-5 { animation: slide-fade 0.8s ease forwards; animation-delay: 1.3s; }
 
-        /* Continuous floating for text after appearing */
+        /* Continuous floating for text (staggered) */
         @keyframes float-text { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-6px);} }
-        .float-text { animation: float-text 4s ease-in-out infinite; animation-fill-mode: both; }
+        .float-text-1 { animation: float-text 4s ease-in-out infinite; animation-delay: 0s; }
+        .float-text-2 { animation: float-text 5s ease-in-out infinite; animation-delay: 0.5s; }
+        .float-text-3 { animation: float-text 4.5s ease-in-out infinite; animation-delay: 0.2s; }
+        .float-text-4 { animation: float-text 5.2s ease-in-out infinite; animation-delay: 0.3s; }
+        .float-text-5 { animation: float-text 4.8s ease-in-out infinite; animation-delay: 0.4s; }
       `}</style>
     </div>
   );
 }
-
