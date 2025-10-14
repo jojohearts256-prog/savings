@@ -80,7 +80,7 @@ export default function Login() {
 
       {/* Login Form on Left */}
       <div className="relative z-10 w-full md:w-1/2 flex items-center justify-start px-12">
-        <div className="p-10 w-full max-w-md rounded-3xl bg-[#0D1B3D]/90 backdrop-blur-xl shadow-2xl animate-slide-in">
+        <div className="p-10 w-full max-w-md rounded-3xl bg-[#0D1B3D]/90 backdrop-blur-xl shadow-2xl animate-slide-in transform-gpu hover:scale-105 hover:-translate-y-1 hover:rotate-1 transition duration-500">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] mb-4 shadow-md">
               <Lock className="w-8 h-8 text-white" />
@@ -148,20 +148,20 @@ export default function Login() {
 
       {/* Motivational Text on Right */}
       <div className="hidden md:flex w-1/2 items-center justify-center relative px-12">
-        <div className="text-white z-10">
-          <h2 className="text-4xl font-bold mb-4 drop-shadow-lg animate-fade-float">
+        <div className="relative z-10 p-6 rounded-xl bg-black/50">
+          <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-xl animate-fade-float">
             Grow. Save. Prosper Together.
           </h2>
-          <p className="text-lg mb-2 animate-fade-float-slow">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-fade-float-slow">
             Empowering Financial Growth Digitally.
           </p>
-          <p className="text-lg mb-2 animate-fade-float-slow">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-fade-float-slow">
             Every Coin Counts! Start Saving Today.
           </p>
-          <p className="text-lg mb-2 animate-fade-float-slow">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-fade-float-slow">
             Turn Group Savings into Shared Success.
           </p>
-          <p className="text-lg mb-2 animate-fade-float-slow">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-fade-float-slow">
             Small Steps. Big Future.
           </p>
         </div>
