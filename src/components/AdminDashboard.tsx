@@ -124,19 +124,20 @@ export default function AdminDashboard() {
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
                 <Users className="w-6 h-6 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-white tracking-wide">
-                SmartSave Admin
-              </h1>
+              <h1 className="text-xl font-bold text-white tracking-wide">SmartSave Admin</h1>
             </div>
 
+            {/* Profile + Logout */}
             <div className="flex items-center gap-4 relative z-20">
               <div className="text-right">
                 <p className="text-sm font-medium text-white">{profile?.full_name}</p>
                 <p className="text-xs text-white/80 capitalize">{profile?.role}</p>
               </div>
-              {/* LOGOUT BUTTON */}
               <button
-                onClick={() => signOut()} // This calls your AuthContext signOut function
+                onClick={async () => {
+                  await signOut(); 
+                  window.location.href = '/login'; // redirect to login page
+                }}
                 className="p-2 bg-white/20 hover:bg-red-500/30 rounded-xl transition-all duration-300 hover:scale-110 shadow-md hover:shadow-lg"
               >
                 <LogOut className="w-5 h-5 text-white" />
@@ -176,7 +177,6 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Active Tab */}
         {activeTab === 'dashboard' && (
           <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-6 animate-fade-in">Overview</h2>
@@ -195,7 +195,6 @@ export default function AdminDashboard() {
         {activeTab === 'reports' && <Reports />}
       </div>
 
-      {/* Animations */}
       <style>{`
         @keyframes float {
           0%, 100% { transform: translateY(0); }
