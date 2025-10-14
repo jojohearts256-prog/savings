@@ -114,8 +114,18 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right side: Particles + Visuals */}
+      {/* Right side: Image + Particles + Motivational Text */}
       <div className="hidden md:flex w-1/2 items-center justify-center relative overflow-hidden">
+        {/* Background image */}
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-70"
+          style={{
+            backgroundImage:
+              "url('https://i.pinimg.com/1200x/26/a5/2e/26a52e8b95ed4915aeb8cc8dd4bbd36f.jpg')",
+          }}
+        ></div>
+
+        {/* Particles */}
         <Particles
           id="tsparticles-right"
           init={particlesInit}
@@ -148,9 +158,12 @@ export default function Login() {
           }}
         />
 
-        {/* Floating text */}
-        <div className="absolute top-20 left-14 text-white font-bold text-4xl tracking-wide z-20 drop-shadow-lg animate-fade-float">
+        {/* Motivational text */}
+        <div className="absolute top-16 left-12 text-white font-bold text-4xl tracking-wide z-20 drop-shadow-lg animate-fade-float">
           Grow. Save. <br /> Prosper Together.
+        </div>
+        <div className="absolute top-44 left-12 text-white text-xl z-20 animate-fade-float-slow">
+          Every Coin Counts. <br /> Build Your Future Today.
         </div>
         <div className="absolute bottom-24 right-10 text-white text-lg z-20 animate-fade-float-slow">
           Empowering Financial Growth Digitally.
