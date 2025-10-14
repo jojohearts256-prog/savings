@@ -148,20 +148,20 @@ export default function Login() {
 
       {/* Motivational Text on Right */}
       <div className="hidden md:flex w-1/2 items-center justify-center relative px-12">
-        <div className="relative z-10 p-6 rounded-xl bg-black/50">
-          <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-xl animate-slide-fade-1">
+        <div className="relative z-10 p-6 rounded-xl bg-black/40">
+          <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-xl animate-slide-fade-1 float-text">
             Grow. Save. Prosper Together.
           </h2>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-2">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-2 float-text">
             Empowering Financial Growth Digitally.
           </p>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-3">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-3 float-text">
             Every Coin Counts! Start Saving Today.
           </p>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-4">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-4 float-text">
             Turn Group Savings into Shared Success.
           </p>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-5">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-5 float-text">
             Small Steps. Big Future.
           </p>
         </div>
@@ -170,10 +170,7 @@ export default function Login() {
       {/* Animations */}
       <style>{`
         /* Floating login form */
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
+        @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
         .animate-float { animation: float 6s ease-in-out infinite; }
 
         /* Sliding/fading motivational text */
@@ -184,15 +181,11 @@ export default function Login() {
         .animate-slide-fade-4 { animation: slide-fade 0.8s ease forwards; animation-delay: 1.0s; }
         .animate-slide-fade-5 { animation: slide-fade 0.8s ease forwards; animation-delay: 1.3s; }
 
-        /* Continuous hover floating for text after appearing */
-        @keyframes float-text { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
-        .animate-slide-fade-1, .animate-slide-fade-2, .animate-slide-fade-3, .animate-slide-fade-4, .animate-slide-fade-5 {
-          animation-fill-mode: forwards;
-        }
-        .animate-slide-fade-1:hover, .animate-slide-fade-2:hover, .animate-slide-fade-3:hover, .animate-slide-fade-4:hover, .animate-slide-fade-5:hover {
-          animation: float-text 4s ease-in-out infinite;
-        }
+        /* Continuous floating for text after appearing */
+        @keyframes float-text { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-6px);} }
+        .float-text { animation: float-text 4s ease-in-out infinite; animation-fill-mode: both; }
       `}</style>
     </div>
   );
 }
+
