@@ -1,9 +1,6 @@
-iimport React, { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Lock, Mail, AlertCircle } from 'lucide-react';
-import Particles from 'react-tsparticles';
-import type { Engine, Container } from 'tsparticles-engine';
-import { loadFull } from 'tsparticles';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -25,17 +22,6 @@ export default function Login() {
       setLoading(false);
     }
   };
-
-  // tsparticles init
-  const particlesInit = useCallback(async (engine: Engine) => {
-    // load full bundle
-    await loadFull(engine);
-  }, []);
-
-  const particlesLoaded = useCallback(async (container: Container | undefined) => {
-    // you could store container if needed
-    return;
-  }, []);
 
   return (
     <div
@@ -117,85 +103,30 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right side visuals with particles */}
+      {/* Right side visuals */}
       <div className="hidden md:flex w-1/2 items-center justify-center relative overflow-hidden">
-        {/* Particles canvas (fills this right half only) */}
-        <Particles
-          id="tsparticles-right"
-          init={particlesInit}
-          loaded={particlesLoaded}
-          style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}
-          options={{
-            fullScreen: { enable: false }, // do NOT take full screen; confined to this container
-            fpsLimit: 60,
-            background: { color: { value: 'transparent' } },
-            particles: {
-              number: { value: 40, density: { enable: true, area: 800 } },
-              color: { value: ['#00BFFF', '#007B8A', '#D8468C'] },
-              shape: { type: 'circle' },
-              opacity: {
-                value: 0.7,
-                random: { enable: true, minimumValue: 0.4 },
-                anim: { enable: true, speed: 0.5, opacity_min: 0.3, sync: false }
-              },
-              size: {
-                value: { min: 2, max: 8 },
-                random: true,
-                anim: { enable: true, speed: 4, size_min: 1, sync: false }
-              },
-              move: {
-                enable: true,
-                speed: 0.8,
-                direction: 'none',
-                random: true,
-                straight: false,
-                outModes: { default: 'out' },
-                attract: { enable: false }
-              },
-              links: {
-                enable: true,
-                distance: 140,
-                color: '#00BFFF',
-                opacity: 0.08,
-                width: 1
-              }
-            },
-            interactivity: {
-              events: {
-                onHover: { enable: true, mode: 'repulse' },
-                onClick: { enable: true, mode: 'push' },
-                resize: true
-              },
-              modes: {
-                grab: { distance: 200, links: { opacity: 0.2 } },
-                bubble: { distance: 200, size: 6, duration: 2, opacity: 0.8 },
-                repulse: { distance: 100 },
-                push: { quantity: 4 },
-                remove: { quantity: 2 }
-              }
-            },
-            detectRetina: true
-          }}
-        />
-
         {/* Gradient overlay for smooth transition */}
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-[#00BFFF]/30 to-white/30 z-10 pointer-events-none"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-[#00BFFF]/40 to-white/40"></div>
 
-        {/* Floating text (above particles) */}
-        <div className="absolute top-20 left-14 text-white font-bold text-4xl tracking-wide z-20 drop-shadow-lg">
+        {/* Floating text */}
+        <div className="absolute top-20 left-14 text-white font-bold text-4xl tracking-wide animate-fade-float drop-shadow-lg">
           Grow. Save. <br /> Prosper Together.
         </div>
-        <div className="absolute bottom-24 right-10 text-white text-lg z-20">
+        <div className="absolute bottom-24 right-10 text-white text-lg animate-fade-float-slow">
           Empowering Financial Growth Digitally.
         </div>
 
-        {/* Soft decorative circles */}
-        <div className="absolute -top-24 -left-24 w-80 h-80 bg-white/10 opacity-25 rounded-full animate-spin-slow z-5"></div>
-        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-white/10 opacity-25 rounded-full animate-spin-slow-reverse z-5"></div>
+        {/* Floating circles */}
+        <div className="absolute -top-24 -left-24 w-80 h-80 bg-white/15 opacity-25 rounded-full animate-spin-slow"></div>
+        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-white/15 opacity-25 rounded-full animate-spin-slow-reverse"></div>
       </div>
 
       {/* Animations */}
       <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0); opacity: 1; }
+          50% { transform: translateY(-10px); opacity: 0.85; }
+        }
         @keyframes fade-float {
           0%, 100% { transform: translateY(0); opacity: 1; }
           50% { transform: translateY(-12px); opacity: 0.7; }
