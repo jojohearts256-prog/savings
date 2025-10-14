@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase, Member, Transaction, Loan } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -14,6 +14,9 @@ import MemberManagement from './MemberManagement';
 import TransactionManagement from './TransactionManagement';
 import LoanManagement from './LoanManagement';
 import Reports from './Reports';
+import Particles from 'react-tsparticles';
+import type { Engine, Container } from 'tsparticles-engine';
+import { loadFull } from 'tsparticles';
 
 type Tab = 'dashboard' | 'members' | 'transactions' | 'loans' | 'reports';
 
@@ -54,15 +57,21 @@ export default function AdminDashboard() {
     setStats({ totalMembers, totalBalance, totalLoans, pendingLoans });
   };
 
-  // Modern stat card with floating animation
-  const StatCard = ({ icon: Icon, label, value, color, index }: any) => (
+  const particlesInit = useCallback(async (engine: Engine) => {
+    await loadFull(engine);
+  }, []);
+
+  const particlesLoaded = useCallback(async (container: Container | undefined) => {}, []);
+
+  // Stat card component with floating animation
+  const StatCard = ({ icon: Icon, label, value, index }: any) => (
     <div
-      className={`bg-gradient-to-br ${color} rounded-2xl p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-3xl animate-float`}
+      className="bg-gradient-to-br from-[#007B8A] via-[#00BFFF] to-[#D8468C] rounded-2xl p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-3xl animate-float"
       style={{ animationDelay: `${index * 0.2}s` }}
     >
       <div className="flex items-center justify-between mb-4">
         <div
-          className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow-lg`}
+          className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] via-[#00BFFF] to-[#D8468C] flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow-lg"
         >
           <Icon className="w-6 h-6 text-white" />
         </div>
@@ -73,14 +82,45 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen relative bg-gray-100">
+      {/* Particles behind the dashboard */}
+      <Particles
+        id="dashboard-particles"
+        init={particlesInit}
+        loaded={particlesLoaded}
+        style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}
+        options={{
+          fullScreen: { enable: false },
+          fpsLimit: 60,
+          background: { color: { value: 'transparent' } },
+          particles: {
+            number: { value: 40, density: { enable: true, area: 800 } },
+            color: { value: ['#007B8A', '#00BFFF', '#D8468C'] },
+            shape: { type: 'circle' },
+            opacity: {
+              value: 0.7,
+              random: { enable: true, minimumValue: 0.4 },
+              anim: { enable: true, speed: 0.5, opacity_min: 0.3, sync: false }
+            },
+            size: { value: { min: 2, max: 8 }, random: true, anim: { enable: true, speed: 4, size_min: 1, sync: false } },
+            move: { enable: true, speed: 0.8, direction: 'none', random: true, straight: false, outModes: { default: 'out' } },
+            links: { enable: true, distance: 140, color: '#00BFFF', opacity: 0.08, width: 1 }
+          },
+          interactivity: {
+            events: { onHover: { enable: true, mode: 'repulse' }, onClick: { enable: true, mode: 'push' }, resize: true },
+            modes: { grab: { distance: 200, links: { opacity: 0.2 } }, bubble: { distance: 200, size: 6, duration: 2, opacity: 0.8 }, repulse: { distance: 100 }, push: { quantity: 4 }, remove: { quantity: 2 } }
+          },
+          detectRetina: true
+        }}
+      />
+
       {/* Navbar */}
-      <nav className="bg-gradient-to-r from-[#004366] to-[#005f99] shadow-lg">
+      <nav className="relative z-10 bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo + Title */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#004366] to-[#005f99] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#007B8A] via-[#00BFFF] to-[#D8468C] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
                 <Users className="w-6 h-6 text-white" />
               </div>
               <h1 className="text-xl font-bold text-white tracking-wide">
@@ -110,7 +150,7 @@ export default function AdminDashboard() {
       </nav>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Tabs */}
         <div className="mb-6">
           <div className="border-b border-gray-300">
@@ -127,8 +167,8 @@ export default function AdminDashboard() {
                   onClick={() => setActiveTab(id as Tab)}
                   className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-all duration-300 ${
                     activeTab === id
-                      ? 'border-[#004366] text-[#004366]'
-                      : 'border-transparent text-gray-600 hover:text-[#005f99] hover:border-[#005f99]'
+                      ? 'border-[#007B8A] text-[#007B8A]'
+                      : 'border-transparent text-gray-600 hover:text-[#D8468C] hover:border-[#D8468C]'
                   } hover:scale-105`}
                 >
                   <Icon className="w-4 h-4" />
@@ -148,28 +188,24 @@ export default function AdminDashboard() {
                 icon={Users}
                 label="Total Members"
                 value={stats.totalMembers}
-                color="from-[#004366] to-[#005f99]"
                 index={0}
               />
               <StatCard
                 icon={DollarSign}
                 label="Total Balance"
                 value={`$${stats.totalBalance.toLocaleString()}`}
-                color="from-[#004366] to-[#005f99]"
                 index={1}
               />
               <StatCard
                 icon={CreditCard}
                 label="Outstanding Loans"
                 value={`$${stats.totalLoans.toLocaleString()}`}
-                color="from-[#004366] to-[#005f99]"
                 index={2}
               />
               <StatCard
                 icon={Bell}
                 label="Pending Loans"
                 value={stats.pendingLoans}
-                color="from-[#004366] to-[#005f99]"
                 index={3}
               />
             </div>
@@ -182,7 +218,7 @@ export default function AdminDashboard() {
         {activeTab === 'reports' && <Reports />}
       </div>
 
-      {/* Floating Animation */}
+      {/* Floating animation */}
       <style>{`
         @keyframes float {
           0%, 100% { transform: translateY(0); }
