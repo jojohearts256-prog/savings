@@ -35,16 +35,10 @@ export default function Login() {
   }, []);
 
   return (
-    <div
-      className="min-h-screen flex overflow-hidden"
-      style={{
-        background:
-          'linear-gradient(110deg, #007B8A 0%, #00BFFF 45%, #D8468C 75%, #ffffff 95%)',
-      }}
-    >
+    <div className="min-h-screen flex overflow-hidden">
       {/* Left side: Login Form */}
       <div className="w-full md:w-1/2 flex items-center justify-center px-6 relative z-10">
-        <div className="p-10 w-full max-w-md rounded-2xl shadow-2xl bg-white/20 backdrop-blur-xl animate-slide-in border border-white/30">
+        <div className="p-10 w-full max-w-md rounded-3xl shadow-2xl bg-[#1A2A6C]/80 backdrop-blur-xl animate-slide-in">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] mb-4 shadow-md">
               <Lock className="w-8 h-8 text-white" />
@@ -52,7 +46,7 @@ export default function Login() {
             <h1 className="text-3xl font-bold text-white mb-1">
               SmartSave Management
             </h1>
-            <p className="text-gray-100/90">
+            <p className="text-gray-200/90">
               Transforming Group Savings into Shared Success
             </p>
           </div>
@@ -75,7 +69,7 @@ export default function Login() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/30 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
+                  className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/20 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
                   placeholder="Enter your email"
                   required
                 />
@@ -92,7 +86,7 @@ export default function Login() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/30 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
+                  className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/20 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
                   placeholder="Enter your password"
                   required
                 />
@@ -116,9 +110,9 @@ export default function Login() {
 
       {/* Right side: Image + Particles + Motivational Text */}
       <div className="hidden md:flex w-1/2 items-center justify-center relative overflow-hidden">
-        {/* Background image */}
+        {/* Styled background image */}
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-70"
+          className="absolute inset-0 rounded-l-3xl bg-cover bg-center shadow-lg opacity-80"
           style={{
             backgroundImage:
               "url('https://i.pinimg.com/1200x/26/a5/2e/26a52e8b95ed4915aeb8cc8dd4bbd36f.jpg')",
@@ -158,14 +152,14 @@ export default function Login() {
           }}
         />
 
-        {/* Motivational text */}
-        <div className="absolute top-16 left-12 text-white font-bold text-4xl tracking-wide z-20 drop-shadow-lg animate-fade-float">
+        {/* Motivational texts with floating animation */}
+        <div className="absolute top-16 left-12 text-white font-bold text-4xl tracking-wide z-20 drop-shadow-lg animate-float">
           Grow. Save. <br /> Prosper Together.
         </div>
-        <div className="absolute top-44 left-12 text-white text-xl z-20 animate-fade-float-slow">
+        <div className="absolute top-44 left-12 text-white text-xl z-20 animate-float-slow">
           Every Coin Counts. <br /> Build Your Future Today.
         </div>
-        <div className="absolute bottom-24 right-10 text-white text-lg z-20 animate-fade-float-slow">
+        <div className="absolute bottom-24 right-10 text-white text-lg z-20 animate-float-slow">
           Empowering Financial Growth Digitally.
         </div>
 
@@ -176,11 +170,16 @@ export default function Login() {
 
       {/* Animations */}
       <style>{`
+        @keyframes float { 0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-12px);opacity:0.85} }
+        @keyframes float-slow { 0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-16px);opacity:0.8} }
         @keyframes fade-float { 0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-12px);opacity:0.7} }
         @keyframes fade-float-slow { 0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-16px);opacity:0.7} }
         @keyframes spin-slow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
         @keyframes spin-slow-reverse { from{transform:rotate(360deg)} to{transform:rotate(0deg)} }
         @keyframes slide-in { from{opacity:0;transform:translateX(-40px)} to{opacity:1;transform:translateX(0)} }
+
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        .animate-float-slow { animation: float-slow 8s ease-in-out infinite; }
         .animate-fade-float { animation: fade-float 6s ease-in-out infinite; }
         .animate-fade-float-slow { animation: fade-float-slow 8s ease-in-out infinite; }
         .animate-spin-slow { animation: spin-slow 25s linear infinite; }
