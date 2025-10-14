@@ -80,7 +80,7 @@ export default function Login() {
 
       {/* Login Form on Left */}
       <div className="relative z-10 w-full md:w-1/2 flex items-center justify-start px-12">
-        <div className="p-10 w-full max-w-md rounded-3xl bg-[#0D1B3D]/90 backdrop-blur-xl shadow-2xl animate-slide-in transform-gpu hover:scale-105 hover:-translate-y-1 hover:rotate-1 transition duration-500">
+        <div className="p-10 w-full max-w-md rounded-3xl bg-[#0D1B3D]/90 backdrop-blur-xl shadow-2xl animate-float transform-gpu transition-transform duration-500">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] mb-4 shadow-md">
               <Lock className="w-8 h-8 text-white" />
@@ -149,19 +149,19 @@ export default function Login() {
       {/* Motivational Text on Right */}
       <div className="hidden md:flex w-1/2 items-center justify-center relative px-12">
         <div className="relative z-10 p-6 rounded-xl bg-black/50">
-          <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-xl animate-fade-float">
+          <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-xl animate-slide-fade-1">
             Grow. Save. Prosper Together.
           </h2>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-fade-float-slow">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-2">
             Empowering Financial Growth Digitally.
           </p>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-fade-float-slow">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-3">
             Every Coin Counts! Start Saving Today.
           </p>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-fade-float-slow">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-4">
             Turn Group Savings into Shared Success.
           </p>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-fade-float-slow">
+          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-5">
             Small Steps. Big Future.
           </p>
         </div>
@@ -169,12 +169,29 @@ export default function Login() {
 
       {/* Animations */}
       <style>{`
-        @keyframes slide-in { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes fade-float { 0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-12px);opacity:0.7} }
-        @keyframes fade-float-slow { 0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-16px);opacity:0.7} }
-        .animate-slide-in { animation: slide-in 0.8s ease forwards; }
-        .animate-fade-float { animation: fade-float 6s ease-in-out infinite; }
-        .animate-fade-float-slow { animation: fade-float-slow 8s ease-in-out infinite; }
+        /* Floating login form */
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+
+        /* Sliding/fading motivational text */
+        @keyframes slide-fade { 0% { opacity:0; transform:translateY(30px); } 100% { opacity:1; transform:translateY(0); } }
+        .animate-slide-fade-1 { animation: slide-fade 0.8s ease forwards; animation-delay: 0.1s; }
+        .animate-slide-fade-2 { animation: slide-fade 0.8s ease forwards; animation-delay: 0.4s; }
+        .animate-slide-fade-3 { animation: slide-fade 0.8s ease forwards; animation-delay: 0.7s; }
+        .animate-slide-fade-4 { animation: slide-fade 0.8s ease forwards; animation-delay: 1.0s; }
+        .animate-slide-fade-5 { animation: slide-fade 0.8s ease forwards; animation-delay: 1.3s; }
+
+        /* Continuous hover floating for text after appearing */
+        @keyframes float-text { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+        .animate-slide-fade-1, .animate-slide-fade-2, .animate-slide-fade-3, .animate-slide-fade-4, .animate-slide-fade-5 {
+          animation-fill-mode: forwards;
+        }
+        .animate-slide-fade-1:hover, .animate-slide-fade-2:hover, .animate-slide-fade-3:hover, .animate-slide-fade-4:hover, .animate-slide-fade-5:hover {
+          animation: float-text 4s ease-in-out infinite;
+        }
       `}</style>
     </div>
   );
