@@ -13,9 +13,13 @@ export default function TransactionManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingMembers, setLoadingMembers] = useState(false);
 
+  // Helper to format amounts consistently as UGX
+  const formatUGX = (amount: any) => `UGX ${Number(amount ?? 0).toLocaleString('en-UG')}`;
+
   useEffect(() => {
     loadTransactions();
     loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadTransactions = async () => {
@@ -296,15 +300,15 @@ export default function TransactionManagement() {
                 </tr>
                 <tr>
                   <th>Amount</th>
-                  <td>${Number(tx.amount).toLocaleString()}</td>
+                  <td>{formatUGX(tx.amount)}</td>
                 </tr>
                 <tr>
                   <th>Balance Before</th>
-                  <td>${Number(tx.balance_before).toLocaleString()}</td>
+                  <td>{formatUGX(tx.balance_before)}</td>
                 </tr>
                 <tr>
                   <th>Balance After</th>
-                  <td className="total">${Number(tx.balance_after).toLocaleString()}</td>
+                  <td className="total">{formatUGX(tx.balance_after)}</td>
                 </tr>
                 <tr>
                   <th>Description</th>
@@ -380,9 +384,9 @@ export default function TransactionManagement() {
                     <span className="text-sm capitalize">{tx.transaction_type}</span>
                   </td>
                   <td className={`px-6 py-4 text-sm font-semibold ${tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'}`}>
-                    {tx.transaction_type === 'withdrawal' ? '-' : '+'}${Number(tx.amount).toLocaleString()}
+                    {tx.transaction_type === 'withdrawal' ? '-' : '+'}{formatUGX(tx.amount)}
                   </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-[#008080]">${Number(tx.balance_after).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm font-semibold text-[#008080]">{formatUGX(tx.balance_after)}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{tx.recorded_by_name}</td>
                   <td className="px-6 py-4">
                     <button
