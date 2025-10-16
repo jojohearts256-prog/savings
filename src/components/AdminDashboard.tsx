@@ -9,13 +9,11 @@ import {
   LogOut,
   FileText,
   Bell,
-  PieChart,
 } from 'lucide-react';
 import MemberManagement from './MemberManagement';
 import TransactionManagement from './TransactionManagement';
 import LoanManagement from './LoanManagement';
 import Reports from './Reports';
-import ProfitDistribution from './ProfitDistribution';
 import Particles from 'react-tsparticles';
 import { loadFull } from 'tsparticles';
 import CountUp from 'react-countup';
@@ -149,7 +147,6 @@ export default function AdminDashboard() {
                 { id: 'transactions', label: 'Transactions', icon: DollarSign },
                 { id: 'loans', label: 'Loans', icon: CreditCard },
                 { id: 'reports', label: 'Reports', icon: FileText },
-                { id: 'profit', label: 'Profit Distribution', icon: PieChart },
               ].map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
@@ -183,7 +180,6 @@ export default function AdminDashboard() {
         {activeTab === 'transactions' && <TransactionManagement />}
         {activeTab === 'loans' && <LoanManagement />}
         {activeTab === 'reports' && <Reports />}
-        {activeTab === 'profit' && <ProfitDistribution />}
       </div>
 
       <style>{`
