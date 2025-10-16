@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -21,14 +20,6 @@ import CountUp from 'react-countup';
 
 export default function AdminDashboard() {
   const { profile, signOut } = useAuth();
-  let navigateHook;
-  try {
-    navigateHook = useNavigate();
-  } catch (err) {
-    // If useNavigate throws because Router isn't present, we'll fallback to window.location
-    console.warn('useNavigate unavailable (no Router). Falling back to window.location.', err);
-    navigateHook = null;
-  }
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [stats, setStats] = useState({
@@ -39,9 +30,7 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    // loadStats will run after first render — safe to define below
     loadStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadStats() {
@@ -60,7 +49,6 @@ export default function AdminDashboard() {
 
       setStats({ totalMembers, totalBalance, totalLoans, pendingLoans });
     } catch (err) {
-      // don't crash the whole app — log and show zeros
       console.error('Failed to load stats:', err);
       setStats({ totalMembers: 0, totalBalance: 0, totalLoans: 0, pendingLoans: 0 });
     }
@@ -74,9 +62,7 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  const particlesLoaded = useCallback((container) => {
-    // optional
-  }, []);
+  const particlesLoaded = useCallback(() => {}, []);
 
   const StatCard = ({ icon: Icon, label, value, index }) => (
     <div
@@ -95,23 +81,13 @@ export default function AdminDashboard() {
     </div>
   );
 
+  // ✅ Fixed logout — now same as MemberDashboard
   async function handleSignOut() {
     try {
       await signOut();
+      // No manual navigation; AuthContext handles redirect
     } catch (err) {
-      console.error('signOut failed:', err);
-    }
-
-    // use React Router navigation if available, otherwise fallback to full redirect
-    if (navigateHook) {
-      try {
-        navigateHook('/login', { replace: true });
-      } catch (err) {
-        console.warn('navigate failed, falling back to window.location', err);
-        window.location.href = '/login';
-      }
-    } else {
-      window.location.href = '/login';
+      console.error('Error signing out:', err.message);
     }
   }
 
