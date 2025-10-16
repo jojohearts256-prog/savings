@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase, Member } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DollarSign, Users, TrendingUp, CheckCircle, Clock } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function ProfitDistribution() {
   const { profile } = useAuth();
@@ -17,25 +17,21 @@ export default function ProfitDistribution() {
 
   const loadProfitData = async () => {
     try {
-      // Fetch all members
       const { data: memberData } = await supabase.from('members').select('*');
       const membersList = memberData || [];
 
-      // Calculate total balances
       const totalBal = membersList.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
       setTotalBalances(totalBal);
 
-      // Fetch total profit (sum of all loan interests earned and not yet distributed)
       const { data: loanData } = await supabase.from('loans').select('*');
       const profit = (loanData || [])
         .filter(l => l.status === 'disbursed')
         .reduce((sum, l) => sum + ((Number(l.amount_approved) || 0) * (Number(l.interest_rate) || 0) / 100) - (l.profit_distributed || 0), 0);
-      setTotalProfit(profit);
+      setTotalProfit(Math.floor(profit));
 
-      // Calculate share % and profit share for each member
       const membersWithProfit = membersList.map(m => {
         const sharePercent = totalBal > 0 ? Number(m.account_balance || 0) / totalBal : 0;
-        const profitShare = Math.floor(sharePercent * profit); // no decimals
+        const profitShare = Math.floor(sharePercent * profit);
         return {
           ...m,
           sharePercent,
@@ -58,13 +54,11 @@ export default function ProfitDistribution() {
     try {
       const newBalance = Number(member.account_balance) + member.profitShare;
 
-      // Update member balance
       await supabase
         .from('members')
         .update({ account_balance: newBalance })
         .eq('id', memberId);
 
-      // Record transaction
       await supabase.from('transactions').insert({
         member_id: member.id,
         transaction_type: 'profit_share',
@@ -75,8 +69,9 @@ export default function ProfitDistribution() {
         recorded_by: profile?.id,
       });
 
-      // Update UI
-      loadProfitData();
+      // Update member status in UI
+      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, account_balance: newBalance, status: 'Paid' } : m));
+
     } catch (err) {
       console.error('Error disbursing profit for member:', err);
       alert('Error occurred. Check console.');
@@ -85,10 +80,11 @@ export default function ProfitDistribution() {
     }
   };
 
-  // Data for chart
+  // Chart data
   const chartData = members.map(m => ({
     name: m.full_name,
     profit: m.profitShare || 0,
+    percent: m.sharePercent ? +(m.sharePercent * 100).toFixed(2) : 0,
   }));
 
   return (
@@ -136,7 +132,8 @@ export default function ProfitDistribution() {
             <XAxis dataKey="name" tick={{ fontSize: 12 }} />
             <YAxis />
             <Tooltip formatter={(value: number) => `+UGX ${value.toLocaleString()}`} />
-            <Bar dataKey="profit" fill="#10B981" />
+            <Legend />
+            <Bar dataKey="profit" fill="#10B981" name="Profit UGX" />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -173,14 +170,23 @@ export default function ProfitDistribution() {
                   <td className="px-6 py-4 text-center">
                     <button
                       onClick={() => handleDisburse(m.id)}
-                      disabled={distributing || !m.profitShare || m.profitShare <= 0}
+                      disabled={distributing || !m.profitShare || m.profitShare <= 0 || m.status === 'Paid'}
                       className="px-4 py-1 btn-primary text-white rounded-xl disabled:opacity-50"
                     >
-                      {distributing ? 'Processing...' : 'Disburse'}
+                      {distributing && m.status !== 'Paid' ? 'Processing...' : 'Disburse'}
                     </button>
                   </td>
                 </tr>
               ))}
+              {/* Totals Row */}
+              <tr className="bg-gray-100 font-semibold text-gray-800">
+                <td className="px-6 py-4" colSpan={2}>Totals</td>
+                <td className="px-6 py-4">+UGX {totalBalances.toLocaleString()}</td>
+                <td className="px-6 py-4"></td>
+                <td className="px-6 py-4">+UGX {totalProfit.toLocaleString()}</td>
+                <td className="px-6 py-4"></td>
+                <td className="px-6 py-4"></td>
+              </tr>
             </tbody>
           </table>
         </div>
