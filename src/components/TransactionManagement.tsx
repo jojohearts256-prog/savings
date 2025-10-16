@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member, Profile } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowUpCircle, ArrowDownCircle, DollarSign, Search, Printer, Info } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Banknote, Search, Printer, Info } from 'lucide-react';
 
 export default function TransactionManagement() {
   const { profile } = useAuth();
@@ -13,8 +13,8 @@ export default function TransactionManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingMembers, setLoadingMembers] = useState(false);
 
-  // Helper to format amounts consistently as UGX
-  const formatUGX = (amount: any) => `UGX ${Number(amount ?? 0).toLocaleString('en-UG')}`;
+  // Helper to format amounts consistently as UGX (whole numbers)
+  const formatUGX = (amount: any) => `UGX ${Math.round(Number(amount ?? 0)).toLocaleString('en-UG')}`;
 
   useEffect(() => {
     loadTransactions();
@@ -202,8 +202,8 @@ export default function TransactionManagement() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
               <input
                 type="number"
-                step="0.01"
-                min="0.01"
+                step="1"
+                min="1"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
@@ -341,7 +341,7 @@ export default function TransactionManagement() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Transaction Management</h2>
         <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors">
-          <DollarSign className="w-5 h-5" />
+          <Banknote className="w-5 h-5" />
           New Transaction
         </button>
       </div>
