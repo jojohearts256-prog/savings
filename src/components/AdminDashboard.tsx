@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase, Member, Transaction, Loan } from '../lib/supabase';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Users,
@@ -15,15 +16,21 @@ import TransactionManagement from './TransactionManagement';
 import LoanManagement from './LoanManagement';
 import Reports from './Reports';
 import Particles from 'react-tsparticles';
-import type { Engine, Container } from 'tsparticles-engine';
 import { loadFull } from 'tsparticles';
 import CountUp from 'react-countup';
 
-type Tab = 'dashboard' | 'members' | 'transactions' | 'loans' | 'reports';
-
 export default function AdminDashboard() {
   const { profile, signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  let navigateHook;
+  try {
+    navigateHook = useNavigate();
+  } catch (err) {
+    // If useNavigate throws because Router isn't present, we'll fallback to window.location
+    console.warn('useNavigate unavailable (no Router). Falling back to window.location.', err);
+    navigateHook = null;
+  }
+
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [stats, setStats] = useState({
     totalMembers: 0,
     totalBalance: 0,
@@ -32,47 +39,52 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
+    // loadStats will run after first render — safe to define below
     loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadStats = async () => {
-    const [membersRes, loansRes] = await Promise.all([
-      supabase.from('members').select('account_balance'),
-      supabase.from('loans').select('status, outstanding_balance'),
-    ]);
+  async function loadStats() {
+    try {
+      const [membersRes, loansRes] = await Promise.all([
+        supabase.from('members').select('account_balance'),
+        supabase.from('loans').select('status, outstanding_balance'),
+      ]);
 
-    const totalMembers = membersRes.data?.length || 0;
-    const totalBalance =
-      membersRes.data?.reduce(
-        (sum, m) => sum + Number(m.account_balance),
-        0
-      ) || 0;
-    const pendingLoans =
-      loansRes.data?.filter((l) => l.status === 'pending').length || 0;
-    const totalLoans =
-      loansRes.data?.reduce(
-        (sum, l) => sum + Number(l.outstanding_balance || 0),
-        0
-      ) || 0;
+      const totalMembers = membersRes?.data?.length || 0;
+      const totalBalance =
+        (membersRes?.data || []).reduce((sum, m) => sum + Number(m?.account_balance || 0), 0) || 0;
+      const pendingLoans = (loansRes?.data || []).filter((l) => l?.status === 'pending').length || 0;
+      const totalLoans =
+        (loansRes?.data || []).reduce((sum, l) => sum + Number(l?.outstanding_balance || 0), 0) || 0;
 
-    setStats({ totalMembers, totalBalance, totalLoans, pendingLoans });
-  };
+      setStats({ totalMembers, totalBalance, totalLoans, pendingLoans });
+    } catch (err) {
+      // don't crash the whole app — log and show zeros
+      console.error('Failed to load stats:', err);
+      setStats({ totalMembers: 0, totalBalance: 0, totalLoans: 0, pendingLoans: 0 });
+    }
+  }
 
-  const particlesInit = useCallback(async (engine: Engine) => {
-    await loadFull(engine);
+  const particlesInit = useCallback(async (engine) => {
+    try {
+      await loadFull(engine);
+    } catch (err) {
+      console.warn('particles loadFull failed', err);
+    }
   }, []);
 
-  const particlesLoaded = useCallback(async (container: Container | undefined) => {}, []);
+  const particlesLoaded = useCallback((container) => {
+    // optional
+  }, []);
 
-  const StatCard = ({ icon: Icon, label, value, index }: any) => (
+  const StatCard = ({ icon: Icon, label, value, index }) => (
     <div
       className="bg-white/90 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 animate-float"
       style={{ animationDelay: `${index * 0.2}s` }}
     >
       <div className="flex items-center justify-between mb-4">
-        <div
-          className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow"
-        >
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow">
           <Icon className="w-6 h-6 text-white" />
         </div>
       </div>
@@ -82,6 +94,26 @@ export default function AdminDashboard() {
       <p className="text-sm text-gray-600">{label}</p>
     </div>
   );
+
+  async function handleSignOut() {
+    try {
+      await signOut();
+    } catch (err) {
+      console.error('signOut failed:', err);
+    }
+
+    // use React Router navigation if available, otherwise fallback to full redirect
+    if (navigateHook) {
+      try {
+        navigateHook('/login', { replace: true });
+      } catch (err) {
+        console.warn('navigate failed, falling back to window.location', err);
+        window.location.href = '/login';
+      }
+    } else {
+      window.location.href = '/login';
+    }
+  }
 
   return (
     <div className="min-h-screen relative bg-gray-100">
@@ -102,17 +134,38 @@ export default function AdminDashboard() {
             opacity: {
               value: 0.7,
               random: { enable: true, minimumValue: 0.4 },
-              anim: { enable: true, speed: 0.5, opacity_min: 0.3, sync: false }
+              anim: { enable: true, speed: 0.5, opacity_min: 0.3, sync: false },
             },
-            size: { value: { min: 2, max: 8 }, random: true, anim: { enable: true, speed: 4, size_min: 1, sync: false } },
-            move: { enable: true, speed: 0.8, direction: 'none', random: true, straight: false, outModes: { default: 'out' } },
-            links: { enable: true, distance: 140, color: '#00BFFF', opacity: 0.08, width: 1 }
+            size: {
+              value: { min: 2, max: 8 },
+              random: true,
+              anim: { enable: true, speed: 4, size_min: 1, sync: false },
+            },
+            move: {
+              enable: true,
+              speed: 0.8,
+              direction: 'none',
+              random: true,
+              straight: false,
+              outModes: { default: 'out' },
+            },
+            links: { enable: true, distance: 140, color: '#00BFFF', opacity: 0.08, width: 1 },
           },
           interactivity: {
-            events: { onHover: { enable: true, mode: 'repulse' }, onClick: { enable: true, mode: 'push' }, resize: true },
-            modes: { grab: { distance: 200, links: { opacity: 0.2 } }, bubble: { distance: 200, size: 6, duration: 2, opacity: 0.8 }, repulse: { distance: 100 }, push: { quantity: 4 }, remove: { quantity: 2 } }
+            events: {
+              onHover: { enable: true, mode: 'repulse' },
+              onClick: { enable: true, mode: 'push' },
+              resize: true,
+            },
+            modes: {
+              grab: { distance: 200, links: { opacity: 0.2 } },
+              bubble: { distance: 200, size: 6, duration: 2, opacity: 0.8 },
+              repulse: { distance: 100 },
+              push: { quantity: 4 },
+              remove: { quantity: 2 },
+            },
           },
-          detectRetina: true
+          detectRetina: true,
         }}
       />
 
@@ -134,10 +187,7 @@ export default function AdminDashboard() {
                 <p className="text-xs text-white/80 capitalize">{profile?.role}</p>
               </div>
               <button
-                onClick={async () => {
-                  await signOut(); 
-                  window.location.href = '/login'; // redirect to login page
-                }}
+                onClick={handleSignOut}
                 className="p-2 bg-white/20 hover:bg-red-500/30 rounded-xl transition-all duration-300 hover:scale-110 shadow-md hover:shadow-lg"
               >
                 <LogOut className="w-5 h-5 text-white" />
@@ -162,7 +212,7 @@ export default function AdminDashboard() {
               ].map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
-                  onClick={() => setActiveTab(id as Tab)}
+                  onClick={() => setActiveTab(id)}
                   className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-all duration-300 ${
                     activeTab === id
                       ? 'border-[#071A3F] text-[#071A3F]'
