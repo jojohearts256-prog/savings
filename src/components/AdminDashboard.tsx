@@ -15,6 +15,7 @@ import MemberManagement from './MemberManagement';
 import TransactionManagement from './TransactionManagement';
 import LoanManagement from './LoanManagement';
 import Reports from './Reports';
+import ProfitDistribution from './ProfitDistribution';
 import Particles from 'react-tsparticles';
 import { loadFull } from 'tsparticles';
 import CountUp from 'react-countup';
@@ -30,14 +31,28 @@ export default function AdminDashboard() {
     pendingLoans: 0,
   });
 
-  // Profit Distribution state
-  const [profitData, setProfitData] = useState<any[]>([]);
-  const [totalProfit, setTotalProfit] = useState(0);
+  const particlesInit = useCallback(async (engine) => {
+    await loadFull(engine);
+  }, []);
 
-  useEffect(() => {
-    loadStats();
-    if (activeTab === 'profit') loadProfitData();
-  }, [activeTab]);
+  const particlesLoaded = useCallback(() => {}, []);
+
+  const StatCard = ({ icon: Icon, label, value, index }) => (
+    <div
+      className="bg-white/90 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 animate-float"
+      style={{ animationDelay: `${index * 0.2}s` }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow">
+          <Icon className="w-6 h-6 text-white" />
+        </div>
+      </div>
+      <h3 className="text-2xl font-bold text-gray-900 mb-1">
+        {typeof value === 'number' ? <CountUp end={value} duration={1.5} separator="," /> : value}
+      </h3>
+      <p className="text-sm text-gray-600">{label}</p>
+    </div>
+  );
 
   async function loadStats() {
     try {
@@ -60,59 +75,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // Load profit distribution data
-  async function loadProfitData() {
-    try {
-      const { data: members } = await supabase.from('members').select('id, full_name, account_balance');
-      if (!members) return;
-
-      const totalFunds = members.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
-      const profitPercentage = 0.05; // Example: 5% of total funds as profit
-      const totalProfit = totalFunds * profitPercentage;
-      setTotalProfit(totalProfit);
-
-      const distribution = members.map((m) => {
-        const share = (Number(m.account_balance || 0) / totalFunds) * totalProfit;
-        return {
-          id: m.id,
-          name: m.full_name,
-          balance: Number(m.account_balance || 0),
-          profitShare: share,
-        };
-      });
-      setProfitData(distribution);
-    } catch (err) {
-      console.error('Error loading profit data:', err);
-    }
-  }
-
-  const particlesInit = useCallback(async (engine) => {
-    try {
-      await loadFull(engine);
-    } catch (err) {
-      console.warn('particles loadFull failed', err);
-    }
-  }, []);
-
-  const particlesLoaded = useCallback(() => {}, []);
-
-  const StatCard = ({ icon: Icon, label, value, index }) => (
-    <div
-      className="bg-white/90 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 animate-float"
-      style={{ animationDelay: `${index * 0.2}s` }}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow">
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-      </div>
-      <h3 className="text-2xl font-bold text-gray-900 mb-1">
-        {typeof value === 'number' ? <CountUp end={value} duration={1.5} separator="," /> : value}
-      </h3>
-      <p className="text-sm text-gray-600">{label}</p>
-    </div>
-  );
-
   async function handleSignOut() {
     try {
       await signOut();
@@ -120,6 +82,10 @@ export default function AdminDashboard() {
       console.error('Error signing out:', err.message);
     }
   }
+
+  useEffect(() => {
+    loadStats();
+  }, []);
 
   return (
     <div className="min-h-screen relative bg-gray-100">
@@ -137,16 +103,11 @@ export default function AdminDashboard() {
             number: { value: 40, density: { enable: true, area: 800 } },
             color: { value: ['#071A3F', '#007B8A', '#D8468C'] },
             shape: { type: 'circle' },
-            opacity: { value: 0.7, random: { enable: true, minimumValue: 0.4 }, anim: { enable: true, speed: 0.5, opacity_min: 0.3, sync: false } },
-            size: { value: { min: 2, max: 8 }, random: true, anim: { enable: true, speed: 4, size_min: 1, sync: false } },
-            move: { enable: true, speed: 0.8, direction: 'none', random: true, straight: false, outModes: { default: 'out' } },
+            opacity: { value: 0.7, random: { enable: true, minimumValue: 0.4 } },
+            size: { value: { min: 2, max: 8 }, random: true },
+            move: { enable: true, speed: 0.8, direction: 'none', random: true },
             links: { enable: true, distance: 140, color: '#00BFFF', opacity: 0.08, width: 1 },
           },
-          interactivity: {
-            events: { onHover: { enable: true, mode: 'repulse' }, onClick: { enable: true, mode: 'push' }, resize: true },
-            modes: { grab: { distance: 200, links: { opacity: 0.2 } }, bubble: { distance: 200, size: 6, duration: 2, opacity: 0.8 }, repulse: { distance: 100 }, push: { quantity: 4 }, remove: { quantity: 2 } },
-          },
-          detectRetina: true,
         }}
       />
 
@@ -177,9 +138,8 @@ export default function AdminDashboard() {
         </div>
       </nav>
 
-      {/* Content */}
+      {/* Tabs */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Tabs */}
         <div className="mb-6">
           <div className="border-b border-gray-300">
             <nav className="flex gap-2">
@@ -223,41 +183,7 @@ export default function AdminDashboard() {
         {activeTab === 'transactions' && <TransactionManagement />}
         {activeTab === 'loans' && <LoanManagement />}
         {activeTab === 'reports' && <Reports />}
-
-        {activeTab === 'profit' && (
-          <div className="bg-white rounded-2xl p-6 card-shadow">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Profit Distribution</h2>
-            <p className="mb-4 text-gray-700">
-              Total Profit to distribute: <span className="font-semibold text-green-700">{totalProfit.toLocaleString()} UGX</span>
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border border-gray-200 rounded-xl">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-sm font-semibold text-gray-700">Member</th>
-                    <th className="px-6 py-3 text-sm font-semibold text-gray-700">Account Balance</th>
-                    <th className="px-6 py-3 text-sm font-semibold text-gray-700">Profit Share</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {profitData.map((m) => (
-                    <tr key={m.id}>
-                      <td className="px-6 py-4 text-sm text-gray-800">{m.name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-800">{m.balance.toLocaleString()} UGX</td>
-                      <td className="px-6 py-4 text-sm text-green-700 font-semibold">{m.profitShare.toLocaleString()} UGX</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <button
-              onClick={() => alert('Profit disbursed successfully!')}
-              className="mt-4 px-6 py-2 bg-green-700 text-white font-semibold rounded-xl hover:bg-green-800 transition-all duration-300"
-            >
-              Disburse Profit
-            </button>
-          </div>
-        )}
+        {activeTab === 'profit' && <ProfitDistribution />}
       </div>
 
       <style>{`
