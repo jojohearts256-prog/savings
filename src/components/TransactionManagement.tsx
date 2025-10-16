@@ -86,7 +86,16 @@ export default function TransactionManagement() {
     const handleSelectMember = (member: Member) => {
       setFormData({ ...formData, member_id: String(member.id) });
       setMemberSearch(member.full_name);
+      // Hide suggestions after selection
+      setShowSuggestions(false);
     };
+
+    const [showSuggestions, setShowSuggestions] = useState(true);
+
+    useEffect(() => {
+      // Show suggestions only if member not yet selected
+      setShowSuggestions(!formData.member_id);
+    }, [formData.member_id]);
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -166,11 +175,11 @@ export default function TransactionManagement() {
               <input
                 type="text"
                 value={memberSearch}
-                onChange={(e) => setMemberSearch(e.target.value)}
+                onChange={(e) => { setMemberSearch(e.target.value); setShowSuggestions(true); setFormData({...formData, member_id: ''}); }}
                 placeholder="Search member..."
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
               />
-              {memberSearch && filteredMembers.length > 0 && (
+              {memberSearch && filteredMembers.length > 0 && showSuggestions && (
                 <ul className="absolute z-50 bg-white border border-gray-200 mt-1 w-full max-h-44 overflow-auto rounded-xl shadow-lg">
                   {filteredMembers.map((m) => (
                     <li
