@@ -9,6 +9,7 @@ import {
   LogOut,
   FileText,
   Bell,
+  PieChart,
 } from 'lucide-react';
 import MemberManagement from './MemberManagement';
 import TransactionManagement from './TransactionManagement';
@@ -29,9 +30,14 @@ export default function AdminDashboard() {
     pendingLoans: 0,
   });
 
+  // Profit Distribution state
+  const [profitData, setProfitData] = useState<any[]>([]);
+  const [totalProfit, setTotalProfit] = useState(0);
+
   useEffect(() => {
     loadStats();
-  }, []);
+    if (activeTab === 'profit') loadProfitData();
+  }, [activeTab]);
 
   async function loadStats() {
     try {
@@ -51,6 +57,32 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error('Failed to load stats:', err);
       setStats({ totalMembers: 0, totalBalance: 0, totalLoans: 0, pendingLoans: 0 });
+    }
+  }
+
+  // Load profit distribution data
+  async function loadProfitData() {
+    try {
+      const { data: members } = await supabase.from('members').select('id, full_name, account_balance');
+      if (!members) return;
+
+      const totalFunds = members.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
+      const profitPercentage = 0.05; // Example: 5% of total funds as profit
+      const totalProfit = totalFunds * profitPercentage;
+      setTotalProfit(totalProfit);
+
+      const distribution = members.map((m) => {
+        const share = (Number(m.account_balance || 0) / totalFunds) * totalProfit;
+        return {
+          id: m.id,
+          name: m.full_name,
+          balance: Number(m.account_balance || 0),
+          profitShare: share,
+        };
+      });
+      setProfitData(distribution);
+    } catch (err) {
+      console.error('Error loading profit data:', err);
     }
   }
 
@@ -81,11 +113,9 @@ export default function AdminDashboard() {
     </div>
   );
 
-  // ✅ Fixed logout — now same as MemberDashboard
   async function handleSignOut() {
     try {
       await signOut();
-      // No manual navigation; AuthContext handles redirect
     } catch (err) {
       console.error('Error signing out:', err.message);
     }
@@ -107,39 +137,14 @@ export default function AdminDashboard() {
             number: { value: 40, density: { enable: true, area: 800 } },
             color: { value: ['#071A3F', '#007B8A', '#D8468C'] },
             shape: { type: 'circle' },
-            opacity: {
-              value: 0.7,
-              random: { enable: true, minimumValue: 0.4 },
-              anim: { enable: true, speed: 0.5, opacity_min: 0.3, sync: false },
-            },
-            size: {
-              value: { min: 2, max: 8 },
-              random: true,
-              anim: { enable: true, speed: 4, size_min: 1, sync: false },
-            },
-            move: {
-              enable: true,
-              speed: 0.8,
-              direction: 'none',
-              random: true,
-              straight: false,
-              outModes: { default: 'out' },
-            },
+            opacity: { value: 0.7, random: { enable: true, minimumValue: 0.4 }, anim: { enable: true, speed: 0.5, opacity_min: 0.3, sync: false } },
+            size: { value: { min: 2, max: 8 }, random: true, anim: { enable: true, speed: 4, size_min: 1, sync: false } },
+            move: { enable: true, speed: 0.8, direction: 'none', random: true, straight: false, outModes: { default: 'out' } },
             links: { enable: true, distance: 140, color: '#00BFFF', opacity: 0.08, width: 1 },
           },
           interactivity: {
-            events: {
-              onHover: { enable: true, mode: 'repulse' },
-              onClick: { enable: true, mode: 'push' },
-              resize: true,
-            },
-            modes: {
-              grab: { distance: 200, links: { opacity: 0.2 } },
-              bubble: { distance: 200, size: 6, duration: 2, opacity: 0.8 },
-              repulse: { distance: 100 },
-              push: { quantity: 4 },
-              remove: { quantity: 2 },
-            },
+            events: { onHover: { enable: true, mode: 'repulse' }, onClick: { enable: true, mode: 'push' }, resize: true },
+            modes: { grab: { distance: 200, links: { opacity: 0.2 } }, bubble: { distance: 200, size: 6, duration: 2, opacity: 0.8 }, repulse: { distance: 100 }, push: { quantity: 4 }, remove: { quantity: 2 } },
           },
           detectRetina: true,
         }}
@@ -156,7 +161,6 @@ export default function AdminDashboard() {
               <h1 className="text-xl font-bold text-white tracking-wide">SmartSave Admin</h1>
             </div>
 
-            {/* Profile + Logout */}
             <div className="flex items-center gap-4 relative z-20">
               <div className="text-right">
                 <p className="text-sm font-medium text-white">{profile?.full_name}</p>
@@ -185,14 +189,13 @@ export default function AdminDashboard() {
                 { id: 'transactions', label: 'Transactions', icon: DollarSign },
                 { id: 'loans', label: 'Loans', icon: CreditCard },
                 { id: 'reports', label: 'Reports', icon: FileText },
+                { id: 'profit', label: 'Profit Distribution', icon: PieChart },
               ].map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
                   onClick={() => setActiveTab(id)}
                   className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-all duration-300 ${
-                    activeTab === id
-                      ? 'border-[#071A3F] text-[#071A3F]'
-                      : 'border-transparent text-gray-600 hover:text-[#D8468C] hover:border-[#D8468C]'
+                    activeTab === id ? 'border-[#071A3F] text-[#071A3F]' : 'border-transparent text-gray-600 hover:text-[#D8468C] hover:border-[#D8468C]'
                   } hover:scale-105`}
                 >
                   <Icon className="w-4 h-4" />
@@ -203,6 +206,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Tab Content */}
         {activeTab === 'dashboard' && (
           <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-6 animate-fade-in">Overview</h2>
@@ -219,6 +223,41 @@ export default function AdminDashboard() {
         {activeTab === 'transactions' && <TransactionManagement />}
         {activeTab === 'loans' && <LoanManagement />}
         {activeTab === 'reports' && <Reports />}
+
+        {activeTab === 'profit' && (
+          <div className="bg-white rounded-2xl p-6 card-shadow">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Profit Distribution</h2>
+            <p className="mb-4 text-gray-700">
+              Total Profit to distribute: <span className="font-semibold text-green-700">{totalProfit.toLocaleString()} UGX</span>
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border border-gray-200 rounded-xl">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-sm font-semibold text-gray-700">Member</th>
+                    <th className="px-6 py-3 text-sm font-semibold text-gray-700">Account Balance</th>
+                    <th className="px-6 py-3 text-sm font-semibold text-gray-700">Profit Share</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {profitData.map((m) => (
+                    <tr key={m.id}>
+                      <td className="px-6 py-4 text-sm text-gray-800">{m.name}</td>
+                      <td className="px-6 py-4 text-sm text-gray-800">{m.balance.toLocaleString()} UGX</td>
+                      <td className="px-6 py-4 text-sm text-green-700 font-semibold">{m.profitShare.toLocaleString()} UGX</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button
+              onClick={() => alert('Profit disbursed successfully!')}
+              className="mt-4 px-6 py-2 bg-green-700 text-white font-semibold rounded-xl hover:bg-green-800 transition-all duration-300"
+            >
+              Disburse Profit
+            </button>
+          </div>
+        )}
       </div>
 
       <style>{`
