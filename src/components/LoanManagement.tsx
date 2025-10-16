@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, Loan, Member, Profile } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { CreditCard, CheckCircle, XCircle, Clock, DollarSign, TrendingUp } from 'lucide-react';
+import { CreditCard, CheckCircle, XCircle, Clock, TrendingUp } from 'lucide-react';
 
 export default function LoanManagement() {
   const { profile } = useAuth();
@@ -48,7 +48,7 @@ export default function LoanManagement() {
           member_id: loan.member_id,
           type: 'loan_approved',
           title: 'Loan Approved',
-          message: `Your loan request of $${approvedAmount} has been approved at ${interestRate}% interest. Total repayable: $${totalRepayable.toFixed(2)}`,
+          message: `Your loan request of UGX ${approvedAmount.toLocaleString('en-UG')} has been approved at ${interestRate}% interest. Total repayable: UGX ${totalRepayable.toLocaleString('en-UG')}`,
         });
       } else {
         await supabase
@@ -108,7 +108,7 @@ export default function LoanManagement() {
         member_id: loan.member_id,
         type: 'loan_disbursed',
         title: 'Loan Disbursed',
-        message: `Your loan of $${loan.amount_approved} has been disbursed to your account.`,
+        message: `Your loan of UGX ${loan.amount_approved.toLocaleString('en-UG')} has been disbursed to your account.`,
       });
 
       loadLoans();
@@ -129,12 +129,11 @@ export default function LoanManagement() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Approved Amount</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Approved Amount (UGX)</label>
               <input
-                type="number"
-                step="0.01"
-                value={approvedAmount}
-                onChange={(e) => setApprovedAmount(parseFloat(e.target.value))}
+                type="text"
+                value={approvedAmount.toLocaleString('en-UG')}
+                onChange={(e) => setApprovedAmount(Number(e.target.value.replace(/,/g, '')))}
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
               />
             </div>
@@ -153,15 +152,15 @@ export default function LoanManagement() {
             <div className="bg-blue-50 rounded-xl p-4">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-600">Principal:</span>
-                <span className="font-semibold text-gray-800">${approvedAmount.toFixed(2)}</span>
+                <span className="font-semibold text-gray-800">UGX {approvedAmount.toLocaleString('en-UG')}</span>
               </div>
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-600">Interest ({interestRate}%):</span>
-                <span className="font-semibold text-gray-800">${(approvedAmount * interestRate / 100).toFixed(2)}</span>
+                <span className="font-semibold text-gray-800">UGX {(approvedAmount * interestRate / 100).toLocaleString('en-UG')}</span>
               </div>
               <div className="flex justify-between text-base font-bold border-t border-blue-200 pt-2 mt-2">
                 <span className="text-gray-800">Total Repayable:</span>
-                <span className="text-[#008080]">${totalRepayable.toFixed(2)}</span>
+                <span className="text-[#008080]">UGX {totalRepayable.toLocaleString('en-UG')}</span>
               </div>
             </div>
 
@@ -198,7 +197,7 @@ export default function LoanManagement() {
       setLoading(true);
 
       try {
-        const repaymentAmount = parseFloat(amount);
+        const repaymentAmount = parseFloat(amount.replace(/,/g, ''));
         const newOutstanding = Number(loan.outstanding_balance) - repaymentAmount;
 
         await supabase.from('loan_repayments').insert({
@@ -221,7 +220,7 @@ export default function LoanManagement() {
           member_id: loan.member_id,
           type: 'loan_repayment',
           title: 'Loan Repayment Recorded',
-          message: `A repayment of $${repaymentAmount} has been recorded. Outstanding balance: $${newOutstanding.toFixed(2)}`,
+          message: `A repayment of UGX ${repaymentAmount.toLocaleString('en-UG')} has been recorded. Outstanding balance: UGX ${newOutstanding.toLocaleString('en-UG')}`,
         });
 
         onClose();
@@ -241,15 +240,13 @@ export default function LoanManagement() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="bg-blue-50 rounded-xl p-4 mb-4">
               <p className="text-sm text-gray-600 mb-1">Outstanding Balance</p>
-              <p className="text-2xl font-bold text-[#008080]">${Number(loan.outstanding_balance).toLocaleString()}</p>
+              <p className="text-2xl font-bold text-[#008080]">UGX {Number(loan.outstanding_balance).toLocaleString('en-UG')}</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Repayment Amount</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Repayment Amount (UGX)</label>
               <input
-                type="number"
-                step="0.01"
-                max={loan.outstanding_balance}
+                type="text"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
@@ -294,7 +291,7 @@ export default function LoanManagement() {
       case 'pending': return <Clock className="w-4 h-4" />;
       case 'approved': return <CheckCircle className="w-4 h-4" />;
       case 'rejected': return <XCircle className="w-4 h-4" />;
-      case 'disbursed': return <DollarSign className="w-4 h-4" />;
+      case 'disbursed': return <CreditCard className="w-4 h-4" />;
       case 'completed': return <CheckCircle className="w-4 h-4" />;
       default: return null;
     }
@@ -331,7 +328,7 @@ export default function LoanManagement() {
         <div className="bg-white rounded-2xl p-5 card-shadow">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-green-600" />
+              <CreditCard className="w-5 h-5 text-green-600" />
             </div>
             <span className="text-sm font-medium text-gray-600">Active</span>
           </div>
@@ -348,10 +345,10 @@ export default function LoanManagement() {
             <span className="text-sm font-medium text-gray-600">Total Outstanding</span>
           </div>
           <p className="text-2xl font-bold text-[#008080]">
-            ${loans
+            UGX {loans
               .filter(l => l.status === 'disbursed')
               .reduce((sum, l) => sum + Number(l.outstanding_balance || 0), 0)
-              .toLocaleString()}
+              .toLocaleString('en-UG')}
           </p>
         </div>
       </div>
@@ -378,9 +375,9 @@ export default function LoanManagement() {
                     <div className="text-xs text-gray-500">{loan.members?.member_number}</div>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
-                    ${Number(loan.amount_requested).toLocaleString()}
+                    UGX {Number(loan.amount_requested).toLocaleString('en-UG')}
                     {loan.amount_approved && loan.amount_approved !== loan.amount_requested && (
-                      <div className="text-xs text-green-600">Approved: ${Number(loan.amount_approved).toLocaleString()}</div>
+                      <div className="text-xs text-green-600">Approved: UGX {Number(loan.amount_approved).toLocaleString('en-UG')}</div>
                     )}
                   </td>
                   <td className="px-6 py-4">
@@ -390,7 +387,7 @@ export default function LoanManagement() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-[#008080]">
-                    {loan.outstanding_balance ? `$${Number(loan.outstanding_balance).toLocaleString()}` : '-'}
+                    {loan.outstanding_balance ? `UGX ${Number(loan.outstanding_balance).toLocaleString('en-UG')}` : '-'}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
