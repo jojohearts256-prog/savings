@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom'; // ✅ added
 import { supabase, Member, Transaction, Loan } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -23,6 +24,7 @@ type Tab = 'dashboard' | 'members' | 'transactions' | 'loans' | 'reports';
 
 export default function AdminDashboard() {
   const { profile, signOut } = useAuth();
+  const navigate = useNavigate(); // ✅ navigation hook
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [stats, setStats] = useState({
     totalMembers: 0,
@@ -43,10 +45,7 @@ export default function AdminDashboard() {
 
     const totalMembers = membersRes.data?.length || 0;
     const totalBalance =
-      membersRes.data?.reduce(
-        (sum, m) => sum + Number(m.account_balance),
-        0
-      ) || 0;
+      membersRes.data?.reduce((sum, m) => sum + Number(m.account_balance), 0) || 0;
     const pendingLoans =
       loansRes.data?.filter((l) => l.status === 'pending').length || 0;
     const totalLoans =
@@ -70,14 +69,16 @@ export default function AdminDashboard() {
       style={{ animationDelay: `${index * 0.2}s` }}
     >
       <div className="flex items-center justify-between mb-4">
-        <div
-          className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow"
-        >
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow">
           <Icon className="w-6 h-6 text-white" />
         </div>
       </div>
       <h3 className="text-2xl font-bold text-gray-900 mb-1">
-        {typeof value === 'number' ? <CountUp end={value} duration={1.5} separator="," /> : value}
+        {typeof value === 'number' ? (
+          <CountUp end={value} duration={1.5} separator="," />
+        ) : (
+          value
+        )}
       </h3>
       <p className="text-sm text-gray-600">{label}</p>
     </div>
@@ -102,17 +103,38 @@ export default function AdminDashboard() {
             opacity: {
               value: 0.7,
               random: { enable: true, minimumValue: 0.4 },
-              anim: { enable: true, speed: 0.5, opacity_min: 0.3, sync: false }
+              anim: { enable: true, speed: 0.5, opacity_min: 0.3, sync: false },
             },
-            size: { value: { min: 2, max: 8 }, random: true, anim: { enable: true, speed: 4, size_min: 1, sync: false } },
-            move: { enable: true, speed: 0.8, direction: 'none', random: true, straight: false, outModes: { default: 'out' } },
-            links: { enable: true, distance: 140, color: '#00BFFF', opacity: 0.08, width: 1 }
+            size: {
+              value: { min: 2, max: 8 },
+              random: true,
+              anim: { enable: true, speed: 4, size_min: 1, sync: false },
+            },
+            move: {
+              enable: true,
+              speed: 0.8,
+              direction: 'none',
+              random: true,
+              straight: false,
+              outModes: { default: 'out' },
+            },
+            links: { enable: true, distance: 140, color: '#00BFFF', opacity: 0.08, width: 1 },
           },
           interactivity: {
-            events: { onHover: { enable: true, mode: 'repulse' }, onClick: { enable: true, mode: 'push' }, resize: true },
-            modes: { grab: { distance: 200, links: { opacity: 0.2 } }, bubble: { distance: 200, size: 6, duration: 2, opacity: 0.8 }, repulse: { distance: 100 }, push: { quantity: 4 }, remove: { quantity: 2 } }
+            events: {
+              onHover: { enable: true, mode: 'repulse' },
+              onClick: { enable: true, mode: 'push' },
+              resize: true,
+            },
+            modes: {
+              grab: { distance: 200, links: { opacity: 0.2 } },
+              bubble: { distance: 200, size: 6, duration: 2, opacity: 0.8 },
+              repulse: { distance: 100 },
+              push: { quantity: 4 },
+              remove: { quantity: 2 },
+            },
           },
-          detectRetina: true
+          detectRetina: true,
         }}
       />
 
@@ -124,7 +146,9 @@ export default function AdminDashboard() {
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
                 <Users className="w-6 h-6 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-white tracking-wide">SmartSave Admin</h1>
+              <h1 className="text-xl font-bold text-white tracking-wide">
+                SmartSave Admin
+              </h1>
             </div>
 
             {/* Profile + Logout */}
@@ -135,8 +159,8 @@ export default function AdminDashboard() {
               </div>
               <button
                 onClick={async () => {
-                  await signOut(); 
-                  window.location.href = '/login'; // redirect to login page
+                  await signOut();
+                  navigate('/login', { replace: true }); // ✅ smooth redirect without white screen
                 }}
                 className="p-2 bg-white/20 hover:bg-red-500/30 rounded-xl transition-all duration-300 hover:scale-110 shadow-md hover:shadow-lg"
               >
@@ -179,7 +203,9 @@ export default function AdminDashboard() {
 
         {activeTab === 'dashboard' && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-6 animate-fade-in">Overview</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 animate-fade-in">
+              Overview
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               <StatCard icon={Users} label="Total Members" value={stats.totalMembers} index={0} />
               <StatCard icon={DollarSign} label="Total Balance" value={stats.totalBalance} index={1} />
