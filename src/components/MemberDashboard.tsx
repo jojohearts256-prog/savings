@@ -66,11 +66,12 @@ export default function MemberDashboard() {
       try {
         if (!member) throw new Error('Member data not found');
 
-        const { data: loanNumberData } = await supabase.rpc('generate_loan_number');
+        // ✅ Generate a unique loan number to avoid duplicates
+        const loanNumber = "LN" + Date.now() + Math.floor(Math.random() * 1000);
 
         const { error: loanError } = await supabase.from('loans').insert({
           member_id: member.id,
-          loan_number: loanNumberData,
+          loan_number: loanNumber,
           amount_requested: parseFloat(formData.amount),
           repayment_period_months: parseInt(formData.repayment_period),
           reason: formData.reason,
@@ -163,7 +164,7 @@ export default function MemberDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navbar with new gradient */}
+      {/* Navbar */}
       <nav className="bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -200,6 +201,7 @@ export default function MemberDashboard() {
         </div>
       </nav>
 
+      {/* Notifications */}
       {showNotifications && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="bg-white rounded-2xl card-shadow p-4 max-h-96 overflow-y-auto">
@@ -230,9 +232,10 @@ export default function MemberDashboard() {
         </div>
       )}
 
-      {/* Rest of content remains unchanged */}
+      {/* Dashboard Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Account Balance */}
           <div className="bg-white rounded-2xl p-6 card-shadow-hover">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#00BFFF] flex items-center justify-center">
@@ -245,6 +248,7 @@ export default function MemberDashboard() {
             </h3>
           </div>
 
+          {/* Contributions */}
           <div className="bg-white rounded-2xl p-6 card-shadow-hover">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00BFFF] to-[#D8468C] flex items-center justify-center">
@@ -257,6 +261,7 @@ export default function MemberDashboard() {
             </h3>
           </div>
 
+          {/* Loans */}
           <div className="bg-white rounded-2xl p-6 card-shadow-hover">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] flex items-center justify-center">
@@ -270,8 +275,9 @@ export default function MemberDashboard() {
           </div>
         </div>
 
-        {/* Rest of content unchanged */}
+        {/* Recent Transactions & Loans */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Recent Transactions */}
           <div className="bg-white rounded-2xl card-shadow p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-gray-800">Recent Transactions</h3>
@@ -297,6 +303,7 @@ export default function MemberDashboard() {
             </div>
           </div>
 
+          {/* My Loans */}
           <div className="bg-white rounded-2xl card-shadow p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-gray-800">My Loans</h3>
