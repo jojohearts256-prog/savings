@@ -1,128 +1,122 @@
-import { useState, useEffect } from 'react';
-import { supabase, Member, Profile } from '../lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { supabase, Member } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Banknote, Printer } from 'lucide-react';
+import { DollarSign, Printer, Banknote } from 'lucide-react';
 
 export default function ProfitManagement() {
   const { profile } = useAuth();
-  const [profits, setProfits] = useState<any[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [profits, setProfits] = useState<any[]>([]);
   const [showDistributeModal, setShowDistributeModal] = useState(false);
+  const [selectedProfit, setSelectedProfit] = useState<any>(null);
   const [totalProfit, setTotalProfit] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  // Helper for UGX formatting
   const formatUGX = (amount: any) => `UGX ${Math.round(Number(amount ?? 0)).toLocaleString('en-UG')}`;
 
-  // Load all profit records
+  // Load all members
+  const loadMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('members')
+        .select('id, full_name, account_balance, total_contributions');
+      if (error) throw error;
+      setMembers(data || []);
+    } catch (err: any) {
+      console.error('Error loading members:', err.message);
+      setMembers([]);
+    }
+  };
+
+  // Load all profits
   const loadProfits = async () => {
     try {
       const { data, error } = await supabase
         .from('profits')
         .select(`
           *,
-          members!profits_member_id_fkey(full_name, member_number),
-          recorded_by:profiles!profits_recorded_by_fkey(full_name)
+          member:members!profits_member_id_fkey(full_name, member_number)
         `)
-        .order('date_distributed', { ascending: false });
-
+        .order('created_at', { ascending: false });
       if (error) throw error;
-
       const flattened = (data || []).map((p: any) => ({
         ...p,
-        member_name: p.members?.full_name || '-',
-        member_number: p.members?.member_number || '-',
-        recorded_by_name: p.recorded_by?.full_name || '-',
+        member_name: p.member?.full_name || '-',
+        member_number: p.member?.member_number || '-',
       }));
-
       setProfits(flattened);
     } catch (err: any) {
-      console.error('Error loading profits:', err);
+      console.error('Error loading profits:', err.message);
       setProfits([]);
     }
   };
 
-  // Load members for profit distribution
-  const loadMembers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('members')
-        .select('id, full_name, member_number, account_balance');
-
-      if (error) throw error;
-      setMembers(data || []);
-    } catch (err: any) {
-      console.error('Error loading members:', err);
-      setMembers([]);
-    }
-  };
-
   useEffect(() => {
-    loadProfits();
     loadMembers();
+    loadProfits();
   }, []);
 
-  // Distribute profits proportionally
-  const handleDistribute = async () => {
-    setError('');
+  const distributeProfits = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
-
     try {
       const profitAmount = parseFloat(totalProfit);
-      if (isNaN(profitAmount) || profitAmount <= 0) throw new Error('Enter a valid profit amount');
-      if (!members || members.length === 0) throw new Error('No members to distribute profits to');
+      if (isNaN(profitAmount) || profitAmount <= 0) throw new Error('Invalid profit amount');
 
-      const totalBalance = members.reduce((sum, m) => sum + Number(m.account_balance), 0);
-      if (totalBalance === 0) throw new Error('Total account balances are zero');
+      const totalBalances = members.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
+      if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
-      const profitInserts = members.map((m) => {
-        const share = (Number(m.account_balance) / totalBalance) * profitAmount;
-        return {
-          member_id: m.id,
-          profit_amount: share,
-          account_balance_at_distribution: Number(m.account_balance),
+      const inserts = [];
+      const updates = [];
+
+      for (const member of members) {
+        const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
+        if (memberShare <= 0) continue;
+
+        inserts.push({
+          member_id: member.id,
+          profit_amount: memberShare,
           recorded_by: profile?.id,
-        };
-      });
+        });
 
-      // Insert profit records
-      const { error: insertError } = await supabase.from('profits').insert(profitInserts);
+        updates.push(
+          supabase
+            .from('members')
+            .update({ account_balance: (Number(member.account_balance) || 0) + memberShare })
+            .eq('id', member.id)
+        );
+      }
+
+      const { error: insertError } = await supabase.from('profits').insert(inserts);
       if (insertError) throw insertError;
 
       // Update member balances
-      for (let m of profitInserts) {
-        await supabase
-          .from('members')
-          .update({ account_balance: m.account_balance_at_distribution + m.profit_amount })
-          .eq('id', m.member_id);
-      }
+      for (const u of updates) await u;
 
-      setShowDistributeModal(false);
       setTotalProfit('');
+      setShowDistributeModal(false);
       await loadProfits();
       await loadMembers();
+      alert('Profits distributed successfully!');
     } catch (err: any) {
-      setError(err.message || 'Failed to distribute profits');
+      console.error(err);
+      alert(err.message || 'Failed to distribute profits');
     } finally {
       setLoading(false);
     }
   };
 
   const handlePrint = (profit: any) => {
-    const printContent = `
+    const content = `
       <div style="font-family: Arial; padding: 20px;">
-        <h2>Profit Distribution Receipt</h2>
-        <p><strong>Member:</strong> ${profit.member_name}</p>
-        <p><strong>Member Number:</strong> ${profit.member_number}</p>
-        <p><strong>Profit Amount:</strong> ${formatUGX(profit.profit_amount)}</p>
-        <p><strong>Account Balance Before:</strong> ${formatUGX(profit.account_balance_at_distribution)}</p>
-        <p><strong>Date Distributed:</strong> ${new Date(profit.date_distributed).toLocaleString()}</p>
-        <p><strong>Recorded By:</strong> ${profit.recorded_by_name}</p>
+        <h2 style="color:#008080">Profit Receipt</h2>
+        <p>Date: ${new Date(profit.created_at).toLocaleString()}</p>
+        <p>Member: ${profit.member_name}</p>
+        <p>Amount: ${formatUGX(profit.profit_amount)}</p>
       </div>
     `;
     const w = window.open('', '', 'width=600,height=800');
-    w?.document.write(printContent);
+    w?.document.write(content);
     w?.document.close();
     w?.focus();
     w?.print();
@@ -136,11 +130,11 @@ export default function ProfitManagement() {
           onClick={() => setShowDistributeModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors"
         >
-          <Banknote className="w-5 h-5" />
-          Distribute Profits
+          <Banknote className="w-5 h-5" /> Distribute Profits
         </button>
       </div>
 
+      {/* Profit Table */}
       <div className="bg-white rounded-2xl card-shadow overflow-hidden shadow-md">
         <div className="overflow-x-auto">
           <table className="w-full min-w-max">
@@ -148,22 +142,19 @@ export default function ProfitManagement() {
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Date</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member Number</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Account Balance</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Profit Amount</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Recorded By</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Receipt</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {profits.map((p) => (
                 <tr key={p.id} className="hover:bg-[#f0f8f8] transition-colors cursor-pointer">
-                  <td className="px-6 py-4 text-sm text-gray-600">{new Date(p.date_distributed).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm text-gray-800">{p.member_name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{p.member_number}</td>
-                  <td className="px-6 py-4 text-sm font-semibold text-[#008080]">{formatUGX(p.account_balance_at_distribution)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{new Date(p.created_at).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm text-gray-800">
+                    {p.member_name}
+                    <div className="text-xs text-gray-500 italic">{p.member_number}</div>
+                  </td>
                   <td className="px-6 py-4 text-sm font-semibold text-green-600">{formatUGX(p.profit_amount)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{p.recorded_by_name}</td>
                   <td className="px-6 py-4">
                     <button
                       onClick={() => handlePrint(p)}
@@ -179,38 +170,41 @@ export default function ProfitManagement() {
         </div>
       </div>
 
-      {/* Distribute Profits Modal */}
+      {/* Distribute Modal */}
       {showDistributeModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl">
             <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Distribute Profits</h2>
-            {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">{error}</div>}
-            <div className="space-y-4">
-              <input
-                type="number"
-                step="1"
-                min="1"
-                value={totalProfit}
-                onChange={(e) => setTotalProfit(e.target.value)}
-                placeholder="Enter total profit to distribute"
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-              />
+            <form onSubmit={distributeProfits} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Total Profit Amount</label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={totalProfit}
+                  onChange={(e) => setTotalProfit(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+                  required
+                />
+              </div>
               <div className="flex gap-3 pt-4">
                 <button
-                  onClick={handleDistribute}
+                  type="submit"
                   disabled={loading}
                   className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors shadow-md"
                 >
                   {loading ? 'Distributing...' : 'Distribute'}
                 </button>
                 <button
-                  onClick={() => { setShowDistributeModal(false); setError(''); }}
+                  type="button"
+                  onClick={() => setShowDistributeModal(false)}
                   className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
