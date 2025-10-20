@@ -66,9 +66,33 @@ export default function MemberDashboard() {
       try {
         if (!member) throw new Error('Member data not found');
 
-        // ✅ Generate a unique loan number to avoid duplicates
+        // 1️⃣ Minimum deposit required to request a loan
+        const MIN_DEPOSIT = 50;
+        if (Number(member.account_balance) < MIN_DEPOSIT) {
+          throw new Error(`You must have at least $${MIN_DEPOSIT} in your account to request a loan.`);
+        }
+
+        // 2️⃣ Loan limit based on member balance (max 2x account balance)
+        const MAX_LOAN_MULTIPLIER = 2;
+        const maxLoanAmount = Number(member.account_balance) * MAX_LOAN_MULTIPLIER;
+        if (parseFloat(formData.amount) > maxLoanAmount) {
+          throw new Error(`Your loan request cannot exceed $${maxLoanAmount.toLocaleString()} based on your account balance.`);
+        }
+
+        // 3️⃣ Check company available balance
+        const companyBalanceRes = await supabase
+          .from('company_balance')
+          .select('balance')
+          .maybeSingle();
+        const companyBalance = companyBalanceRes.data?.balance || 0;
+        if (parseFloat(formData.amount) > companyBalance) {
+          throw new Error(`Loan request exceeds the company’s available balance of $${companyBalance.toLocaleString()}.`);
+        }
+
+        // ✅ Generate a unique loan number
         const loanNumber = "LN" + Date.now() + Math.floor(Math.random() * 1000);
 
+        // 4️⃣ Insert loan request
         const { error: loanError } = await supabase.from('loans').insert({
           member_id: member.id,
           loan_number: loanNumber,
