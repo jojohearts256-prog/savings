@@ -19,33 +19,47 @@ export default function MemberDashboard() {
   const loadMemberData = async () => {
     if (!profile) return;
 
-    const [memberRes, transactionsRes, loansRes, notificationsRes] = await Promise.all([
-      supabase.from('members').select('*').eq('profile_id', profile.id).maybeSingle(),
-      supabase.from('transactions').select('*').eq('member_id', profile.id).order('transaction_date', { ascending: false }).limit(10),
-      supabase.from('loans').select('*').eq('member_id', profile.id).order('requested_date', { ascending: false }),
-      supabase.from('notifications').select('*').eq('member_id', profile.id).order('sent_at', { ascending: false }).limit(20),
-    ]);
-
-    if (memberRes.data) {
-      const memberWithId = await supabase
+    try {
+      const memberRes = await supabase
         .from('members')
         .select('*')
         .eq('profile_id', profile.id)
         .maybeSingle();
 
-      setMember(memberWithId.data);
+      if (!memberRes.data) return;
 
-      if (memberWithId.data) {
-        const [txRes, loanRes, notifRes] = await Promise.all([
-          supabase.from('transactions').select('*').eq('member_id', memberWithId.data.id).order('transaction_date', { ascending: false }).limit(10),
-          supabase.from('loans').select('*').eq('member_id', memberWithId.data.id).order('requested_date', { ascending: false }),
-          supabase.from('notifications').select('*').eq('member_id', memberWithId.data.id).order('sent_at', { ascending: false }).limit(20),
-        ]);
+      const fetchedMember = {
+        ...memberRes.data,
+        account_balance: Number(memberRes.data.account_balance),
+        total_contributions: Number(memberRes.data.total_contributions),
+      };
+      setMember(fetchedMember);
 
-        setTransactions(txRes.data || []);
-        setLoans(loanRes.data || []);
-        setNotifications(notifRes.data || []);
-      }
+      const [txRes, loanRes, notifRes] = await Promise.all([
+        supabase
+          .from('transactions')
+          .select('*')
+          .eq('member_id', fetchedMember.id)
+          .order('transaction_date', { ascending: false })
+          .limit(10),
+        supabase
+          .from('loans')
+          .select('*')
+          .eq('member_id', fetchedMember.id)
+          .order('requested_date', { ascending: false }),
+        supabase
+          .from('notifications')
+          .select('*')
+          .eq('member_id', fetchedMember.id)
+          .order('sent_at', { ascending: false })
+          .limit(20),
+      ]);
+
+      setTransactions(txRes.data || []);
+      setLoans(loanRes.data || []);
+      setNotifications(notifRes.data || []);
+    } catch (err) {
+      console.error('Failed to load member data:', err);
     }
   };
 
@@ -66,37 +80,18 @@ export default function MemberDashboard() {
       try {
         if (!member) throw new Error('Member data not found');
 
-        // Minimum deposit required to request a loan
-        const MIN_DEPOSIT = 50000; // UGX
-        if (Number(member.account_balance) < MIN_DEPOSIT) {
-          throw new Error(`You must have at least UGX ${MIN_DEPOSIT.toLocaleString()} in your account to request a loan.`);
-        }
+        const requestedAmount = Number(formData.amount);
+        if (requestedAmount > member.account_balance)
+          throw new Error(
+            `Your request exceeds your account balance of UGX ${member.account_balance.toLocaleString()}`
+          );
 
-        // Loan limit based on member balance (max 2x account balance)
-        const MAX_LOAN_MULTIPLIER = 2;
-        const maxLoanAmount = Number(member.account_balance) * MAX_LOAN_MULTIPLIER;
-        if (parseFloat(formData.amount) > maxLoanAmount) {
-          throw new Error(`Your loan request cannot exceed UGX ${maxLoanAmount.toLocaleString()} based on your account balance.`);
-        }
+        const loanNumber = 'LN' + Date.now() + Math.floor(Math.random() * 1000);
 
-        // Check company available balance
-        const companyBalanceRes = await supabase
-          .from('company_balance')
-          .select('balance')
-          .maybeSingle();
-        const companyBalance = companyBalanceRes.data?.balance || 0;
-        if (parseFloat(formData.amount) > companyBalance) {
-          throw new Error(`Loan request exceeds the company’s available balance of UGX ${companyBalance.toLocaleString()}.`);
-        }
-
-        // Generate a unique loan number
-        const loanNumber = "LN" + Date.now() + Math.floor(Math.random() * 1000);
-
-        // Insert loan request
         const { error: loanError } = await supabase.from('loans').insert({
           member_id: member.id,
           loan_number: loanNumber,
-          amount_requested: parseFloat(formData.amount),
+          amount_requested: requestedAmount,
           repayment_period_months: parseInt(formData.repayment_period),
           reason: formData.reason,
         });
@@ -116,19 +111,18 @@ export default function MemberDashboard() {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl p-6 max-w-md w-full">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Request Loan</h2>
-
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
               {error}
             </div>
           )}
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Loan Amount (UGX)</label>
               <input
                 type="number"
                 step="1000"
+                min="1000"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#007B8A] focus:border-transparent outline-none"
@@ -184,7 +178,7 @@ export default function MemberDashboard() {
     );
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -266,9 +260,9 @@ export default function MemberDashboard() {
                 <DollarSign className="w-6 h-6 text-white" />
               </div>
             </div>
-            <p className="text-sm text-gray-600 mb-1">Account Balance</p>
+            <p className="text-sm text-gray-600 mb-1">Account Balance (UGX)</p>
             <h3 className="text-3xl font-bold text-[#007B8A]">
-              UGX {member ? Number(member.account_balance).toLocaleString() : '0'}
+              {member ? member.account_balance.toLocaleString() : '0'}
             </h3>
           </div>
 
@@ -279,9 +273,9 @@ export default function MemberDashboard() {
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
             </div>
-            <p className="text-sm text-gray-600 mb-1">Total Contributions</p>
+            <p className="text-sm text-gray-600 mb-1">Total Contributions (UGX)</p>
             <h3 className="text-3xl font-bold text-[#007B8A]">
-              UGX {member ? Number(member.total_contributions).toLocaleString() : '0'}
+              {member ? member.total_contributions.toLocaleString() : '0'}
             </h3>
           </div>
 
@@ -294,7 +288,7 @@ export default function MemberDashboard() {
             </div>
             <p className="text-sm text-gray-600 mb-1">Active Loans</p>
             <h3 className="text-3xl font-bold text-gray-800">
-              {loans.filter(l => l.status === 'disbursed').length}
+              {loans.filter((l) => l.status === 'disbursed').length}
             </h3>
           </div>
         </div>
@@ -315,12 +309,17 @@ export default function MemberDashboard() {
                     <p className="text-xs text-gray-600">{new Date(tx.transaction_date).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
-                    <p className={`text-sm font-semibold ${
-                      tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'
-                    }`}>
-                      {tx.transaction_type === 'withdrawal' ? '-' : '+'}UGX {Number(tx.amount).toLocaleString()}
+                    <p
+                      className={`text-sm font-semibold ${
+                        tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'
+                      }`}
+                    >
+                      {tx.transaction_type === 'withdrawal' ? '-' : '+'}
+                      {Number(tx.amount).toLocaleString()} UGX
                     </p>
-                    <p className="text-xs text-gray-600">Bal: UGX {Number(tx.balance_after).toLocaleString()}</p>
+                    <p className="text-xs text-gray-600">
+                      Bal: {Number(tx.balance_after).toLocaleString()} UGX
+                    </p>
                   </div>
                 </div>
               ))}
@@ -348,23 +347,33 @@ export default function MemberDashboard() {
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="text-sm font-medium text-gray-800">{loan.loan_number}</p>
-                        <p className="text-xs text-gray-600">{new Date(loan.requested_date).toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-600">
+                          {new Date(loan.requested_date).toLocaleDateString()}
+                        </p>
                       </div>
-                      <span className={`status-badge text-xs ${
-                        loan.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        loan.status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                        loan.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                        loan.status === 'disbursed' ? 'bg-green-100 text-green-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span
+                        className={`status-badge text-xs ${
+                          loan.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : loan.status === 'approved'
+                            ? 'bg-blue-100 text-blue-800'
+                            : loan.status === 'rejected'
+                            ? 'bg-red-100 text-red-800'
+                            : loan.status === 'disbursed'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
                         {loan.status}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
-                      <span>Amount: UGX {Number(loan.amount_approved || loan.amount_requested).toLocaleString()}</span>
+                      <span>
+                        Amount: {Number(loan.amount_approved || loan.amount_requested).toLocaleString()} UGX
+                      </span>
                       {loan.outstanding_balance !== null && (
                         <span className="font-semibold text-[#007B8A]">
-                          Outstanding: UGX {Number(loan.outstanding_balance).toLocaleString()}
+                          Outstanding: {Number(loan.outstanding_balance).toLocaleString()} UGX
                         </span>
                       )}
                     </div>
