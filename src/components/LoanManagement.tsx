@@ -1,23 +1,36 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { CreditCard, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { CreditCard, CheckCircle, XCircle, Clock, X } from 'lucide-react';
 
 export default function LoanManagement() {
   const { profile } = useAuth();
   const [loans, setLoans] = useState<any[]>([]);
   const [selectedLoan, setSelectedLoan] = useState<any>(null);
   const [showRepaymentModal, setShowRepaymentModal] = useState(false);
+  const [repaymentAmount, setRepaymentAmount] = useState<number>(0);
+  const [repaymentNotes, setRepaymentNotes] = useState<string>('');
+  const [repaymentMode, setRepaymentMode] = useState<'manual' | 'emi'>('manual');
 
   useEffect(() => {
     loadLoans();
   }, []);
 
-  // ✅ Load loans from the new view that includes full_name & phone
   const loadLoans = async () => {
     const { data, error } = await supabase
-      .from('loans_with_details')
-      .select('*')
+      .from('loans')
+      .select(`
+        *,
+        members!loans_member_id_fkey (
+          id,
+          member_number,
+          account_balance,
+          profiles!members_profile_id_fkey (
+            full_name,
+            phone
+          )
+        )
+      `)
       .order('requested_date', { ascending: false });
 
     if (error) console.error('Error loading loans:', error);
@@ -97,9 +110,7 @@ export default function LoanManagement() {
           title: 'Loan Approved',
           message: `Your loan of UGX ${approvedAmount.toLocaleString(
             'en-UG'
-          )} has been approved for ${loanTerm} months at ${interestRate}% interest. Monthly payment: UGX ${Math.round(
-            monthlyPayment
-          ).toLocaleString('en-UG')}.`,
+          )} has been approved for ${loanTerm} months at ${interestRate}% interest.`,
         });
       } else {
         await supabase
@@ -115,7 +126,7 @@ export default function LoanManagement() {
           member_id: loan.member_id,
           type: 'loan_rejected',
           title: 'Loan Rejected',
-          message: 'Your loan request has been reviewed and could not be approved at this time.',
+          message: 'Your loan request has been reviewed and could not be approved.',
         });
       }
 
@@ -130,8 +141,7 @@ export default function LoanManagement() {
   const handleDisburse = async (loanId: string) => {
     try {
       const loan = loans.find((l) => l.id === loanId);
-
-      const newBalance = Number(loan.account_balance) + Number(loan.amount_approved);
+      const member = loan.members;
 
       await supabase
         .from('loans')
@@ -141,13 +151,14 @@ export default function LoanManagement() {
         })
         .eq('id', loanId);
 
+      const newBalance = Number(member.account_balance) + Number(loan.amount_approved);
       await supabase.from('members').update({ account_balance: newBalance }).eq('id', loan.member_id);
 
       await supabase.from('transactions').insert({
         member_id: loan.member_id,
         transaction_type: 'deposit',
         amount: loan.amount_approved,
-        balance_before: loan.account_balance,
+        balance_before: member.account_balance,
         balance_after: newBalance,
         description: `Loan disbursement - ${loan.loan_number}`,
         recorded_by: profile?.id,
@@ -157,9 +168,7 @@ export default function LoanManagement() {
         member_id: loan.member_id,
         type: 'loan_disbursed',
         title: 'Loan Disbursed',
-        message: `Your loan of UGX ${loan.amount_approved.toLocaleString(
-          'en-UG'
-        )} has been disbursed to your account.`,
+        message: `Your loan of UGX ${loan.amount_approved.toLocaleString('en-UG')} has been disbursed to your account.`,
       });
 
       loadLoans();
@@ -249,6 +258,7 @@ export default function LoanManagement() {
       });
 
       await loadLoans();
+      setShowRepaymentModal(false);
     } catch (err) {
       console.error('Error recording repayment', err);
     }
@@ -303,11 +313,11 @@ export default function LoanManagement() {
                 <tr key={loan.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{loan.loan_number}</td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
-                    {loan.full_name || '—'}
-                    <div className="text-xs text-gray-500">{loan.member_number}</div>
+                    {loan.members?.profiles?.full_name || '—'}
+                    <div className="text-xs text-gray-500">{loan.members?.member_number}</div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-700">
-                    {loan.phone || '—'}
+                    {loan.members?.profiles?.phone || '—'}
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
                     UGX {Number(loan.amount_requested).toLocaleString('en-UG')}
@@ -367,6 +377,58 @@ export default function LoanManagement() {
           </table>
         </div>
       </div>
+
+      {/* ---------- Repayment Modal ---------- */}
+      {showRepaymentModal && selectedLoan && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-2xl shadow-lg w-full max-w-md relative">
+            <button
+              onClick={() => setShowRepaymentModal(false)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+            >
+              <X size={20} />
+            </button>
+
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">Record Repayment</h3>
+
+            <div className="space-y-3">
+              <input
+                type="number"
+                placeholder="Repayment Amount"
+                value={repaymentAmount}
+                onChange={(e) => setRepaymentAmount(Number(e.target.value))}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+              <textarea
+                placeholder="Notes (optional)"
+                value={repaymentNotes}
+                onChange={(e) => setRepaymentNotes(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium">Mode:</label>
+                <select
+                  value={repaymentMode}
+                  onChange={(e) => setRepaymentMode(e.target.value as 'manual' | 'emi')}
+                  className="border rounded-lg px-2 py-1 text-sm"
+                >
+                  <option value="manual">Manual</option>
+                  <option value="emi">EMI</option>
+                </select>
+              </div>
+            </div>
+
+            <button
+              onClick={() =>
+                handleRepayment(selectedLoan, repaymentAmount, repaymentNotes, repaymentMode)
+              }
+              className="mt-5 w-full btn-primary text-white py-2 rounded-lg"
+            >
+              Submit Repayment
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
