@@ -9,11 +9,13 @@ import {
   LogOut,
   FileText,
   Bell,
+  Banknote,
 } from 'lucide-react';
 import MemberManagement from './MemberManagement';
 import TransactionManagement from './TransactionManagement';
 import LoanManagement from './LoanManagement';
 import Reports from './Reports';
+import ProfitManagement from './ProfitManagement';
 import Particles from 'react-tsparticles';
 import { loadFull } from 'tsparticles';
 import CountUp from 'react-countup';
@@ -85,6 +87,15 @@ export default function AdminDashboard() {
     loadStats();
   }, []);
 
+  const tabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
+    { id: 'members', label: 'Members', icon: Users },
+    { id: 'transactions', label: 'Transactions', icon: DollarSign },
+    { id: 'loans', label: 'Loans', icon: CreditCard },
+    { id: 'reports', label: 'Reports', icon: FileText },
+    { id: 'profits', label: 'Profits', icon: Banknote },
+  ];
+
   return (
     <div className="min-h-screen relative bg-gray-100">
       {/* Particles */}
@@ -141,18 +152,14 @@ export default function AdminDashboard() {
         <div className="mb-6">
           <div className="border-b border-gray-300">
             <nav className="flex gap-2">
-              {[
-                { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
-                { id: 'members', label: 'Members', icon: Users },
-                { id: 'transactions', label: 'Transactions', icon: DollarSign },
-                { id: 'loans', label: 'Loans', icon: CreditCard },
-                { id: 'reports', label: 'Reports', icon: FileText },
-              ].map(({ id, label, icon: Icon }) => (
+              {tabs.map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
                   onClick={() => setActiveTab(id)}
                   className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-all duration-300 ${
-                    activeTab === id ? 'border-[#071A3F] text-[#071A3F]' : 'border-transparent text-gray-600 hover:text-[#D8468C] hover:border-[#D8468C]'
+                    activeTab === id
+                      ? 'border-[#071A3F] text-[#071A3F]'
+                      : 'border-transparent text-gray-600 hover:text-[#D8468C] hover:border-[#D8468C]'
                   } hover:scale-105`}
                 >
                   <Icon className="w-4 h-4" />
@@ -180,6 +187,7 @@ export default function AdminDashboard() {
         {activeTab === 'transactions' && <TransactionManagement />}
         {activeTab === 'loans' && <LoanManagement />}
         {activeTab === 'reports' && <Reports />}
+        {activeTab === 'profits' && <ProfitManagement />}
       </div>
 
       <style>{`
