@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { CreditCard, CheckCircle, XCircle, Clock, TrendingUp } from 'lucide-react';
+import { CreditCard, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 export default function LoanManagement() {
   const { profile } = useAuth();
@@ -22,13 +22,16 @@ export default function LoanManagement() {
           id,
           member_number,
           account_balance,
-          profiles (full_name, phone_number)
+          profiles!members_profile_id_fkey (
+            full_name,
+            phone
+          )
         )
       `)
       .order('requested_date', { ascending: false });
 
-    if (error) console.error(error);
-    setLoans(data || []);
+    if (error) console.error('Error loading loans:', error);
+    setLoans([...(data || [])]); // ensures React re-render
   };
 
   // ----------------- Helper functions -----------------
@@ -255,7 +258,6 @@ export default function LoanManagement() {
         )} has been recorded. Outstanding balance: UGX ${newOutstanding.toLocaleString('en-UG')}`,
       });
 
-      // Reload loans after repayment to reflect updates immediately
       await loadLoans();
     } catch (err) {
       console.error('Error recording repayment', err);
@@ -263,7 +265,7 @@ export default function LoanManagement() {
   };
   // ----------------------------------------------------
 
-  // ---------------- Status Badge helpers ----------------
+  // ---------------- Status helpers -------------------
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending': return <Clock className="w-4 h-4" />;
@@ -315,7 +317,7 @@ export default function LoanManagement() {
                     <div className="text-xs text-gray-500">{loan.members?.member_number}</div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-700">
-                    {loan.members?.profiles?.phone_number || '—'}
+                    {loan.members?.profiles?.phone || '—'}
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
                     UGX {Number(loan.amount_requested).toLocaleString('en-UG')}
