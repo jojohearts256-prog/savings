@@ -15,7 +15,12 @@ import MemberManagement from './MemberManagement';
 import TransactionManagement from './TransactionManagement';
 import LoanManagement from './LoanManagement';
 import Reports from './Reports';
-import ProfitManagement from './ProfitManagement';
+import Profiid SERIAL PRIMARY KEY,
+member_id UUID REFERENCES members(id),
+profit_amount NUMERIC,
+recorded_by UUID REFERENCES profiles(id),
+created_at TIMESTAMP DEFAULT now()
+tManagement from './ProfitManagement';
 import Particles from 'react-tsparticles';
 import { loadFull } from 'tsparticles';
 import CountUp from 'react-countup';
