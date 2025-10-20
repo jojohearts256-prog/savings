@@ -1,208 +1,213 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { supabase, Member } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  Users,
-  DollarSign,
-  TrendingUp,
-  CreditCard,
-  LogOut,
-  FileText,
-  Bell,
-  Banknote,
-} from 'lucide-react';
-import MemberManagement from './MemberManagement';
-import TransactionManagement from './TransactionManagement';
-import LoanManagement from './LoanManagement';
-import Reports from './Reports';
-import ProfitManagement from './ProfitManagement';
-import Particles from 'react-tsparticles';
-import { loadFull } from 'tsparticles';
-import CountUp from 'react-countup';
+import { DollarSign, Printer, Banknote } from 'lucide-react';
 
-export default function AdminDashboard() {
-  const { profile, signOut } = useAuth();
+export default function ProfitManagement() {
+  const { profile } = useAuth();
+  const [members, setMembers] = useState<Member[]>([]);
+  const [profits, setProfits] = useState<any[]>([]);
+  const [showDistributeModal, setShowDistributeModal] = useState(false);
+  const [selectedProfit, setSelectedProfit] = useState<any>(null);
+  const [totalProfit, setTotalProfit] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [stats, setStats] = useState({
-    totalMembers: 0,
-    totalBalance: 0,
-    totalLoans: 0,
-    pendingLoans: 0,
-  });
+  const formatUGX = (amount: any) => `UGX ${Math.round(Number(amount ?? 0)).toLocaleString('en-UG')}`;
 
-  const particlesInit = useCallback(async (engine) => {
-    await loadFull(engine);
-  }, []);
-
-  const particlesLoaded = useCallback(() => {}, []);
-
-  const StatCard = ({ icon: Icon, label, value, index }) => (
-    <div
-      className="bg-white/90 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 animate-float"
-      style={{ animationDelay: `${index * 0.2}s` }}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center transition-transform duration-300 hover:scale-125 shadow">
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-      </div>
-      <h3 className="text-2xl font-bold text-gray-900 mb-1">
-        {typeof value === 'number' ? <CountUp end={value} duration={1.5} separator="," /> : value}
-      </h3>
-      <p className="text-sm text-gray-600">{label}</p>
-    </div>
-  );
-
-  async function loadStats() {
+  // Load all members
+  const loadMembers = async () => {
     try {
-      const [membersRes, loansRes] = await Promise.all([
-        supabase.from('members').select('account_balance'),
-        supabase.from('loans').select('status, outstanding_balance'),
-      ]);
-
-      const totalMembers = membersRes?.data?.length || 0;
-      const totalBalance =
-        (membersRes?.data || []).reduce((sum, m) => sum + Number(m?.account_balance || 0), 0) || 0;
-      const pendingLoans = (loansRes?.data || []).filter((l) => l?.status === 'pending').length || 0;
-      const totalLoans =
-        (loansRes?.data || []).reduce((sum, l) => sum + Number(l?.outstanding_balance || 0), 0) || 0;
-
-      setStats({ totalMembers, totalBalance, totalLoans, pendingLoans });
-    } catch (err) {
-      console.error('Failed to load stats:', err);
-      setStats({ totalMembers: 0, totalBalance: 0, totalLoans: 0, pendingLoans: 0 });
+      const { data, error } = await supabase
+        .from('members')
+        .select('id, full_name, account_balance, total_contributions');
+      if (error) throw error;
+      setMembers(data || []);
+    } catch (err: any) {
+      console.error('Error loading members:', err.message);
+      setMembers([]);
     }
-  }
+  };
 
-  async function handleSignOut() {
+  // Load all profits
+  const loadProfits = async () => {
     try {
-      await signOut();
-    } catch (err) {
-      console.error('Error signing out:', err.message);
+      const { data, error } = await supabase
+        .from('profits')
+        .select(`
+          *,
+          member:members!profits_member_id_fkey(full_name, member_number)
+        `)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const flattened = (data || []).map((p: any) => ({
+        ...p,
+        member_name: p.member?.full_name || '-',
+        member_number: p.member?.member_number || '-',
+      }));
+      setProfits(flattened);
+    } catch (err: any) {
+      console.error('Error loading profits:', err.message);
+      setProfits([]);
     }
-  }
+  };
 
   useEffect(() => {
-    loadStats();
+    loadMembers();
+    loadProfits();
   }, []);
 
-  const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
-    { id: 'members', label: 'Members', icon: Users },
-    { id: 'transactions', label: 'Transactions', icon: DollarSign },
-    { id: 'loans', label: 'Loans', icon: CreditCard },
-    { id: 'reports', label: 'Reports', icon: FileText },
-    { id: 'profits', label: 'Profits', icon: Banknote },
-  ];
+  const distributeProfits = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const profitAmount = parseFloat(totalProfit);
+      if (isNaN(profitAmount) || profitAmount <= 0) throw new Error('Invalid profit amount');
+
+      const totalBalances = members.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
+      if (totalBalances === 0) throw new Error('No balances to distribute profits to');
+
+      const inserts = [];
+      const updates = [];
+
+      for (const member of members) {
+        const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
+        if (memberShare <= 0) continue;
+
+        inserts.push({
+          member_id: member.id,
+          profit_amount: memberShare,
+          recorded_by: profile?.id,
+        });
+
+        updates.push(
+          supabase
+            .from('members')
+            .update({ account_balance: (Number(member.account_balance) || 0) + memberShare })
+            .eq('id', member.id)
+        );
+      }
+
+      const { error: insertError } = await supabase.from('profits').insert(inserts);
+      if (insertError) throw insertError;
+
+      // Update member balances
+      for (const u of updates) await u;
+
+      setTotalProfit('');
+      setShowDistributeModal(false);
+      await loadProfits();
+      await loadMembers();
+      alert('Profits distributed successfully!');
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Failed to distribute profits');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrint = (profit: any) => {
+    const content = `
+      <div style="font-family: Arial; padding: 20px;">
+        <h2 style="color:#008080">Profit Receipt</h2>
+        <p>Date: ${new Date(profit.created_at).toLocaleString()}</p>
+        <p>Member: ${profit.member_name}</p>
+        <p>Amount: ${formatUGX(profit.profit_amount)}</p>
+      </div>
+    `;
+    const w = window.open('', '', 'width=600,height=800');
+    w?.document.write(content);
+    w?.document.close();
+    w?.focus();
+    w?.print();
+  };
 
   return (
-    <div className="min-h-screen relative bg-gray-100">
-      {/* Particles */}
-      <Particles
-        id="dashboard-particles"
-        init={particlesInit}
-        loaded={particlesLoaded}
-        style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}
-        options={{
-          fullScreen: { enable: false },
-          fpsLimit: 60,
-          background: { color: { value: 'transparent' } },
-          particles: {
-            number: { value: 40, density: { enable: true, area: 800 } },
-            color: { value: ['#071A3F', '#007B8A', '#D8468C'] },
-            shape: { type: 'circle' },
-            opacity: { value: 0.7, random: { enable: true, minimumValue: 0.4 } },
-            size: { value: { min: 2, max: 8 }, random: true },
-            move: { enable: true, speed: 0.8, direction: 'none', random: true },
-            links: { enable: true, distance: 140, color: '#00BFFF', opacity: 0.08, width: 1 },
-          },
-        }}
-      />
-
-      {/* Navbar */}
-      <nav className="relative z-20 bg-gradient-to-r from-[#071A3F] via-[#007B8A] to-[#D8468C] shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16 relative z-20">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#071A3F] via-[#007B8A] to-[#D8468C] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
-                <Users className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-xl font-bold text-white tracking-wide">SmartSave Admin</h1>
-            </div>
-
-            <div className="flex items-center gap-4 relative z-20">
-              <div className="text-right">
-                <p className="text-sm font-medium text-white">{profile?.full_name}</p>
-                <p className="text-xs text-white/80 capitalize">{profile?.role}</p>
-              </div>
-              <button
-                onClick={handleSignOut}
-                className="p-2 bg-white/20 hover:bg-red-500/30 rounded-xl transition-all duration-300 hover:scale-110 shadow-md hover:shadow-lg"
-              >
-                <LogOut className="w-5 h-5 text-white" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Tabs */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <div className="border-b border-gray-300">
-            <nav className="flex gap-2">
-              {tabs.map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => setActiveTab(id)}
-                  className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-all duration-300 ${
-                    activeTab === id
-                      ? 'border-[#071A3F] text-[#071A3F]'
-                      : 'border-transparent text-gray-600 hover:text-[#D8468C] hover:border-[#D8468C]'
-                  } hover:scale-105`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {label}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        {activeTab === 'dashboard' && (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-6 animate-fade-in">Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              <StatCard icon={Users} label="Total Members" value={stats.totalMembers} index={0} />
-              <StatCard icon={DollarSign} label="Total Balance" value={stats.totalBalance} index={1} />
-              <StatCard icon={CreditCard} label="Outstanding Loans" value={stats.totalLoans} index={2} />
-              <StatCard icon={Bell} label="Pending Loans" value={stats.pendingLoans} index={3} />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'members' && <MemberManagement />}
-        {activeTab === 'transactions' && <TransactionManagement />}
-        {activeTab === 'loans' && <LoanManagement />}
-        {activeTab === 'reports' && <Reports />}
-        {activeTab === 'profits' && <ProfitManagement />}
+    <div className="p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">Profit Management</h2>
+        <button
+          onClick={() => setShowDistributeModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors"
+        >
+          <Banknote className="w-5 h-5" /> Distribute Profits
+        </button>
       </div>
 
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
-        .animate-float { animation: float 6s ease-in-out infinite; }
+      {/* Profit Table */}
+      <div className="bg-white rounded-2xl card-shadow overflow-hidden shadow-md">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-max">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Date</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Profit Amount</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Receipt</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {profits.map((p) => (
+                <tr key={p.id} className="hover:bg-[#f0f8f8] transition-colors cursor-pointer">
+                  <td className="px-6 py-4 text-sm text-gray-600">{new Date(p.created_at).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm text-gray-800">
+                    {p.member_name}
+                    <div className="text-xs text-gray-500 italic">{p.member_number}</div>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-semibold text-green-600">{formatUGX(p.profit_amount)}</td>
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => handlePrint(p)}
+                      className="flex items-center gap-1 px-3 py-1 bg-[#008080] text-white rounded-xl text-sm hover:bg-[#006666] transition-colors"
+                    >
+                      <Printer className="w-4 h-4" /> Print
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-        @keyframes fadeIn {
-          0% { opacity: 0; transform: translateY(10px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in { animation: fadeIn 1s ease-out forwards; }
-      `}</style>
+      {/* Distribute Modal */}
+      {showDistributeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Distribute Profits</h2>
+            <form onSubmit={distributeProfits} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Total Profit Amount</label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={totalProfit}
+                  onChange={(e) => setTotalProfit(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+                  required
+                />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors shadow-md"
+                >
+                  {loading ? 'Distributing...' : 'Distribute'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDistributeModal(false)}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
