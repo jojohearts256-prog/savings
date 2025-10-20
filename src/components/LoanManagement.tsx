@@ -1,16 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { CreditCard, CheckCircle, XCircle, Clock, X } from 'lucide-react';
+import { CreditCard, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 export default function LoanManagement() {
   const { profile } = useAuth();
   const [loans, setLoans] = useState<any[]>([]);
   const [selectedLoan, setSelectedLoan] = useState<any>(null);
   const [showRepaymentModal, setShowRepaymentModal] = useState(false);
-  const [repaymentAmount, setRepaymentAmount] = useState<number>(0);
-  const [repaymentNotes, setRepaymentNotes] = useState<string>('');
-  const [repaymentMode, setRepaymentMode] = useState<'manual' | 'emi'>('manual');
 
   useEffect(() => {
     loadLoans();
@@ -34,7 +31,7 @@ export default function LoanManagement() {
       .order('requested_date', { ascending: false });
 
     if (error) console.error('Error loading loans:', error);
-    setLoans([...(data || [])]);
+    setLoans([...(data || [])]); // ensures React re-render
   };
 
   // ----------------- Helper functions -----------------
@@ -110,7 +107,9 @@ export default function LoanManagement() {
           title: 'Loan Approved',
           message: `Your loan of UGX ${approvedAmount.toLocaleString(
             'en-UG'
-          )} has been approved for ${loanTerm} months at ${interestRate}% interest.`,
+          )} has been approved for ${loanTerm} months at ${interestRate}% interest. Monthly payment: UGX ${Math.round(
+            monthlyPayment
+          ).toLocaleString('en-UG')}.`,
         });
       } else {
         await supabase
@@ -126,7 +125,7 @@ export default function LoanManagement() {
           member_id: loan.member_id,
           type: 'loan_rejected',
           title: 'Loan Rejected',
-          message: 'Your loan request has been reviewed and could not be approved.',
+          message: 'Your loan request has been reviewed and could not be approved at this time.',
         });
       }
 
@@ -168,7 +167,9 @@ export default function LoanManagement() {
         member_id: loan.member_id,
         type: 'loan_disbursed',
         title: 'Loan Disbursed',
-        message: `Your loan of UGX ${loan.amount_approved.toLocaleString('en-UG')} has been disbursed to your account.`,
+        message: `Your loan of UGX ${loan.amount_approved.toLocaleString(
+          'en-UG'
+        )} has been disbursed to your account.`,
       });
 
       loadLoans();
@@ -258,14 +259,12 @@ export default function LoanManagement() {
       });
 
       await loadLoans();
-      setShowRepaymentModal(false);
     } catch (err) {
       console.error('Error recording repayment', err);
     }
   };
   // ----------------------------------------------------
 
-  // ---------------- Status helpers -------------------
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending': return <Clock className="w-4 h-4" />;
@@ -287,7 +286,6 @@ export default function LoanManagement() {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
-  // ------------------------------------------------------
 
   // ------------------- Main UI --------------------------
   return (
@@ -299,6 +297,7 @@ export default function LoanManagement() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                {/* Removed Loan ID column */}
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Loan #</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member Name</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Phone</th>
@@ -378,54 +377,55 @@ export default function LoanManagement() {
         </div>
       </div>
 
-      {/* ---------- Repayment Modal ---------- */}
+      {/* Repayment Modal */}
       {showRepaymentModal && selectedLoan && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-2xl shadow-lg w-full max-w-md relative">
-            <button
-              onClick={() => setShowRepaymentModal(false)}
-              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
-            >
-              <X size={20} />
-            </button>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">
+              Loan Repayment - {selectedLoan.loan_number}
+            </h3>
 
-            <h3 className="text-lg font-semibold mb-4 text-gray-800">Record Repayment</h3>
-
-            <div className="space-y-3">
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-600 mb-1">Repayment Amount</label>
               <input
                 type="number"
-                placeholder="Repayment Amount"
-                value={repaymentAmount}
-                onChange={(e) => setRepaymentAmount(Number(e.target.value))}
-                className="w-full border rounded-lg px-3 py-2 text-sm"
+                className="w-full border rounded-lg px-3 py-2 text-gray-800"
+                placeholder="Enter amount"
+                onChange={(e) => setSelectedLoan({ ...selectedLoan, repaymentAmount: Number(e.target.value) })}
               />
-              <textarea
-                placeholder="Notes (optional)"
-                value={repaymentNotes}
-                onChange={(e) => setRepaymentNotes(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm"
-              />
-              <div className="flex items-center gap-3">
-                <label className="text-sm font-medium">Mode:</label>
-                <select
-                  value={repaymentMode}
-                  onChange={(e) => setRepaymentMode(e.target.value as 'manual' | 'emi')}
-                  className="border rounded-lg px-2 py-1 text-sm"
-                >
-                  <option value="manual">Manual</option>
-                  <option value="emi">EMI</option>
-                </select>
-              </div>
             </div>
 
-            <button
-              onClick={() =>
-                handleRepayment(selectedLoan, repaymentAmount, repaymentNotes, repaymentMode)
-              }
-              className="mt-5 w-full btn-primary text-white py-2 rounded-lg"
-            >
-              Submit Repayment
-            </button>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-600 mb-1">Notes</label>
+              <textarea
+                className="w-full border rounded-lg px-3 py-2 text-gray-800"
+                placeholder="Optional notes"
+                onChange={(e) => setSelectedLoan({ ...selectedLoan, notes: e.target.value })}
+              />
+            </div>
+
+            <div className="flex justify-between gap-3 mt-6">
+              <button
+                onClick={() => setShowRepaymentModal(false)}
+                className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleRepayment(
+                    selectedLoan,
+                    selectedLoan.repaymentAmount || 0,
+                    selectedLoan.notes || '',
+                    'manual'
+                  );
+                  setShowRepaymentModal(false);
+                }}
+                className="flex-1 py-2 bg-[#008080] text-white rounded-lg hover:bg-[#006666]"
+              >
+                Confirm Repayment
+              </button>
+            </div>
           </div>
         </div>
       )}
