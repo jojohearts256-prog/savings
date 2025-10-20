@@ -13,25 +13,15 @@ export default function LoanManagement() {
     loadLoans();
   }, []);
 
+  // ✅ Load loans from the new view that includes full_name & phone
   const loadLoans = async () => {
     const { data, error } = await supabase
-      .from('loans')
-      .select(`
-        *,
-        members!loans_member_id_fkey (
-          id,
-          member_number,
-          account_balance,
-          profiles!members_profile_id_fkey (
-            full_name,
-            phone
-          )
-        )
-      `)
+      .from('loans_with_details')
+      .select('*')
       .order('requested_date', { ascending: false });
 
     if (error) console.error('Error loading loans:', error);
-    setLoans([...(data || [])]); // ensures React re-render
+    setLoans([...(data || [])]);
   };
 
   // ----------------- Helper functions -----------------
@@ -113,7 +103,7 @@ export default function LoanManagement() {
         });
       } else {
         await supabase
-          .from('loans_with_details')
+          .from('loans')
           .update({
             status: 'rejected',
             approved_by: profile?.id,
@@ -140,7 +130,8 @@ export default function LoanManagement() {
   const handleDisburse = async (loanId: string) => {
     try {
       const loan = loans.find((l) => l.id === loanId);
-      const member = loan.members;
+
+      const newBalance = Number(loan.account_balance) + Number(loan.amount_approved);
 
       await supabase
         .from('loans')
@@ -150,14 +141,13 @@ export default function LoanManagement() {
         })
         .eq('id', loanId);
 
-      const newBalance = Number(member.account_balance) + Number(loan.amount_approved);
       await supabase.from('members').update({ account_balance: newBalance }).eq('id', loan.member_id);
 
       await supabase.from('transactions').insert({
         member_id: loan.member_id,
         transaction_type: 'deposit',
         amount: loan.amount_approved,
-        balance_before: member.account_balance,
+        balance_before: loan.account_balance,
         balance_after: newBalance,
         description: `Loan disbursement - ${loan.loan_number}`,
         recorded_by: profile?.id,
@@ -313,11 +303,11 @@ export default function LoanManagement() {
                 <tr key={loan.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{loan.loan_number}</td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
-                    {loan.members?.profiles?.full_name || '—'}
-                    <div className="text-xs text-gray-500">{loan.members?.member_number}</div>
+                    {loan.full_name || '—'}
+                    <div className="text-xs text-gray-500">{loan.member_number}</div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-700">
-                    {loan.members?.profiles?.phone || '—'}
+                    {loan.phone || '—'}
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
                     UGX {Number(loan.amount_requested).toLocaleString('en-UG')}
