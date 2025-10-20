@@ -113,7 +113,7 @@ export default function LoanManagement() {
         });
       } else {
         await supabase
-          .from('loans')
+          .from('loans_with_details')
           .update({
             status: 'rejected',
             approved_by: profile?.id,
