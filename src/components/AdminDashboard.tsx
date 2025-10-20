@@ -15,12 +15,7 @@ import MemberManagement from './MemberManagement';
 import TransactionManagement from './TransactionManagement';
 import LoanManagement from './LoanManagement';
 import Reports from './Reports';
-import Profiid SERIAL PRIMARY KEY,
-member_id UUID REFERENCES members(id),
-profit_amount NUMERIC,
-recorded_by UUID REFERENCES profiles(id),
-created_at TIMESTAMP DEFAULT now()
-tManagement from './ProfitManagement';
+import ProfitManagement from './ProfitManagement'; // ✅ Fixed import
 import Particles from 'react-tsparticles';
 import { loadFull } from 'tsparticles';
 import CountUp from 'react-countup';
@@ -98,12 +93,12 @@ export default function AdminDashboard() {
     { id: 'transactions', label: 'Transactions', icon: DollarSign },
     { id: 'loans', label: 'Loans', icon: CreditCard },
     { id: 'reports', label: 'Reports', icon: FileText },
-    { id: 'profits', label: 'Profits', icon: Banknote },
+    { id: 'profits', label: 'Profits', icon: Banknote }, // ✅ Profits tab
   ];
 
   return (
     <div className="min-h-screen relative bg-gray-100">
-      {/* Particles */}
+      {/* Particles Background */}
       <Particles
         id="dashboard-particles"
         init={particlesInit}
@@ -181,7 +176,7 @@ export default function AdminDashboard() {
             <h2 className="text-2xl font-bold text-gray-800 mb-6 animate-fade-in">Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               <StatCard icon={Users} label="Total Members" value={stats.totalMembers} index={0} />
-              <StatCard icon={DollarSign} label="Total Balance" value={stats.totalBalance} index={1} />
+              <StatCard icon={DollarSign} label="Total Balance (UGX)" value={stats.totalBalance} index={1} />
               <StatCard icon={CreditCard} label="Outstanding Loans" value={stats.totalLoans} index={2} />
               <StatCard icon={Bell} label="Pending Loans" value={stats.pendingLoans} index={3} />
             </div>
@@ -192,7 +187,7 @@ export default function AdminDashboard() {
         {activeTab === 'transactions' && <TransactionManagement />}
         {activeTab === 'loans' && <LoanManagement />}
         {activeTab === 'reports' && <Reports />}
-        {activeTab === 'profits' && <ProfitManagement />}
+        {activeTab === 'profits' && <ProfitManagement />} {/* ✅ Profits page working now */}
       </div>
 
       <style>{`
