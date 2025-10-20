@@ -66,33 +66,33 @@ export default function MemberDashboard() {
       try {
         if (!member) throw new Error('Member data not found');
 
-        // 1️⃣ Minimum deposit required to request a loan
-        const MIN_DEPOSIT = 50;
+        // Minimum deposit required to request a loan
+        const MIN_DEPOSIT = 50000; // UGX
         if (Number(member.account_balance) < MIN_DEPOSIT) {
-          throw new Error(`You must have at least $${MIN_DEPOSIT} in your account to request a loan.`);
+          throw new Error(`You must have at least UGX ${MIN_DEPOSIT.toLocaleString()} in your account to request a loan.`);
         }
 
-        // 2️⃣ Loan limit based on member balance (max 2x account balance)
+        // Loan limit based on member balance (max 2x account balance)
         const MAX_LOAN_MULTIPLIER = 2;
         const maxLoanAmount = Number(member.account_balance) * MAX_LOAN_MULTIPLIER;
         if (parseFloat(formData.amount) > maxLoanAmount) {
-          throw new Error(`Your loan request cannot exceed $${maxLoanAmount.toLocaleString()} based on your account balance.`);
+          throw new Error(`Your loan request cannot exceed UGX ${maxLoanAmount.toLocaleString()} based on your account balance.`);
         }
 
-        // 3️⃣ Check company available balance
+        // Check company available balance
         const companyBalanceRes = await supabase
           .from('company_balance')
           .select('balance')
           .maybeSingle();
         const companyBalance = companyBalanceRes.data?.balance || 0;
         if (parseFloat(formData.amount) > companyBalance) {
-          throw new Error(`Loan request exceeds the company’s available balance of $${companyBalance.toLocaleString()}.`);
+          throw new Error(`Loan request exceeds the company’s available balance of UGX ${companyBalance.toLocaleString()}.`);
         }
 
-        // ✅ Generate a unique loan number
+        // Generate a unique loan number
         const loanNumber = "LN" + Date.now() + Math.floor(Math.random() * 1000);
 
-        // 4️⃣ Insert loan request
+        // Insert loan request
         const { error: loanError } = await supabase.from('loans').insert({
           member_id: member.id,
           loan_number: loanNumber,
@@ -125,10 +125,10 @@ export default function MemberDashboard() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Loan Amount</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Loan Amount (UGX)</label>
               <input
                 type="number"
-                step="0.01"
+                step="1000"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#007B8A] focus:border-transparent outline-none"
@@ -268,7 +268,7 @@ export default function MemberDashboard() {
             </div>
             <p className="text-sm text-gray-600 mb-1">Account Balance</p>
             <h3 className="text-3xl font-bold text-[#007B8A]">
-              ${member ? Number(member.account_balance).toLocaleString() : '0'}
+              UGX {member ? Number(member.account_balance).toLocaleString() : '0'}
             </h3>
           </div>
 
@@ -281,7 +281,7 @@ export default function MemberDashboard() {
             </div>
             <p className="text-sm text-gray-600 mb-1">Total Contributions</p>
             <h3 className="text-3xl font-bold text-[#007B8A]">
-              ${member ? Number(member.total_contributions).toLocaleString() : '0'}
+              UGX {member ? Number(member.total_contributions).toLocaleString() : '0'}
             </h3>
           </div>
 
@@ -318,9 +318,9 @@ export default function MemberDashboard() {
                     <p className={`text-sm font-semibold ${
                       tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'
                     }`}>
-                      {tx.transaction_type === 'withdrawal' ? '-' : '+'}${Number(tx.amount).toLocaleString()}
+                      {tx.transaction_type === 'withdrawal' ? '-' : '+'}UGX {Number(tx.amount).toLocaleString()}
                     </p>
-                    <p className="text-xs text-gray-600">Bal: ${Number(tx.balance_after).toLocaleString()}</p>
+                    <p className="text-xs text-gray-600">Bal: UGX {Number(tx.balance_after).toLocaleString()}</p>
                   </div>
                 </div>
               ))}
@@ -361,10 +361,10 @@ export default function MemberDashboard() {
                       </span>
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
-                      <span>Amount: ${Number(loan.amount_approved || loan.amount_requested).toLocaleString()}</span>
+                      <span>Amount: UGX {Number(loan.amount_approved || loan.amount_requested).toLocaleString()}</span>
                       {loan.outstanding_balance !== null && (
                         <span className="font-semibold text-[#007B8A]">
-                          Outstanding: ${Number(loan.outstanding_balance).toLocaleString()}
+                          Outstanding: UGX {Number(loan.outstanding_balance).toLocaleString()}
                         </span>
                       )}
                     </div>
