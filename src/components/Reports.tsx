@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { FileText, Download, TrendingUp } from 'lucide-react';
@@ -108,71 +107,18 @@ export default function Reports() {
     }
   };
 
-  // --- PDF Download ---
-  const downloadPDF = () => {
-    if (!reportData) return;
+  // --- PDF Download for a single metric ---
+  const downloadMetricPDF = (label: string, value: any) => {
     const doc = new jsPDF();
     doc.setFontSize(18);
-    doc.text(`${reportType.toUpperCase()} Report`, 14, 22);
-
-    // General stats
-    let stats: any[] = [];
-    if (reportType === 'member') {
-      stats = [
-        ['Name', reportData.member.profiles.full_name],
-        ['Member Number', reportData.member.member_number],
-        ['Current Balance', `$${Number(reportData.member.account_balance).toLocaleString()}`],
-        ['Total Contributions', `$${Number(reportData.member.total_contributions).toLocaleString()}`],
-        ['Total Deposits', `$${reportData.totalDeposits.toLocaleString()}`],
-        ['Total Withdrawals', `$${reportData.totalWithdrawals.toLocaleString()}`],
-        ['Active Loans', reportData.activeLoans],
-        ['Completed Loans', reportData.completedLoans],
-      ];
-    } else {
-      stats = [
-        ['Total Deposits', `$${reportData.totalDeposits.toLocaleString()}`],
-        ['Total Withdrawals', `$${reportData.totalWithdrawals.toLocaleString()}`],
-        ['Total Contributions', `$${reportData.totalContributions.toLocaleString()}`],
-        ['Current Balance', `$${reportData.currentBalance.toLocaleString()}`],
-        ['Transactions', reportData.transactionCount],
-        ['Loans Requested', reportData.loansRequested],
-        ['Loans Approved', reportData.loansApproved],
-        ['Total Loan Amount', `$${reportData.totalLoanAmount.toLocaleString()}`],
-      ];
-    }
-
-    doc.autoTable({ startY: 30, head: [['Metric', 'Value']], body: stats });
-
-    // Transactions Table
-    if (reportData.transactions && reportData.transactions.length) {
-      doc.text('Transactions', 14, doc.lastAutoTable.finalY + 10);
-      const txTable = reportData.transactions.map((tx: any) => [
-        new Date(tx.transaction_date).toLocaleDateString(),
-        tx.transaction_type,
-        `$${Number(tx.amount).toLocaleString()}`,
-        `$${Number(tx.balance_after).toLocaleString()}`,
-      ]);
-      doc.autoTable({ startY: doc.lastAutoTable.finalY + 15, head: [['Date', 'Type', 'Amount', 'Balance']], body: txTable });
-    }
-
-    // Loans Table
-    if (reportData.loans && reportData.loans.length) {
-      doc.text('Loans', 14, doc.lastAutoTable.finalY + 10);
-      const loansTable = reportData.loans.map((l: any) => [
-        new Date(l.requested_date).toLocaleDateString(),
-        `$${Number(l.amount_requested).toLocaleString()}`,
-        l.status,
-        `$${Number(l.amount_approved || 0).toLocaleString()}`,
-      ]);
-      doc.autoTable({ startY: doc.lastAutoTable.finalY + 15, head: [['Requested', 'Amount Requested', 'Status', 'Amount Approved']], body: loansTable });
-    }
-
-    doc.save(`${reportType}-report.pdf`);
+    doc.text(`${label} Report`, 14, 22);
+    doc.autoTable({ startY: 30, head: [['Metric', 'Value']], body: [[label, value]] });
+    doc.save(`${label}-report.pdf`);
   };
 
-  // --- StatCard Component ---
+  // --- StatCard Component with PDF button ---
   const StatCard = ({ label, value, icon: Icon, color }: any) => (
-    <div className="bg-white rounded-xl p-4 card-shadow">
+    <div className="bg-white rounded-xl p-4 card-shadow relative">
       <div className="flex items-center gap-3 mb-2">
         <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center`}>
           <Icon className="w-5 h-5 text-white" />
@@ -180,6 +126,13 @@ export default function Reports() {
         <span className="text-sm font-medium text-gray-600">{label}</span>
       </div>
       <p className="text-2xl font-bold text-gray-800">{value}</p>
+      <button
+        onClick={() => downloadMetricPDF(label, value)}
+        className="absolute top-3 right-3 p-1 rounded-full bg-gray-200 hover:bg-gray-300"
+        title={`Download ${label}`}
+      >
+        <Download className="w-4 h-4 text-gray-700" />
+      </button>
     </div>
   );
 
@@ -233,12 +186,6 @@ export default function Reports() {
       {/* Reports */}
       {reportData && (
         <div>
-          <div className="flex justify-end mb-4">
-            <button onClick={downloadPDF} className="flex items-center gap-2 bg-[#008080] text-white px-4 py-2 rounded-xl hover:bg-teal-700">
-              <Download className="w-4 h-4" /> Download Full PDF
-            </button>
-          </div>
-
           {(reportType === 'monthly' || reportType === 'yearly') && (
             <div>
               <h3 className="text-xl font-bold text-gray-800 mb-4">{reportData.period} Report</h3>
@@ -260,22 +207,14 @@ export default function Reports() {
               <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Member Information</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Name</p>
-                    <p className="font-semibold text-gray-800">{reportData.member.profiles.full_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Member Number</p>
-                    <p className="font-semibold text-gray-800">{reportData.member.member_number}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Current Balance</p>
-                    <p className="font-semibold text-[#008080] text-xl">${Number(reportData.member.account_balance).toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Total Contributions</p>
-                    <p className="font-semibold text-[#008080] text-xl">${Number(reportData.member.total_contributions).toLocaleString()}</p>
-                  </div>
+                  <StatCard label="Name" value={reportData.member.profiles.full_name} icon={FileText} color="bg-[#ADD8E6]" />
+                  <StatCard label="Member Number" value={reportData.member.member_number} icon={FileText} color="bg-[#ADD8E6]" />
+                  <StatCard label="Current Balance" value={`$${Number(reportData.member.account_balance).toLocaleString()}`} icon={TrendingUp} color="bg-[#008080]" />
+                  <StatCard label="Total Contributions" value={`$${Number(reportData.member.total_contributions).toLocaleString()}`} icon={TrendingUp} color="bg-blue-500" />
+                  <StatCard label="Total Deposits" value={`$${reportData.totalDeposits.toLocaleString()}`} icon={TrendingUp} color="bg-green-500" />
+                  <StatCard label="Total Withdrawals" value={`$${reportData.totalWithdrawals.toLocaleString()}`} icon={TrendingUp} color="bg-red-500" />
+                  <StatCard label="Active Loans" value={reportData.activeLoans} icon={TrendingUp} color="bg-yellow-500" />
+                  <StatCard label="Completed Loans" value={reportData.completedLoans} icon={TrendingUp} color="bg-[#008080]" />
                 </div>
               </div>
             </div>
