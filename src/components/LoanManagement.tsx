@@ -370,6 +370,7 @@ export default function LoanManagement() {
                 <tr key={loan.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{loan.loan_number}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">
+                    {/* FETCH NAME EXACTLY LIKE THE ORIGINAL */}
                     {loan.members?.profiles?.full_name}
                     <div className="text-xs text-gray-500">{loan.members?.member_number}</div>
                   </td>
