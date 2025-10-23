@@ -38,14 +38,15 @@ export default function Reports() {
     const transactions = transactionsRes.data || [];
     const loans = loansRes.data || [];
     const members = membersRes.data || [];
+    const deposits = transactions.filter(t => t.transaction_type === 'deposit');
+    const withdrawals = transactions.filter(t => t.transaction_type === 'withdrawal');
+    const contributions = transactions.filter(t => t.transaction_type === 'contribution');
 
     setReportData({
       period: startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-      transactions,
-      loans,
-      totalDeposits: transactions.filter(t => t.transaction_type === 'deposit').reduce((sum, t) => sum + Number(t.amount), 0),
-      totalWithdrawals: transactions.filter(t => t.transaction_type === 'withdrawal').reduce((sum, t) => sum + Number(t.amount), 0),
-      totalContributions: transactions.filter(t => t.transaction_type === 'contribution').reduce((sum, t) => sum + Number(t.amount), 0),
+      totalDeposits: deposits.reduce((sum, t) => sum + Number(t.amount), 0),
+      totalWithdrawals: withdrawals.reduce((sum, t) => sum + Number(t.amount), 0),
+      totalContributions: contributions.reduce((sum, t) => sum + Number(t.amount), 0),
       transactionCount: transactions.length,
       loansRequested: loans.length,
       loansApproved: loans.filter(l => l.status === 'approved' || l.status === 'disbursed').length,
@@ -68,8 +69,6 @@ export default function Reports() {
 
     setReportData({
       period: selectedYear,
-      transactions,
-      loans,
       totalDeposits: transactions.filter(t => t.transaction_type === 'deposit').reduce((sum, t) => sum + Number(t.amount), 0),
       totalWithdrawals: transactions.filter(t => t.transaction_type === 'withdrawal').reduce((sum, t) => sum + Number(t.amount), 0),
       totalContributions: transactions.filter(t => t.transaction_type === 'contribution').reduce((sum, t) => sum + Number(t.amount), 0),
@@ -107,16 +106,26 @@ export default function Reports() {
     }
   };
 
-  // --- PDF Download for a single metric ---
+  // --- PDF Download for individual card ---
   const downloadMetricPDF = (label: string, value: any) => {
+    if (!reportData) return;
+
     const doc = new jsPDF();
     doc.setFontSize(18);
     doc.text(`${label} Report`, 14, 22);
-    doc.autoTable({ startY: 30, head: [['Metric', 'Value']], body: [[label, value]] });
-    doc.save(`${label}-report.pdf`);
+
+    const printableValue = typeof value === 'number' ? value.toLocaleString() : value;
+
+    doc.autoTable({
+      startY: 30,
+      head: [['Metric', 'Value']],
+      body: [[label, printableValue]],
+    });
+
+    doc.save(`${label.replace(/\s+/g, '-')}-report.pdf`);
   };
 
-  // --- StatCard Component with PDF button ---
+  // --- StatCard Component ---
   const StatCard = ({ label, value, icon: Icon, color }: any) => (
     <div className="bg-white rounded-xl p-4 card-shadow relative">
       <div className="flex items-center gap-3 mb-2">
@@ -129,7 +138,7 @@ export default function Reports() {
       <button
         onClick={() => downloadMetricPDF(label, value)}
         className="absolute top-3 right-3 p-1 rounded-full bg-gray-200 hover:bg-gray-300"
-        title={`Download ${label}`}
+        title={`Download ${label} PDF`}
       >
         <Download className="w-4 h-4 text-gray-700" />
       </button>
@@ -207,15 +216,30 @@ export default function Reports() {
               <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Member Information</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <StatCard label="Name" value={reportData.member.profiles.full_name} icon={FileText} color="bg-[#ADD8E6]" />
-                  <StatCard label="Member Number" value={reportData.member.member_number} icon={FileText} color="bg-[#ADD8E6]" />
-                  <StatCard label="Current Balance" value={`$${Number(reportData.member.account_balance).toLocaleString()}`} icon={TrendingUp} color="bg-[#008080]" />
-                  <StatCard label="Total Contributions" value={`$${Number(reportData.member.total_contributions).toLocaleString()}`} icon={TrendingUp} color="bg-blue-500" />
-                  <StatCard label="Total Deposits" value={`$${reportData.totalDeposits.toLocaleString()}`} icon={TrendingUp} color="bg-green-500" />
-                  <StatCard label="Total Withdrawals" value={`$${reportData.totalWithdrawals.toLocaleString()}`} icon={TrendingUp} color="bg-red-500" />
-                  <StatCard label="Active Loans" value={reportData.activeLoans} icon={TrendingUp} color="bg-yellow-500" />
-                  <StatCard label="Completed Loans" value={reportData.completedLoans} icon={TrendingUp} color="bg-[#008080]" />
+                  <div>
+                    <p className="text-sm text-gray-600">Name</p>
+                    <p className="font-semibold text-gray-800">{reportData.member.profiles.full_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Member Number</p>
+                    <p className="font-semibold text-gray-800">{reportData.member.member_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Current Balance</p>
+                    <p className="font-semibold text-[#008080] text-xl">${Number(reportData.member.account_balance).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Total Contributions</p>
+                    <p className="font-semibold text-[#008080] text-xl">${Number(reportData.member.total_contributions).toLocaleString()}</p>
+                  </div>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <StatCard label="Total Deposits" value={`$${reportData.totalDeposits.toLocaleString()}`} icon={TrendingUp} color="bg-green-500" />
+                <StatCard label="Total Withdrawals" value={`$${reportData.totalWithdrawals.toLocaleString()}`} icon={TrendingUp} color="bg-red-500" />
+                <StatCard label="Active Loans" value={reportData.activeLoans} icon={FileText} color="bg-yellow-500" />
+                <StatCard label="Completed Loans" value={reportData.completedLoans} icon={FileText} color="bg-green-500" />
               </div>
             </div>
           )}
