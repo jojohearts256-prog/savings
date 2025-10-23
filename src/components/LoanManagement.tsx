@@ -328,8 +328,8 @@ export default function LoanManagement() {
               {loans.map((loan) => (
                 <tr key={loan.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    <div className="font-semibold">{loan.members?.profiles?.full_name}</div>
-                    <div className="text-xs text-gray-500">ID: {loan.members?.member_number}</div>
+                    <div className="font-semibold">{loan.members?.profiles?.full_name || 'No Name'}</div>
+                    <div className="text-xs text-gray-500">ID: {loan.members?.member_number || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
                     UGX {Number(loan.amount_requested).toLocaleString('en-UG')}
@@ -358,7 +358,7 @@ export default function LoanManagement() {
                         <button onClick={() => handleDisburse(loan.id)} className="px-3 py-1.5 btn-primary text-white text-sm font-medium rounded-lg">Disburse</button>
                       )}
                       {loan.status === 'disbursed' && (
-                        <button onClick={() => { setSelectedLoan(loan); setShowRepaymentModal(true); }} className="px-3 py-1.5 btn-primary text-white text-sm font-medium rounded-lg">Repayment</button>
+                        <button onClick={() => { setSelectedLoan(loan); setShowRepaymentModal(true); }} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100">Repayment</button>
                       )}
                     </div>
                   </td>
