@@ -16,7 +16,7 @@ export default function LoanManagement() {
   const loadLoans = async () => {
     const { data } = await supabase
       .from('loans')
-      .select(`*, members!loans_member_id_fkey(*, profiles(*))`)
+      .select(`*, members!loans_member_id_fkey(*, profile(*))`)
       .order('requested_date', { ascending: false });
     setLoans(data || []);
   };
@@ -328,8 +328,8 @@ export default function LoanManagement() {
               {loans.map((loan) => (
                 <tr key={loan.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    <div className="font-semibold">{loan.members?.profiles?.full_name || 'No Name'}</div>
-                    <div className="text-xs text-gray-500">ID: {loan.members?.member_number || 'N/A'}</div>
+                    <div className="font-semibold">{loan.members?.profile?.full_name}</div>
+                    <div className="text-xs text-gray-500">ID: {loan.members?.member_number}</div>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
                     UGX {Number(loan.amount_requested).toLocaleString('en-UG')}
@@ -369,8 +369,13 @@ export default function LoanManagement() {
         </div>
       </div>
 
-      {selectedLoan && !showRepaymentModal && <ApprovalModal loan={selectedLoan} onClose={() => setSelectedLoan(null)} />}
-      {selectedLoan && showRepaymentModal && <RepaymentModal loan={selectedLoan} onClose={() => { setSelectedLoan(null); setShowRepaymentModal(false); }} />}
+      {/* Modals */}
+      {selectedLoan && !showRepaymentModal && (
+        <ApprovalModal loan={selectedLoan} onClose={() => setSelectedLoan(null)} />
+      )}
+      {selectedLoan && showRepaymentModal && (
+        <RepaymentModal loan={selectedLoan} onClose={() => { setSelectedLoan(null); setShowRepaymentModal(false); }} />
+      )}
     </div>
   );
 }
