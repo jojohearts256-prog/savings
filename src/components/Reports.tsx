@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { FileText, Download, TrendingUp } from 'lucide-react';
@@ -38,15 +39,14 @@ export default function Reports() {
     const transactions = transactionsRes.data || [];
     const loans = loansRes.data || [];
     const members = membersRes.data || [];
-    const deposits = transactions.filter(t => t.transaction_type === 'deposit');
-    const withdrawals = transactions.filter(t => t.transaction_type === 'withdrawal');
-    const contributions = transactions.filter(t => t.transaction_type === 'contribution');
 
     setReportData({
       period: startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-      totalDeposits: deposits.reduce((sum, t) => sum + Number(t.amount), 0),
-      totalWithdrawals: withdrawals.reduce((sum, t) => sum + Number(t.amount), 0),
-      totalContributions: contributions.reduce((sum, t) => sum + Number(t.amount), 0),
+      transactions,
+      loans,
+      totalDeposits: transactions.filter(t => t.transaction_type === 'deposit').reduce((sum, t) => sum + Number(t.amount), 0),
+      totalWithdrawals: transactions.filter(t => t.transaction_type === 'withdrawal').reduce((sum, t) => sum + Number(t.amount), 0),
+      totalContributions: transactions.filter(t => t.transaction_type === 'contribution').reduce((sum, t) => sum + Number(t.amount), 0),
       transactionCount: transactions.length,
       loansRequested: loans.length,
       loansApproved: loans.filter(l => l.status === 'approved' || l.status === 'disbursed').length,
@@ -69,6 +69,8 @@ export default function Reports() {
 
     setReportData({
       period: selectedYear,
+      transactions,
+      loans,
       totalDeposits: transactions.filter(t => t.transaction_type === 'deposit').reduce((sum, t) => sum + Number(t.amount), 0),
       totalWithdrawals: transactions.filter(t => t.transaction_type === 'withdrawal').reduce((sum, t) => sum + Number(t.amount), 0),
       totalContributions: transactions.filter(t => t.transaction_type === 'contribution').reduce((sum, t) => sum + Number(t.amount), 0),
@@ -106,18 +108,6 @@ export default function Reports() {
     }
   };
 
-  // --- CSV Download ---
-  const downloadCSV = (label: string, value: string | number) => {
-    const csv = `Metric,Value\n${label},${value}`;
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${label}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   // --- PDF Download ---
   const downloadPDF = () => {
     if (!reportData) return;
@@ -125,13 +115,14 @@ export default function Reports() {
     doc.setFontSize(18);
     doc.text(`${reportType.toUpperCase()} Report`, 14, 22);
 
+    // General stats
     let stats: any[] = [];
     if (reportType === 'member') {
       stats = [
         ['Name', reportData.member.profiles.full_name],
         ['Member Number', reportData.member.member_number],
-        ['Current Balance', `$${reportData.member.account_balance.toLocaleString()}`],
-        ['Total Contributions', `$${reportData.member.total_contributions.toLocaleString()}`],
+        ['Current Balance', `$${Number(reportData.member.account_balance).toLocaleString()}`],
+        ['Total Contributions', `$${Number(reportData.member.total_contributions).toLocaleString()}`],
         ['Total Deposits', `$${reportData.totalDeposits.toLocaleString()}`],
         ['Total Withdrawals', `$${reportData.totalWithdrawals.toLocaleString()}`],
         ['Active Loans', reportData.activeLoans],
@@ -152,9 +143,10 @@ export default function Reports() {
 
     doc.autoTable({ startY: 30, head: [['Metric', 'Value']], body: stats });
 
-    if (reportType === 'member' && reportData.transactions.length) {
-      doc.text('Recent Transactions', 14, doc.lastAutoTable.finalY + 10);
-      const txTable = reportData.transactions.slice(0, 10).map((tx: any) => [
+    // Transactions Table
+    if (reportData.transactions && reportData.transactions.length) {
+      doc.text('Transactions', 14, doc.lastAutoTable.finalY + 10);
+      const txTable = reportData.transactions.map((tx: any) => [
         new Date(tx.transaction_date).toLocaleDateString(),
         tx.transaction_type,
         `$${Number(tx.amount).toLocaleString()}`,
@@ -163,12 +155,24 @@ export default function Reports() {
       doc.autoTable({ startY: doc.lastAutoTable.finalY + 15, head: [['Date', 'Type', 'Amount', 'Balance']], body: txTable });
     }
 
+    // Loans Table
+    if (reportData.loans && reportData.loans.length) {
+      doc.text('Loans', 14, doc.lastAutoTable.finalY + 10);
+      const loansTable = reportData.loans.map((l: any) => [
+        new Date(l.requested_date).toLocaleDateString(),
+        `$${Number(l.amount_requested).toLocaleString()}`,
+        l.status,
+        `$${Number(l.amount_approved || 0).toLocaleString()}`,
+      ]);
+      doc.autoTable({ startY: doc.lastAutoTable.finalY + 15, head: [['Requested', 'Amount Requested', 'Status', 'Amount Approved']], body: loansTable });
+    }
+
     doc.save(`${reportType}-report.pdf`);
   };
 
   // --- StatCard Component ---
   const StatCard = ({ label, value, icon: Icon, color }: any) => (
-    <div className="bg-white rounded-xl p-4 card-shadow relative">
+    <div className="bg-white rounded-xl p-4 card-shadow">
       <div className="flex items-center gap-3 mb-2">
         <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center`}>
           <Icon className="w-5 h-5 text-white" />
@@ -176,13 +180,6 @@ export default function Reports() {
         <span className="text-sm font-medium text-gray-600">{label}</span>
       </div>
       <p className="text-2xl font-bold text-gray-800">{value}</p>
-      <button
-        onClick={() => downloadCSV(label, value)}
-        className="absolute top-3 right-3 p-1 rounded-full bg-gray-200 hover:bg-gray-300"
-        title={`Download ${label}`}
-      >
-        <Download className="w-4 h-4 text-gray-700" />
-      </button>
     </div>
   );
 
@@ -279,41 +276,6 @@ export default function Reports() {
                     <p className="text-sm text-gray-600">Total Contributions</p>
                     <p className="font-semibold text-[#008080] text-xl">${Number(reportData.member.total_contributions).toLocaleString()}</p>
                   </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <StatCard label="Total Deposits" value={`$${reportData.totalDeposits.toLocaleString()}`} icon={TrendingUp} color="bg-green-500" />
-                <StatCard label="Total Withdrawals" value={`$${reportData.totalWithdrawals.toLocaleString()}`} icon={TrendingUp} color="bg-red-500" />
-                <StatCard label="Active Loans" value={reportData.activeLoans} icon={FileText} color="bg-yellow-500" />
-                <StatCard label="Completed Loans" value={reportData.completedLoans} icon={FileText} color="bg-green-500" />
-              </div>
-
-              <div className="bg-white rounded-2xl card-shadow p-6">
-                <h4 className="font-bold text-gray-800 mb-4">Recent Transactions</h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Type</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Amount</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {reportData.transactions.slice(0, 10).map((tx: any) => (
-                        <tr key={tx.id}>
-                          <td className="px-4 py-3 text-sm text-gray-600">{new Date(tx.transaction_date).toLocaleDateString()}</td>
-                          <td className="px-4 py-3 text-sm capitalize">{tx.transaction_type}</td>
-                          <td className={`px-4 py-3 text-sm font-semibold ${tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'}`}>
-                            {tx.transaction_type === 'withdrawal' ? '-' : '+'}${Number(tx.amount).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-[#008080]">${Number(tx.balance_after).toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             </div>
