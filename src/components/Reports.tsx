@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { FileText, Download, Calendar, TrendingUp } from 'lucide-react';
+import { FileText, Download, TrendingUp } from 'lucide-react';
 
 export default function Reports() {
   const [reportType, setReportType] = useState<'monthly' | 'yearly' | 'member'>('monthly');
@@ -10,29 +10,18 @@ export default function Reports() {
   const [members, setMembers] = useState<any[]>([]);
   const [reportData, setReportData] = useState<any>(null);
 
-  useEffect(() => {
-    loadMembers();
-  }, []);
-
-  useEffect(() => {
-    generateReport();
-  }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
+  useEffect(() => { loadMembers(); }, []);
+  useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
   const loadMembers = async () => {
-    const { data } = await supabase
-      .from('members')
-      .select('*, profiles(*)');
+    const { data } = await supabase.from('members').select('*, profiles(*)');
     setMembers(data || []);
   };
 
   const generateReport = async () => {
-    if (reportType === 'monthly') {
-      await generateMonthlyReport();
-    } else if (reportType === 'yearly') {
-      await generateYearlyReport();
-    } else if (reportType === 'member' && selectedMemberId) {
-      await generateMemberReport();
-    }
+    if (reportType === 'monthly') await generateMonthlyReport();
+    else if (reportType === 'yearly') await generateYearlyReport();
+    else if (reportType === 'member' && selectedMemberId) await generateMemberReport();
   };
 
   const generateMonthlyReport = async () => {
@@ -63,6 +52,8 @@ export default function Reports() {
 
     setReportData({
       period: startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      transactions,
+      loans,
       totalDeposits: deposits.reduce((sum, t) => sum + Number(t.amount), 0),
       totalWithdrawals: withdrawals.reduce((sum, t) => sum + Number(t.amount), 0),
       totalContributions: contributions.reduce((sum, t) => sum + Number(t.amount), 0),
@@ -79,16 +70,8 @@ export default function Reports() {
     const endDate = new Date(`${selectedYear}-12-31`);
 
     const [transactionsRes, loansRes, membersRes] = await Promise.all([
-      supabase
-        .from('transactions')
-        .select('*')
-        .gte('transaction_date', startDate.toISOString())
-        .lte('transaction_date', endDate.toISOString()),
-      supabase
-        .from('loans')
-        .select('*')
-        .gte('requested_date', startDate.toISOString())
-        .lte('requested_date', endDate.toISOString()),
+      supabase.from('transactions').select('*').gte('transaction_date', startDate.toISOString()).lte('transaction_date', endDate.toISOString()),
+      supabase.from('loans').select('*').gte('requested_date', startDate.toISOString()).lte('requested_date', endDate.toISOString()),
       supabase.from('members').select('account_balance, total_contributions'),
     ]);
 
@@ -98,6 +81,8 @@ export default function Reports() {
 
     setReportData({
       period: selectedYear,
+      transactions,
+      loans,
       totalDeposits: transactions.filter(t => t.transaction_type === 'deposit').reduce((sum, t) => sum + Number(t.amount), 0),
       totalWithdrawals: transactions.filter(t => t.transaction_type === 'withdrawal').reduce((sum, t) => sum + Number(t.amount), 0),
       totalContributions: transactions.filter(t => t.transaction_type === 'contribution').reduce((sum, t) => sum + Number(t.amount), 0),
@@ -113,21 +98,9 @@ export default function Reports() {
 
   const generateMemberReport = async () => {
     const [memberRes, transactionsRes, loansRes] = await Promise.all([
-      supabase
-        .from('members')
-        .select('*, profiles(*)')
-        .eq('id', selectedMemberId)
-        .maybeSingle(),
-      supabase
-        .from('transactions')
-        .select('*')
-        .eq('member_id', selectedMemberId)
-        .order('transaction_date', { ascending: false }),
-      supabase
-        .from('loans')
-        .select('*')
-        .eq('member_id', selectedMemberId)
-        .order('requested_date', { ascending: false }),
+      supabase.from('members').select('*, profiles(*)').eq('id', selectedMemberId).maybeSingle(),
+      supabase.from('transactions').select('*').eq('member_id', selectedMemberId).order('transaction_date', { ascending: false }),
+      supabase.from('loans').select('*').eq('member_id', selectedMemberId).order('requested_date', { ascending: false }),
     ]);
 
     const member = memberRes.data;
@@ -148,6 +121,48 @@ export default function Reports() {
     }
   };
 
+  const downloadCSV = (data: any) => {
+    if (!data) return;
+    let rows: string[] = [];
+
+    // Helper to convert array of objects to CSV
+    const toCSV = (arr: any[], sectionName: string) => {
+      if (!arr || arr.length === 0) return [];
+      const keys = Object.keys(arr[0]);
+      const header = [sectionName, ...keys].join(',');
+      const content = arr.map(row => keys.map(k => `"${row[k]}"`).join(','));
+      return [header, ...content];
+    };
+
+    if (reportType === 'member' && data.member) {
+      rows.push(`Member Report: ${data.member.profiles.full_name}`);
+      rows.push(...toCSV([data.member], 'Member Info'));
+      rows.push(...toCSV(data.transactions, 'Transactions'));
+      rows.push(...toCSV(data.loans, 'Loans'));
+    } else {
+      rows.push(`Report Period: ${data.period}`);
+      rows.push(...toCSV(data.transactions, 'Transactions'));
+      rows.push(...toCSV(data.loans, 'Loans'));
+      rows.push(...toCSV([{
+        totalDeposits: data.totalDeposits,
+        totalWithdrawals: data.totalWithdrawals,
+        totalContributions: data.totalContributions,
+        currentBalance: data.currentBalance,
+        loansRequested: data.loansRequested,
+        loansApproved: data.loansApproved,
+        totalLoanAmount: data.totalLoanAmount,
+      }], 'Summary'));
+    }
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${reportType}-full-report.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const StatCard = ({ label, value, icon: Icon, color }: any) => (
     <div className="bg-white rounded-xl p-4 card-shadow">
       <div className="flex items-center gap-3 mb-2">
@@ -161,9 +176,10 @@ export default function Reports() {
   );
 
   return (
-    <div>
+    <div className="relative">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Reports & Analytics</h2>
 
+      {/* Report selectors */}
       <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div>
@@ -223,157 +239,48 @@ export default function Reports() {
         </div>
       </div>
 
+      {/* Report content */}
       {reportData && (
-        <div>
+        <div className="pb-24">
           {(reportType === 'monthly' || reportType === 'yearly') && (
             <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-800">{reportData.period} Report</h3>
-              </div>
-
+              <h3 className="text-xl font-bold text-gray-800 mb-4">{reportData.period} Report</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard
-                  label="Total Deposits"
-                  value={`$${reportData.totalDeposits.toLocaleString()}`}
-                  icon={TrendingUp}
-                  color="bg-green-500"
-                />
-                <StatCard
-                  label="Total Withdrawals"
-                  value={`$${reportData.totalWithdrawals.toLocaleString()}`}
-                  icon={TrendingUp}
-                  color="bg-red-500"
-                />
-                <StatCard
-                  label="Total Contributions"
-                  value={`$${reportData.totalContributions.toLocaleString()}`}
-                  icon={TrendingUp}
-                  color="bg-blue-500"
-                />
-                <StatCard
-                  label="Current Balance"
-                  value={`$${reportData.currentBalance.toLocaleString()}`}
-                  icon={TrendingUp}
-                  color="bg-[#008080]"
-                />
-                <StatCard
-                  label="Transactions"
-                  value={reportData.transactionCount}
-                  icon={FileText}
-                  color="bg-[#ADD8E6]"
-                />
-                <StatCard
-                  label="Loans Requested"
-                  value={reportData.loansRequested}
-                  icon={FileText}
-                  color="bg-yellow-500"
-                />
-                <StatCard
-                  label="Loans Approved"
-                  value={reportData.loansApproved}
-                  icon={FileText}
-                  color="bg-green-500"
-                />
-                <StatCard
-                  label="Total Loan Amount"
-                  value={`$${reportData.totalLoanAmount.toLocaleString()}`}
-                  icon={TrendingUp}
-                  color="bg-[#008080]"
-                />
+                <StatCard label="Total Deposits" value={`$${reportData.totalDeposits.toLocaleString()}`} icon={TrendingUp} color="bg-green-500" />
+                <StatCard label="Total Withdrawals" value={`$${reportData.totalWithdrawals.toLocaleString()}`} icon={TrendingUp} color="bg-red-500" />
+                <StatCard label="Total Contributions" value={`$${reportData.totalContributions.toLocaleString()}`} icon={TrendingUp} color="bg-blue-500" />
+                <StatCard label="Current Balance" value={`$${reportData.currentBalance.toLocaleString()}`} icon={TrendingUp} color="bg-[#008080]" />
               </div>
             </div>
           )}
 
           {reportType === 'member' && reportData.member && (
             <div>
-              <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Member Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Name</p>
-                    <p className="font-semibold text-gray-800">{reportData.member.profiles.full_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Member Number</p>
-                    <p className="font-semibold text-gray-800">{reportData.member.member_number}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Current Balance</p>
-                    <p className="font-semibold text-[#008080] text-xl">
-                      ${Number(reportData.member.account_balance).toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Total Contributions</p>
-                    <p className="font-semibold text-[#008080] text-xl">
-                      ${Number(reportData.member.total_contributions).toLocaleString()}
-                    </p>
-                  </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-4">{reportData.member.profiles.full_name} Statement</h3>
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <p className="text-sm text-gray-600">Current Balance</p>
+                  <p className="font-semibold text-[#008080] text-xl">${Number(reportData.member.account_balance).toLocaleString()}</p>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <StatCard
-                  label="Total Deposits"
-                  value={`$${reportData.totalDeposits.toLocaleString()}`}
-                  icon={TrendingUp}
-                  color="bg-green-500"
-                />
-                <StatCard
-                  label="Total Withdrawals"
-                  value={`$${reportData.totalWithdrawals.toLocaleString()}`}
-                  icon={TrendingUp}
-                  color="bg-red-500"
-                />
-                <StatCard
-                  label="Active Loans"
-                  value={reportData.activeLoans}
-                  icon={FileText}
-                  color="bg-yellow-500"
-                />
-                <StatCard
-                  label="Completed Loans"
-                  value={reportData.completedLoans}
-                  icon={FileText}
-                  color="bg-green-500"
-                />
-              </div>
-
-              <div className="bg-white rounded-2xl card-shadow p-6">
-                <h4 className="font-bold text-gray-800 mb-4">Recent Transactions</h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Type</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Amount</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {reportData.transactions.slice(0, 10).map((tx: any) => (
-                        <tr key={tx.id}>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {new Date(tx.transaction_date).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3 text-sm capitalize">{tx.transaction_type}</td>
-                          <td className={`px-4 py-3 text-sm font-semibold ${
-                            tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'
-                          }`}>
-                            {tx.transaction_type === 'withdrawal' ? '-' : '+'}${Number(tx.amount).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-[#008080]">
-                            ${Number(tx.balance_after).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div>
+                  <p className="text-sm text-gray-600">Total Contributions</p>
+                  <p className="font-semibold text-[#008080] text-xl">${Number(reportData.member.total_contributions).toLocaleString()}</p>
                 </div>
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* DOWNLOAD BUTTON fixed at bottom-right */}
+      {reportData && (
+        <div className="fixed bottom-6 right-6">
+          <button
+            onClick={() => downloadCSV(reportData)}
+            className="flex items-center gap-2 bg-[#008080] hover:bg-[#006666] text-white px-5 py-3 rounded-xl font-semibold shadow-lg transition"
+          >
+            <Download className="w-5 h-5" /> Download Full Report
+          </button>
         </div>
       )}
     </div>
