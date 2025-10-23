@@ -328,11 +328,7 @@ export default function LoanManagement() {
               {loans.map((loan) => (
                 <tr key={loan.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    <div className="font-semibold">
-                      {loan.members?.profiles?.full_name 
-                        || `${loan.members?.profiles?.first_name || ''} ${loan.members?.profiles?.last_name || ''}`.trim() 
-                        || 'No Name'}
-                    </div>
+                    <div className="font-semibold">{loan.members?.profiles?.full_name || 'No Name'}</div>
                     <div className="text-xs text-gray-500">ID: {loan.members?.member_number || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
@@ -359,10 +355,10 @@ export default function LoanManagement() {
                         </>
                       )}
                       {loan.status === 'approved' && (
-                        <button onClick={() => handleDisburse(loan.id)} className="px-3 py-1.5 btn-primary text-white text-sm font-medium rounded-lg hover:opacity-90">Disburse</button>
+                        <button onClick={() => handleDisburse(loan.id)} className="px-3 py-1.5 btn-primary text-white text-sm font-medium rounded-lg">Disburse</button>
                       )}
-                      {['disbursed', 'completed'].includes(loan.status) && (
-                        <button onClick={() => { setSelectedLoan(loan); setShowRepaymentModal(true); }} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100">Repay</button>
+                      {loan.status === 'disbursed' && (
+                        <button onClick={() => { setSelectedLoan(loan); setShowRepaymentModal(true); }} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100">Repayment</button>
                       )}
                     </div>
                   </td>
@@ -373,7 +369,6 @@ export default function LoanManagement() {
         </div>
       </div>
 
-      {/* Modals */}
       {selectedLoan && !showRepaymentModal && <ApprovalModal loan={selectedLoan} onClose={() => setSelectedLoan(null)} />}
       {selectedLoan && showRepaymentModal && <RepaymentModal loan={selectedLoan} onClose={() => { setSelectedLoan(null); setShowRepaymentModal(false); }} />}
     </div>
