@@ -21,11 +21,20 @@ export default function LoanManagement() {
       )
       .order('requested_date', { ascending: false });
 
-    setLoans(data || []);
+    // Map to ensure full_name is properly available
+    const mappedLoans = (data || []).map(loan => ({
+      ...loan,
+      member_full_name: loan.members?.profiles?.full_name || 'No Name',
+      member_number: loan.members?.member_number || 'N/A'
+    }));
+
+    setLoans(mappedLoans);
   };
 
   const handleLoanAction = async (loanId: string, action: 'approve' | 'reject', approvedAmount?: number, interestRate?: number) => {
     try {
+      const loan = loans.find(l => l.id === loanId);
+
       if (action === 'approve' && approvedAmount && interestRate !== undefined) {
         const totalRepayable = approvedAmount + (approvedAmount * interestRate / 100);
 
@@ -42,7 +51,6 @@ export default function LoanManagement() {
           })
           .eq('id', loanId);
 
-        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_approved',
@@ -58,7 +66,6 @@ export default function LoanManagement() {
           })
           .eq('id', loanId);
 
-        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_rejected',
@@ -360,8 +367,8 @@ export default function LoanManagement() {
               {loans.map((loan) => (
                 <tr key={loan.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    {loan.members?.profiles?.full_name}
-                    <div className="text-xs text-gray-500">{loan.members?.member_number}</div>
+                    {loan.member_full_name}
+                    <div className="text-xs text-gray-500">{loan.member_number}</div>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
                     UGX {Number(loan.amount_requested).toLocaleString('en-UG')}
