@@ -198,7 +198,6 @@ export default function LoanManagement() {
         let principalRemaining = Number(loan.outstanding_balance);
         let interest = principalRemaining * (loan.interest_rate / 100);
         let totalOutstanding = principalRemaining + interest;
-
         const newPrincipal = principalRemaining - repaymentAmount;
         const newInterest = newPrincipal * (loan.interest_rate / 100);
         const newOutstanding = newPrincipal + newInterest;
