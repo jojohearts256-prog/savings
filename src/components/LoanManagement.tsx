@@ -16,19 +16,23 @@ export default function LoanManagement() {
   const loadLoans = async () => {
     const { data } = await supabase
       .from('loans')
-      .select(
-        `*, members!loans_member_id_fkey(*, profiles(*))`
-      )
+      .select(`*, members!loans_member_id_fkey(*, profiles(*))`)
       .order('requested_date', { ascending: false });
 
     setLoans(data || []);
   };
 
-  const handleLoanAction = async (loanId: string, action: 'approve' | 'reject', approvedAmount?: number, interestRate?: number) => {
+  const handleLoanAction = async (
+    loanId: string,
+    action: 'approve' | 'reject',
+    approvedAmount?: number,
+    interestRate?: number
+  ) => {
     try {
-      if (action === 'approve' && approvedAmount && interestRate !== undefined) {
-        const totalRepayable = approvedAmount + (approvedAmount * interestRate / 100);
+      const loan = loans.find(l => l.id === loanId);
 
+      if (action === 'approve' && approvedAmount && interestRate !== undefined) {
+        // Only store principal & interest rate, no flat total
         await supabase
           .from('loans')
           .update({
@@ -37,19 +41,17 @@ export default function LoanManagement() {
             interest_rate: interestRate,
             approved_date: new Date().toISOString(),
             approved_by: profile?.id,
-            total_repayable: totalRepayable,
-            outstanding_balance: approvedAmount, // store principal separately
+            outstanding_balance: approvedAmount,
           })
           .eq('id', loanId);
 
-        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_approved',
           title: 'Loan Approved',
           message: `Your loan request of UGX ${approvedAmount.toLocaleString('en-UG')} has been approved at ${interestRate}% interest.`,
         });
-      } else {
+      } else if (action === 'reject') {
         await supabase
           .from('loans')
           .update({
@@ -58,7 +60,6 @@ export default function LoanManagement() {
           })
           .eq('id', loanId);
 
-        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_rejected',
@@ -120,7 +121,6 @@ export default function LoanManagement() {
   const ApprovalModal = ({ loan, onClose }: any) => {
     const [approvedAmount, setApprovedAmount] = useState(loan.amount_requested);
     const [interestRate, setInterestRate] = useState(5);
-    const totalRepayable = approvedAmount + (approvedAmount * interestRate / 100);
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -150,18 +150,7 @@ export default function LoanManagement() {
             </div>
 
             <div className="bg-blue-50 rounded-xl p-4">
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-600">Principal:</span>
-                <span className="font-semibold text-gray-800">UGX {approvedAmount.toLocaleString('en-UG')}</span>
-              </div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-600">Interest ({interestRate}%):</span>
-                <span className="font-semibold text-gray-800">UGX {(approvedAmount * interestRate / 100).toLocaleString('en-UG')}</span>
-              </div>
-              <div className="flex justify-between text-base font-bold border-t border-blue-200 pt-2 mt-2">
-                <span className="text-gray-800">Total Repayable:</span>
-                <span className="text-[#008080]">UGX {totalRepayable.toLocaleString('en-UG')}</span>
-              </div>
+              <p className="text-sm text-gray-600">Repayments will be calculated using the reducing balance method.</p>
             </div>
 
             <div className="flex gap-3 pt-4">
@@ -170,9 +159,18 @@ export default function LoanManagement() {
                   handleLoanAction(loan.id, 'approve', approvedAmount, interestRate);
                   onClose();
                 }}
-                className="flex-1 py-2 btn-primary text-white font-medium rounded-xl"
+                className="flex-1 py-2 bg-green-600 text-white font-medium rounded-xl"
               >
-                Approve Loan
+                Approve
+              </button>
+              <button
+                onClick={() => {
+                  handleLoanAction(loan.id, 'reject');
+                  onClose();
+                }}
+                className="flex-1 py-2 bg-red-600 text-white font-medium rounded-xl"
+              >
+                Reject
               </button>
               <button
                 onClick={onClose}
@@ -187,7 +185,7 @@ export default function LoanManagement() {
     );
   };
 
-  // --- Repayment Modal (Reducing Balance Method) ---
+  // --- Repayment Modal (Reducing Balance) ---
   const RepaymentModal = ({ loan, onClose }: any) => {
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
@@ -199,15 +197,11 @@ export default function LoanManagement() {
 
       try {
         const repaymentAmount = parseFloat(amount.replace(/,/g, ''));
-
-        // Calculate reducing balance
         let principalRemaining = Number(loan.outstanding_balance);
         let interest = principalRemaining * (loan.interest_rate / 100);
-        let totalOutstanding = principalRemaining + interest;
-
-        const newPrincipal = principalRemaining - repaymentAmount;
-        const newInterest = newPrincipal * (loan.interest_rate / 100);
-        const newOutstanding = newPrincipal + newInterest;
+        let newPrincipal = principalRemaining - repaymentAmount;
+        let newInterest = newPrincipal * (loan.interest_rate / 100);
+        let newOutstanding = newPrincipal + newInterest;
 
         await supabase.from('loan_repayments').insert({
           loan_id: loan.id,
@@ -245,7 +239,6 @@ export default function LoanManagement() {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl p-6 max-w-md w-full">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Record Repayment</h2>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="bg-blue-50 rounded-xl p-4 mb-4">
               <p className="text-sm text-gray-600 mb-1">Outstanding Balance</p>
@@ -295,7 +288,6 @@ export default function LoanManagement() {
     );
   };
 
-  // --- Helpers ---
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending': return <Clock className="w-4 h-4" />;
@@ -330,9 +322,7 @@ export default function LoanManagement() {
             </div>
             <span className="text-sm font-medium text-gray-600">Pending</span>
           </div>
-          <p className="text-2xl font-bold text-gray-800">
-            {loans.filter(l => l.status === 'pending').length}
-          </p>
+          <p className="text-2xl font-bold text-gray-800">{loans.filter(l => l.status === 'pending').length}</p>
         </div>
 
         <div className="bg-white rounded-2xl p-5 card-shadow">
@@ -342,9 +332,7 @@ export default function LoanManagement() {
             </div>
             <span className="text-sm font-medium text-gray-600">Active</span>
           </div>
-          <p className="text-2xl font-bold text-gray-800">
-            {loans.filter(l => l.status === 'disbursed').length}
-          </p>
+          <p className="text-2xl font-bold text-gray-800">{loans.filter(l => l.status === 'disbursed').length}</p>
         </div>
 
         <div className="bg-white rounded-2xl p-5 card-shadow">
@@ -402,14 +390,12 @@ export default function LoanManagement() {
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
                       {loan.status === 'pending' && (
-                        <>
-                          <button
-                            onClick={() => setSelectedLoan(loan)}
-                            className="px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs"
-                          >
-                            Approve
-                          </button>
-                        </>
+                        <button
+                          onClick={() => setSelectedLoan(loan)}
+                          className="px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs"
+                        >
+                          Approve
+                        </button>
                       )}
                       {loan.status === 'approved' && (
                         <button
