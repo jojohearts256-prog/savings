@@ -22,14 +22,21 @@ export default function LoanManagement() {
     setLoans(data || []);
   };
 
+  // Reducing balance interest calculation
+  const calculateOutstandingReducing = (loan: any, repaymentAmount: number) => {
+    let principal = Number(loan.amount_approved) - Number(loan.amount_repaid || 0);
+    const rate = Number(loan.interest_rate) / 100;
+
+    // Interest on remaining principal
+    const interest = principal * rate;
+    let newOutstanding = principal + interest - repaymentAmount;
+
+    return newOutstanding > 0 ? newOutstanding : 0;
+  };
+
   const handleLoanAction = async (loanId: string, action: 'approve' | 'reject', approvedAmount?: number, interestRate?: number) => {
     try {
-      const loan = loans.find(l => l.id === loanId);
-      if (!loan) return;
-
       if (action === 'approve' && approvedAmount && interestRate !== undefined) {
-        const totalRepayable = approvedAmount + (approvedAmount * interestRate / 100);
-
         await supabase
           .from('loans')
           .update({
@@ -38,16 +45,17 @@ export default function LoanManagement() {
             interest_rate: interestRate,
             approved_date: new Date().toISOString(),
             approved_by: profile?.id,
-            total_repayable: totalRepayable,
-            outstanding_balance: totalRepayable,
+            outstanding_balance: approvedAmount, // initial principal
+            amount_repaid: 0,
           })
           .eq('id', loanId);
 
+        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_approved',
           title: 'Loan Approved',
-          message: `Your loan request of UGX ${approvedAmount.toLocaleString('en-UG')} has been approved at ${interestRate}% interest. Total repayable: UGX ${totalRepayable.toLocaleString('en-UG')}`,
+          message: `Your loan request of UGX ${approvedAmount.toLocaleString('en-UG')} has been approved at ${interestRate}% reducing interest.`,
         });
       } else {
         await supabase
@@ -58,6 +66,7 @@ export default function LoanManagement() {
           })
           .eq('id', loanId);
 
+        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_rejected',
@@ -75,7 +84,6 @@ export default function LoanManagement() {
   const handleDisburse = async (loanId: string) => {
     try {
       const loan = loans.find(l => l.id === loanId);
-      if (!loan) return;
 
       await supabase
         .from('loans')
@@ -119,7 +127,6 @@ export default function LoanManagement() {
   const ApprovalModal = ({ loan, onClose }: any) => {
     const [approvedAmount, setApprovedAmount] = useState(loan.amount_requested);
     const [interestRate, setInterestRate] = useState(5);
-    const totalRepayable = approvedAmount + (approvedAmount * interestRate / 100);
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -146,21 +153,6 @@ export default function LoanManagement() {
                 onChange={(e) => setInterestRate(parseFloat(e.target.value))}
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
               />
-            </div>
-
-            <div className="bg-blue-50 rounded-xl p-4">
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-600">Principal:</span>
-                <span className="font-semibold text-gray-800">UGX {approvedAmount.toLocaleString('en-UG')}</span>
-              </div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-600">Interest ({interestRate}%):</span>
-                <span className="font-semibold text-gray-800">UGX {(approvedAmount * interestRate / 100).toLocaleString('en-UG')}</span>
-              </div>
-              <div className="flex justify-between text-base font-bold border-t border-blue-200 pt-2 mt-2">
-                <span className="text-gray-800">Total Repayable:</span>
-                <span className="text-[#008080]">UGX {totalRepayable.toLocaleString('en-UG')}</span>
-              </div>
             </div>
 
             <div className="flex gap-3 pt-4">
@@ -197,7 +189,7 @@ export default function LoanManagement() {
 
       try {
         const repaymentAmount = parseFloat(amount.replace(/,/g, ''));
-        const newOutstanding = Number(loan.outstanding_balance) - repaymentAmount;
+        const newOutstanding = calculateOutstandingReducing(loan, repaymentAmount);
 
         await supabase.from('loan_repayments').insert({
           loan_id: loan.id,
@@ -209,7 +201,7 @@ export default function LoanManagement() {
         await supabase
           .from('loans')
           .update({
-            amount_repaid: Number(loan.amount_repaid) + repaymentAmount,
+            amount_repaid: Number(loan.amount_repaid || 0) + repaymentAmount,
             outstanding_balance: newOutstanding,
             status: newOutstanding <= 0 ? 'completed' : loan.status,
           })
@@ -370,7 +362,7 @@ export default function LoanManagement() {
                 <tr key={loan.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{loan.loan_number}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    {loan.members?.profiles?.full_name}
+                    {loan.members?.profiles?.full_name || 'N/A'}
                     <div className="text-xs text-gray-500">{loan.members?.member_number}</div>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
@@ -437,7 +429,6 @@ export default function LoanManagement() {
       {selectedLoan && !showRepaymentModal && (
         <ApprovalModal loan={selectedLoan} onClose={() => setSelectedLoan(null)} />
       )}
-
       {selectedLoan && showRepaymentModal && (
         <RepaymentModal loan={selectedLoan} onClose={() => { setSelectedLoan(null); setShowRepaymentModal(false); }} />
       )}
