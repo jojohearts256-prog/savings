@@ -17,29 +17,32 @@ export default function LoanManagement() {
     const { data } = await supabase
       .from('loans')
       .select(`
-        id,
-        amount_requested,
-        amount_approved,
-        interest_rate,
-        status,
-        outstanding_balance,
-        amount_repaid,
-        member_id,
-        members!inner(
+        *,
+        members (
           member_number,
           account_balance,
-          profiles!inner(
+          profiles (
             full_name
           )
         )
       `)
       .order('requested_date', { ascending: false });
 
-    setLoans(data || []);
+    const loansWithNames = (data || []).map(loan => ({
+      ...loan,
+      full_name: loan.members?.profiles?.full_name || 'No Name',
+      member_number: loan.members?.member_number || '-',
+      account_balance: loan.members?.account_balance || 0,
+    }));
+
+    setLoans(loansWithNames);
   };
 
   const handleLoanAction = async (loanId: string, action: 'approve' | 'reject', approvedAmount?: number, interestRate?: number) => {
     try {
+      const loan = loans.find(l => l.id === loanId);
+      if (!loan) return;
+
       if (action === 'approve' && approvedAmount && interestRate !== undefined) {
         const totalRepayable = approvedAmount + (approvedAmount * interestRate / 100);
 
@@ -56,7 +59,6 @@ export default function LoanManagement() {
           })
           .eq('id', loanId);
 
-        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_approved',
@@ -72,7 +74,6 @@ export default function LoanManagement() {
           })
           .eq('id', loanId);
 
-        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_rejected',
@@ -90,6 +91,7 @@ export default function LoanManagement() {
   const handleDisburse = async (loanId: string) => {
     try {
       const loan = loans.find(l => l.id === loanId);
+      if (!loan) return;
 
       await supabase
         .from('loans')
@@ -99,8 +101,7 @@ export default function LoanManagement() {
         })
         .eq('id', loanId);
 
-      const member = loan.members;
-      const newBalance = Number(member.account_balance) + Number(loan.amount_approved);
+      const newBalance = Number(loan.account_balance) + Number(loan.amount_approved);
 
       await supabase
         .from('members')
@@ -111,7 +112,7 @@ export default function LoanManagement() {
         member_id: loan.member_id,
         transaction_type: 'deposit',
         amount: loan.amount_approved,
-        balance_before: member.account_balance,
+        balance_before: loan.account_balance,
         balance_after: newBalance,
         description: `Loan disbursement`,
         recorded_by: profile?.id,
@@ -374,8 +375,8 @@ export default function LoanManagement() {
               {loans.map((loan) => (
                 <tr key={loan.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    {loan.members?.profiles?.full_name || 'No Name'}
-                    <div className="text-xs text-gray-500">{loan.members?.member_number}</div>
+                    {loan.full_name}
+                    <div className="text-xs text-gray-500">{loan.member_number}</div>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
                     UGX {Number(loan.amount_requested).toLocaleString('en-UG')}
@@ -421,9 +422,9 @@ export default function LoanManagement() {
                       {loan.status === 'disbursed' && (
                         <button
                           onClick={() => { setSelectedLoan(loan); setShowRepaymentModal(true); }}
-                          className="px-3 py-1.5 bg-purple-600 text-white rounded-xl text-xs"
+                          className="px-3 py-1.5 bg-orange-500 text-white rounded-xl text-xs"
                         >
-                          Repayment
+                          Repay
                         </button>
                       )}
                     </div>
