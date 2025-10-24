@@ -1,4 +1,4 @@
-import { supabase, Loan, Member, Profile } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { CreditCard, CheckCircle, XCircle, Clock, TrendingUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -14,18 +14,24 @@ export default function LoanManagement() {
   }, []);
 
   const loadLoans = async () => {
-    const { data } = await supabase
-      .from('loans')
-      .select(
-        `*, members!loans_member_id_fkey(*, profiles(*))`
-      )
+    const { data, error } = await supabase
+      .from('loans_with_member_name') // Use the SQL view that includes full_name and member_number
+      .select('*')
       .order('requested_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching loans:', error);
+      return;
+    }
 
     setLoans(data || []);
   };
 
   const handleLoanAction = async (loanId: string, action: 'approve' | 'reject', approvedAmount?: number, interestRate?: number) => {
     try {
+      const loan = loans.find(l => l.id === loanId);
+      if (!loan) return;
+
       if (action === 'approve' && approvedAmount && interestRate !== undefined) {
         const totalRepayable = approvedAmount + (approvedAmount * interestRate / 100);
 
@@ -42,7 +48,6 @@ export default function LoanManagement() {
           })
           .eq('id', loanId);
 
-        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_approved',
@@ -58,7 +63,6 @@ export default function LoanManagement() {
           })
           .eq('id', loanId);
 
-        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_rejected',
@@ -76,6 +80,7 @@ export default function LoanManagement() {
   const handleDisburse = async (loanId: string) => {
     try {
       const loan = loans.find(l => l.id === loanId);
+      if (!loan) return;
 
       await supabase
         .from('loans')
@@ -85,8 +90,7 @@ export default function LoanManagement() {
         })
         .eq('id', loanId);
 
-      const member = loan.members;
-      const newBalance = Number(member.account_balance) + Number(loan.amount_approved);
+      const newBalance = Number(loan.account_balance) + Number(loan.amount_approved);
 
       await supabase
         .from('members')
@@ -97,7 +101,7 @@ export default function LoanManagement() {
         member_id: loan.member_id,
         transaction_type: 'deposit',
         amount: loan.amount_approved,
-        balance_before: member.account_balance,
+        balance_before: loan.account_balance,
         balance_after: newBalance,
         description: `Loan disbursement`,
         recorded_by: profile?.id,
@@ -360,8 +364,8 @@ export default function LoanManagement() {
               {loans.map((loan) => (
                 <tr key={loan.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    {loan.members?.profiles?.full_name}
-                    <div className="text-xs text-gray-500">{loan.members?.member_number}</div>
+                    {loan.full_name}
+                    <div className="text-xs text-gray-500">{loan.member_number}</div>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
                     UGX {Number(loan.amount_requested).toLocaleString('en-UG')}
@@ -421,8 +425,13 @@ export default function LoanManagement() {
         </div>
       </div>
 
-      {selectedLoan && <ApprovalModal loan={selectedLoan} onClose={() => setSelectedLoan(null)} />}
-      {selectedLoan && showRepaymentModal && <RepaymentModal loan={selectedLoan} onClose={() => { setSelectedLoan(null); setShowRepaymentModal(false); }} />}
+      {selectedLoan && selectedLoan.status === 'pending' && (
+        <ApprovalModal loan={selectedLoan} onClose={() => setSelectedLoan(null)} />
+      )}
+
+      {selectedLoan && selectedLoan.status === 'disbursed' && showRepaymentModal && (
+        <RepaymentModal loan={selectedLoan} onClose={() => { setSelectedLoan(null); setShowRepaymentModal(false); }} />
+      )}
     </div>
   );
 }
