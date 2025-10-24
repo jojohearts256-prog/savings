@@ -16,7 +16,9 @@ export default function LoanManagement() {
   const loadLoans = async () => {
     const { data } = await supabase
       .from('loans')
-      .select(`*, members!loans_member_id_fkey(*, profiles(*))`)
+      .select(
+        `*, members!loans_member_id_fkey(*, profiles(*))`
+      )
       .order('requested_date', { ascending: false });
 
     setLoans(data || []);
@@ -36,7 +38,7 @@ export default function LoanManagement() {
             approved_date: new Date().toISOString(),
             approved_by: profile?.id,
             total_repayable: totalRepayable,
-            outstanding_balance: totalRepayable,
+            outstanding_balance: approvedAmount, // store principal separately
           })
           .eq('id', loanId);
 
@@ -45,7 +47,7 @@ export default function LoanManagement() {
           member_id: loan.member_id,
           type: 'loan_approved',
           title: 'Loan Approved',
-          message: `Your loan request of UGX ${approvedAmount.toLocaleString('en-UG')} has been approved at ${interestRate}% interest. Total repayable: UGX ${totalRepayable.toLocaleString('en-UG')}`,
+          message: `Your loan request of UGX ${approvedAmount.toLocaleString('en-UG')} has been approved at ${interestRate}% interest.`,
         });
       } else {
         await supabase
@@ -114,6 +116,7 @@ export default function LoanManagement() {
     }
   };
 
+  // --- Approval Modal ---
   const ApprovalModal = ({ loan, onClose }: any) => {
     const [approvedAmount, setApprovedAmount] = useState(loan.amount_requested);
     const [interestRate, setInterestRate] = useState(5);
@@ -184,6 +187,7 @@ export default function LoanManagement() {
     );
   };
 
+  // --- Repayment Modal (Reducing Balance Method) ---
   const RepaymentModal = ({ loan, onClose }: any) => {
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
@@ -195,7 +199,15 @@ export default function LoanManagement() {
 
       try {
         const repaymentAmount = parseFloat(amount.replace(/,/g, ''));
-        const newOutstanding = Number(loan.outstanding_balance) - repaymentAmount;
+
+        // Calculate reducing balance
+        let principalRemaining = Number(loan.outstanding_balance);
+        let interest = principalRemaining * (loan.interest_rate / 100);
+        let totalOutstanding = principalRemaining + interest;
+
+        const newPrincipal = principalRemaining - repaymentAmount;
+        const newInterest = newPrincipal * (loan.interest_rate / 100);
+        const newOutstanding = newPrincipal + newInterest;
 
         await supabase.from('loan_repayments').insert({
           loan_id: loan.id,
@@ -208,8 +220,8 @@ export default function LoanManagement() {
           .from('loans')
           .update({
             amount_repaid: Number(loan.amount_repaid) + repaymentAmount,
-            outstanding_balance: newOutstanding,
-            status: newOutstanding <= 0 ? 'completed' : loan.status,
+            outstanding_balance: newOutstanding <= 0 ? 0 : newOutstanding,
+            status: newOutstanding <= 0 ? 'completed' : 'disbursed',
           })
           .eq('id', loan.id);
 
@@ -283,6 +295,7 @@ export default function LoanManagement() {
     );
   };
 
+  // --- Helpers ---
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending': return <Clock className="w-4 h-4" />;
@@ -392,35 +405,26 @@ export default function LoanManagement() {
                         <>
                           <button
                             onClick={() => setSelectedLoan(loan)}
-                            className="px-3 py-1.5 bg-green-50 text-green-700 text-sm font-medium rounded-lg hover:bg-green-100"
+                            className="px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs"
                           >
                             Approve
-                          </button>
-                          <button
-                            onClick={() => handleLoanAction(loan.id, 'reject')}
-                            className="px-3 py-1.5 bg-red-50 text-red-700 text-sm font-medium rounded-lg hover:bg-red-100"
-                          >
-                            Reject
                           </button>
                         </>
                       )}
                       {loan.status === 'approved' && (
                         <button
                           onClick={() => handleDisburse(loan.id)}
-                          className="px-3 py-1.5 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100"
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs"
                         >
                           Disburse
                         </button>
                       )}
                       {loan.status === 'disbursed' && (
                         <button
-                          onClick={() => {
-                            setSelectedLoan(loan);
-                            setShowRepaymentModal(true);
-                          }}
-                          className="px-3 py-1.5 bg-yellow-50 text-yellow-700 text-sm font-medium rounded-lg hover:bg-yellow-100"
+                          onClick={() => { setSelectedLoan(loan); setShowRepaymentModal(true); }}
+                          className="px-3 py-1.5 bg-orange-500 text-white rounded-xl text-xs"
                         >
-                          Record Repayment
+                          Repay
                         </button>
                       )}
                     </div>
