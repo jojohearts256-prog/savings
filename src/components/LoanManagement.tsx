@@ -16,9 +16,7 @@ export default function LoanManagement() {
   const loadLoans = async () => {
     const { data } = await supabase
       .from('loans')
-      .select(
-        `*, members!loans_member_id_fkey(*, profiles(*))`
-      )
+      .select(`*, members!loans_member_id_fkey(*, profiles(*))`)
       .order('requested_date', { ascending: false });
 
     setLoans(data || []);
@@ -409,7 +407,7 @@ export default function LoanManagement() {
                       {loan.status === 'approved' && (
                         <button
                           onClick={() => handleDisburse(loan.id)}
-                          className="px-3 py-1.5 btn-primary text-white text-sm font-medium rounded-lg"
+                          className="px-3 py-1.5 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100"
                         >
                           Disburse
                         </button>
@@ -420,9 +418,9 @@ export default function LoanManagement() {
                             setSelectedLoan(loan);
                             setShowRepaymentModal(true);
                           }}
-                          className="px-3 py-1.5 btn-primary text-white text-sm font-medium rounded-lg"
+                          className="px-3 py-1.5 bg-yellow-50 text-yellow-700 text-sm font-medium rounded-lg hover:bg-yellow-100"
                         >
-                          Repayment
+                          Record Repayment
                         </button>
                       )}
                     </div>
@@ -437,6 +435,7 @@ export default function LoanManagement() {
       {selectedLoan && !showRepaymentModal && (
         <ApprovalModal loan={selectedLoan} onClose={() => setSelectedLoan(null)} />
       )}
+
       {selectedLoan && showRepaymentModal && (
         <RepaymentModal loan={selectedLoan} onClose={() => { setSelectedLoan(null); setShowRepaymentModal(false); }} />
       )}
