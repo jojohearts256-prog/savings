@@ -15,7 +15,7 @@ export default function LoanManagement() {
 
   const loadLoans = async () => {
     const { data, error } = await supabase
-      .from('loans_with_member_name') // SQL view with full_name & member_number
+      .from('loans_with_member_name') // Use the SQL view that includes full_name and member_number
       .select('*')
       .order('requested_date', { ascending: false });
 
@@ -23,6 +23,7 @@ export default function LoanManagement() {
       console.error('Error fetching loans:', error);
       return;
     }
+
     setLoans(data || []);
   };
 
