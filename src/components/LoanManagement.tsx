@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, Loan, Member, Profile } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { CreditCard, CheckCircle, XCircle, Clock, TrendingUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -14,26 +14,17 @@ export default function LoanManagement() {
   }, []);
 
   const loadLoans = async () => {
-    const { data, error } = await supabase
-      .from('loans_with_member_name') // SQL view with full_name & member_number
-      .select('*')
+    const { data } = await supabase
+      .from('loans')
+      .select(`*, members!loans_member_id_fkey(*, profiles(*))`)
       .order('requested_date', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching loans:', error);
-      return;
-    }
     setLoans(data || []);
   };
 
   const handleLoanAction = async (loanId: string, action: 'approve' | 'reject', approvedAmount?: number, interestRate?: number) => {
     try {
-      const loan = loans.find(l => l.id === loanId);
-      if (!loan) return;
-
       if (action === 'approve' && approvedAmount && interestRate !== undefined) {
         const totalRepayable = approvedAmount + (approvedAmount * interestRate / 100);
-
         await supabase
           .from('loans')
           .update({
@@ -43,25 +34,24 @@ export default function LoanManagement() {
             approved_date: new Date().toISOString(),
             approved_by: profile?.id,
             total_repayable: totalRepayable,
-            outstanding_balance: approvedAmount,
+            outstanding_balance: totalRepayable,
           })
           .eq('id', loanId);
 
+        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_approved',
           title: 'Loan Approved',
-          message: `Your loan request of UGX ${approvedAmount.toLocaleString('en-UG')} has been approved at ${interestRate}% interest.`,
+          message: `Your loan request of UGX ${approvedAmount.toLocaleString('en-UG')} has been approved at ${interestRate}% interest. Total repayable: UGX ${totalRepayable.toLocaleString('en-UG')}`,
         });
-      } else if (action === 'reject') {
+      } else {
         await supabase
           .from('loans')
-          .update({
-            status: 'rejected',
-            approved_by: profile?.id,
-          })
+          .update({ status: 'rejected', approved_by: profile?.id })
           .eq('id', loanId);
 
+        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_rejected',
@@ -69,8 +59,7 @@ export default function LoanManagement() {
           message: 'Your loan request has been reviewed and could not be approved at this time.',
         });
       }
-
-      loadLoans(); // <-- refresh table after approve/reject
+      loadLoans();
     } catch (err) {
       console.error('Error processing loan:', err);
     }
@@ -79,33 +68,24 @@ export default function LoanManagement() {
   const handleDisburse = async (loanId: string) => {
     try {
       const loan = loans.find(l => l.id === loanId);
-      if (!loan) return;
-
       await supabase
         .from('loans')
-        .update({
-          status: 'disbursed',
-          disbursed_date: new Date().toISOString(),
-        })
+        .update({ status: 'disbursed', disbursed_date: new Date().toISOString() })
         .eq('id', loanId);
 
-      const newBalance = Number(loan.account_balance) + Number(loan.amount_approved);
+      const member = loan.members;
+      const newBalance = Number(member.account_balance) + Number(loan.amount_approved);
 
-      await supabase
-        .from('members')
-        .update({ account_balance: newBalance })
-        .eq('id', loan.member_id);
-
+      await supabase.from('members').update({ account_balance: newBalance }).eq('id', loan.member_id);
       await supabase.from('transactions').insert({
         member_id: loan.member_id,
         transaction_type: 'deposit',
         amount: loan.amount_approved,
-        balance_before: loan.account_balance,
+        balance_before: member.account_balance,
         balance_after: newBalance,
         description: `Loan disbursement`,
         recorded_by: profile?.id,
       });
-
       await supabase.from('notifications').insert({
         member_id: loan.member_id,
         type: 'loan_disbursed',
@@ -113,7 +93,7 @@ export default function LoanManagement() {
         message: `Your loan of UGX ${loan.amount_approved.toLocaleString('en-UG')} has been disbursed to your account.`,
       });
 
-      loadLoans(); // <-- refresh table after disbursement
+      loadLoans();
     } catch (err) {
       console.error('Error disbursing loan:', err);
     }
@@ -138,7 +118,6 @@ export default function LoanManagement() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Interest Rate (%)</label>
               <input
@@ -149,7 +128,6 @@ export default function LoanManagement() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
               />
             </div>
-
             <div className="bg-blue-50 rounded-xl p-4">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-600">Principal:</span>
@@ -164,10 +142,12 @@ export default function LoanManagement() {
                 <span className="text-[#008080]">UGX {totalRepayable.toLocaleString('en-UG')}</span>
               </div>
             </div>
-
             <div className="flex gap-3 pt-4">
               <button
-                onClick={() => { handleLoanAction(loan.id, 'approve', approvedAmount, interestRate); onClose(); }}
+                onClick={() => {
+                  handleLoanAction(loan.id, 'approve', approvedAmount, interestRate);
+                  onClose();
+                }}
                 className="flex-1 py-2 btn-primary text-white font-medium rounded-xl"
               >
                 Approve Loan
@@ -195,12 +175,7 @@ export default function LoanManagement() {
       setLoading(true);
       try {
         const repaymentAmount = parseFloat(amount.replace(/,/g, ''));
-        let principalRemaining = Number(loan.outstanding_balance);
-        let interest = principalRemaining * (loan.interest_rate / 100);
-        let totalOutstanding = principalRemaining + interest;
-        const newPrincipal = principalRemaining - repaymentAmount;
-        const newInterest = newPrincipal * (loan.interest_rate / 100);
-        const newOutstanding = newPrincipal + newInterest;
+        const newOutstanding = Number(loan.outstanding_balance) - repaymentAmount;
 
         await supabase.from('loan_repayments').insert({
           loan_id: loan.id,
@@ -213,8 +188,8 @@ export default function LoanManagement() {
           .from('loans')
           .update({
             amount_repaid: Number(loan.amount_repaid) + repaymentAmount,
-            outstanding_balance: newOutstanding <= 0 ? 0 : newOutstanding,
-            status: newOutstanding <= 0 ? 'completed' : 'disbursed',
+            outstanding_balance: newOutstanding,
+            status: newOutstanding <= 0 ? 'completed' : loan.status,
           })
           .eq('id', loan.id);
 
@@ -226,7 +201,7 @@ export default function LoanManagement() {
         });
 
         onClose();
-        loadLoans(); // <-- refresh table after repayment
+        loadLoans();
       } catch (err) {
         console.error('Error recording repayment:', err);
       } finally {
@@ -243,7 +218,6 @@ export default function LoanManagement() {
               <p className="text-sm text-gray-600 mb-1">Outstanding Balance</p>
               <p className="text-2xl font-bold text-[#008080]">UGX {Number(loan.outstanding_balance).toLocaleString('en-UG')}</p>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Repayment Amount (UGX)</label>
               <input
@@ -254,7 +228,6 @@ export default function LoanManagement() {
                 required
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
               <textarea
@@ -264,20 +237,11 @@ export default function LoanManagement() {
                 rows={2}
               />
             </div>
-
             <div className="flex gap-3 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50"
-              >
+              <button type="submit" disabled={loading} className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50">
                 {loading ? 'Recording...' : 'Record Repayment'}
               </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
-              >
+              <button type="button" onClick={onClose} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">
                 Cancel
               </button>
             </div>
@@ -347,6 +311,7 @@ export default function LoanManagement() {
         </div>
       </div>
 
+      {/* Loan Table */}
       <div className="bg-white rounded-2xl card-shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -363,8 +328,8 @@ export default function LoanManagement() {
               {loans.map((loan) => (
                 <tr key={loan.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    {loan.full_name}
-                    <div className="text-xs text-gray-500">{loan.member_number}</div>
+                    <div className="font-semibold">{loan.members?.profiles?.full_name}</div>
+                    <div className="text-xs text-gray-500">ID: {loan.members?.member_number}</div>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
                     UGX {Number(loan.amount_requested).toLocaleString('en-UG')}
@@ -385,35 +350,15 @@ export default function LoanManagement() {
                     <div className="flex gap-2">
                       {loan.status === 'pending' && (
                         <>
-                          <button
-                            onClick={() => setSelectedLoan(loan)}
-                            className="px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleLoanAction(loan.id, 'reject')}
-                            className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs"
-                          >
-                            Reject
-                          </button>
+                          <button onClick={() => setSelectedLoan(loan)} className="px-3 py-1.5 bg-green-50 text-green-700 text-sm font-medium rounded-lg hover:bg-green-100">Approve</button>
+                          <button onClick={() => handleLoanAction(loan.id, 'reject')} className="px-3 py-1.5 bg-red-50 text-red-700 text-sm font-medium rounded-lg hover:bg-red-100">Reject</button>
                         </>
                       )}
                       {loan.status === 'approved' && (
-                        <button
-                          onClick={() => handleDisburse(loan.id)}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs"
-                        >
-                          Disburse
-                        </button>
+                        <button onClick={() => handleDisburse(loan.id)} className="px-3 py-1.5 btn-primary text-white text-sm font-medium rounded-lg">Disburse</button>
                       )}
                       {loan.status === 'disbursed' && (
-                        <button
-                          onClick={() => { setSelectedLoan(loan); setShowRepaymentModal(true); }}
-                          className="px-3 py-1.5 bg-orange-500 text-white rounded-xl text-xs"
-                        >
-                          Repay
-                        </button>
+                        <button onClick={() => { setSelectedLoan(loan); setShowRepaymentModal(true); }} className="px-3 py-1.5 btn-primary text-white text-sm font-medium rounded-lg">Repayment</button>
                       )}
                     </div>
                   </td>
@@ -424,13 +369,8 @@ export default function LoanManagement() {
         </div>
       </div>
 
-      {selectedLoan && selectedLoan.status === 'pending' && (
-        <ApprovalModal loan={selectedLoan} onClose={() => setSelectedLoan(null)} />
-      )}
-
-      {selectedLoan && selectedLoan.status === 'disbursed' && showRepaymentModal && (
-        <RepaymentModal loan={selectedLoan} onClose={() => { setSelectedLoan(null); setShowRepaymentModal(false); }} />
-      )}
+      {selectedLoan && !showRepaymentModal && <ApprovalModal loan={selectedLoan} onClose={() => setSelectedLoan(null)} />}
+      {selectedLoan && showRepaymentModal && <RepaymentModal loan={selectedLoan} onClose={() => { setSelectedLoan(null); setShowRepaymentModal(false); }} />}
     </div>
   );
 }
