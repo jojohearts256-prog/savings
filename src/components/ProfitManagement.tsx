@@ -28,31 +28,31 @@ export default function ProfitManagement() {
     }
   };
 
-  // Load accumulated profits per member
+  // Load profits and merge with all members
   const loadProfits = async () => {
     try {
-      // Sum profits for each member
-      const { data, error } = await supabase
+      const { data: profitData, error } = await supabase
         .from('profits')
-        .select('member_id, full_name, profit_amount')
+        .select('member_id, profit_amount')
         .order('created_at', { ascending: true });
 
       if (error) throw error;
 
       // Aggregate profits per member
-      const profitMap: Record<string, any> = {};
-      (data || []).forEach((p: any) => {
-        if (!profitMap[p.member_id]) {
-          profitMap[p.member_id] = {
-            member_id: p.member_id,
-            full_name: p.full_name,
-            total_profit: 0,
-          };
-        }
-        profitMap[p.member_id].total_profit += Number(p.profit_amount || 0);
+      const profitMap: Record<string, number> = {};
+      (profitData || []).forEach((p: any) => {
+        if (!profitMap[p.member_id]) profitMap[p.member_id] = 0;
+        profitMap[p.member_id] += Number(p.profit_amount || 0);
       });
 
-      setProfits(Object.values(profitMap));
+      // Merge with members so everyone is shown
+      const merged = members.map((m) => ({
+        member_id: m.id,
+        full_name: m.full_name,
+        total_profit: profitMap[m.id] || 0,
+      }));
+
+      setProfits(merged);
     } catch (err: any) {
       console.error('Error loading profits:', err.message);
       setProfits([]);
@@ -60,11 +60,16 @@ export default function ProfitManagement() {
   };
 
   useEffect(() => {
-    loadMembers();
-    loadProfits();
+    const fetchData = async () => {
+      await loadMembers();
+    };
+    fetchData();
   }, []);
 
-  // Manual distribution (optional)
+  useEffect(() => {
+    if (members.length > 0) loadProfits();
+  }, [members]);
+
   const distributeProfits = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
