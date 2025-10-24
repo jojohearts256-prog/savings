@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { supabase, Member } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DollarSign, Printer, Banknote, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
 
 export default function ProfitManagement() {
   const { profile } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [profits, setProfits] = useState<any[]>([]);
   const [showDistributeModal, setShowDistributeModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState<any>(null); // new: modal for selected profit
   const [totalProfit, setTotalProfit] = useState('');
   const [selectedLoanId, setSelectedLoanId] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -52,7 +54,6 @@ export default function ProfitManagement() {
     loadProfits();
   }, []);
 
-  // Distribute profits
   const distributeProfits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLoanId) {
@@ -103,48 +104,28 @@ export default function ProfitManagement() {
     }
   };
 
-  // Printable receipt as a new window
-  const handlePrint = (profit: any) => {
-    const content = `
-      <html>
-      <head>
-        <title>Profit Receipt</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 30px; color: #333; }
-          .receipt { max-width: 500px; border: 1px solid #008080; border-radius: 15px; padding: 20px; margin: auto; }
-          h2 { color: #008080; margin-bottom: 15px; text-align: center; }
-          .info { margin-bottom: 10px; }
-          .info strong { display: inline-block; width: 150px; }
-          .amount { font-size: 1.2rem; color: green; font-weight: bold; margin-top: 15px; text-align: center; }
-          .footer { margin-top: 20px; text-align: center; font-size: 0.9rem; color: gray; }
-          button { margin: 5px; padding: 8px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
-          .print-btn { background-color: #008080; color: white; }
-          .download-btn { background-color: #006666; color: white; }
-        </style>
-      </head>
-      <body>
-        <div class="receipt">
-          <h2>Profit Distribution Receipt</h2>
-          <div class="info"><strong>Date:</strong> ${new Date(profit.created_at).toLocaleString()}</div>
-          <div class="info"><strong>Member:</strong> ${profit.full_name}</div>
-          <div class="info"><strong>Loan Number:</strong> ${profit.loan?.loan_number || '-'}</div>
-          <div class="info"><strong>Loan Amount:</strong> ${formatUGX(profit.loan?.amount_approved || 0)}</div>
-          <div class="info"><strong>Interest Rate:</strong> ${profit.loan?.interest_rate ?? 0}%</div>
-          <div class="info"><strong>Repayment Period:</strong> ${profit.loan?.repayment_period_months ?? 0} months</div>
-          <div class="amount">Profit Amount: ${formatUGX(profit.profit_amount)}</div>
-          <div class="footer">Recorded by: ${profile?.full_name || 'Admin'}<br/>Thank you for participating!</div>
-        </div>
-        <div style="text-align:center; margin-top:20px;">
-          <button class="print-btn" onclick="window.print()">Print</button>
-          <button class="download-btn" onclick="window.close()">Close</button>
-        </div>
-      </body>
-      </html>
-    `;
+  // Open receipt modal in-app
+  const openReceiptModal = (profit: any) => {
+    setShowReceiptModal(profit);
+  };
 
-    const w = window.open('', '', 'width=600,height=800');
-    w?.document.write(content);
-    w?.document.close();
+  // Download PDF from modal
+  const downloadPDF = (profit: any) => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.setTextColor('#008080');
+    doc.text('Profit Distribution Receipt', 105, 20, { align: 'center' });
+    doc.setFontSize(12);
+    doc.setTextColor('#000000');
+    doc.text(`Date: ${new Date(profit.created_at).toLocaleString()}`, 20, 40);
+    doc.text(`Member: ${profit.full_name}`, 20, 50);
+    doc.text(`Loan Number: ${profit.loan?.loan_number || '-'}`, 20, 60);
+    doc.text(`Loan Amount: ${formatUGX(profit.loan?.amount_approved || 0)}`, 20, 70);
+    doc.text(`Interest Rate: ${profit.loan?.interest_rate ?? 0}%`, 20, 80);
+    doc.text(`Repayment Period: ${profit.loan?.repayment_period_months ?? 0} months`, 20, 90);
+    doc.text(`Profit Amount: ${formatUGX(profit.profit_amount)}`, 20, 100);
+    doc.text(`Recorded By: ${profile?.full_name || 'Admin'}`, 20, 110);
+    doc.save(`Profit_Receipt_${profit.id}.pdf`);
   };
 
   return (
@@ -181,10 +162,10 @@ export default function ProfitManagement() {
                   <td className="px-6 py-4 text-sm text-gray-700">{p.loan?.loan_number || '-'}</td>
                   <td className="px-6 py-4">
                     <button
-                      onClick={() => handlePrint(p)}
+                      onClick={() => openReceiptModal(p)}
                       className="flex items-center gap-1 px-3 py-1 bg-[#008080] text-white rounded-xl text-sm hover:bg-[#006666] transition-colors"
                     >
-                      <Printer className="w-4 h-4" /> Print
+                      <Printer className="w-4 h-4" /> View
                     </button>
                   </td>
                 </tr>
@@ -240,6 +221,39 @@ export default function ProfitManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Modal */}
+      {showReceiptModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Profit Receipt</h2>
+            <div className="p-4 border rounded-xl bg-gray-50 space-y-2">
+              <p><strong>Date:</strong> {new Date(showReceiptModal.created_at).toLocaleString()}</p>
+              <p><strong>Member:</strong> {showReceiptModal.full_name}</p>
+              <p><strong>Loan Number:</strong> {showReceiptModal.loan?.loan_number || '-'}</p>
+              <p><strong>Loan Amount:</strong> {formatUGX(showReceiptModal.loan?.amount_approved || 0)}</p>
+              <p><strong>Interest Rate:</strong> {showReceiptModal.loan?.interest_rate || 0}%</p>
+              <p><strong>Repayment Period:</strong> {showReceiptModal.loan?.repayment_period_months || 0} months</p>
+              <p className="text-green-600 font-semibold"><strong>Profit Amount:</strong> {formatUGX(showReceiptModal.profit_amount)}</p>
+              <p><strong>Recorded By:</strong> {profile?.full_name || 'Admin'}</p>
+            </div>
+            <div className="flex gap-3 mt-4 justify-end">
+              <button
+                onClick={() => downloadPDF(showReceiptModal)}
+                className="flex items-center gap-1 px-4 py-2 bg-[#008080] text-white rounded-xl hover:bg-[#006666] transition-colors"
+              >
+                <Download className="w-4 h-4" /> Download
+              </button>
+              <button
+                onClick={() => setShowReceiptModal(null)}
+                className="px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
