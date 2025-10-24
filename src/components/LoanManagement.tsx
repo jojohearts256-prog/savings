@@ -38,7 +38,7 @@ export default function LoanManagement() {
             approved_date: new Date().toISOString(),
             approved_by: profile?.id,
             total_repayable: totalRepayable,
-            outstanding_balance: approvedAmount, // principal stored
+            outstanding_balance: approvedAmount,
           })
           .eq('id', loanId);
 
@@ -99,7 +99,7 @@ export default function LoanManagement() {
         amount: loan.amount_approved,
         balance_before: member.account_balance,
         balance_after: newBalance,
-        description: `Loan disbursement - ${loan.loan_number}`,
+        description: `Loan disbursement`,
         recorded_by: profile?.id,
       });
 
@@ -116,7 +116,6 @@ export default function LoanManagement() {
     }
   };
 
-  // --- Approval Modal ---
   const ApprovalModal = ({ loan, onClose }: any) => {
     const [approvedAmount, setApprovedAmount] = useState(loan.amount_requested);
     const [interestRate, setInterestRate] = useState(5);
@@ -126,7 +125,6 @@ export default function LoanManagement() {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl p-6 max-w-md w-full">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Approve Loan</h2>
-
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Approved Amount (UGX)</label>
@@ -166,10 +164,7 @@ export default function LoanManagement() {
 
             <div className="flex gap-3 pt-4">
               <button
-                onClick={() => {
-                  handleLoanAction(loan.id, 'approve', approvedAmount, interestRate);
-                  onClose();
-                }}
+                onClick={() => { handleLoanAction(loan.id, 'approve', approvedAmount, interestRate); onClose(); }}
                 className="flex-1 py-2 btn-primary text-white font-medium rounded-xl"
               >
                 Approve Loan
@@ -187,7 +182,6 @@ export default function LoanManagement() {
     );
   };
 
-  // --- Repayment Modal (Reducing Balance Method) ---
   const RepaymentModal = ({ loan, onClose }: any) => {
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
@@ -196,15 +190,11 @@ export default function LoanManagement() {
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setLoading(true);
-
       try {
         const repaymentAmount = parseFloat(amount.replace(/,/g, ''));
-
-        // Reducing balance calculation
         let principalRemaining = Number(loan.outstanding_balance);
         let interest = principalRemaining * (loan.interest_rate / 100);
         let totalOutstanding = principalRemaining + interest;
-
         const newPrincipal = principalRemaining - repaymentAmount;
         const newInterest = newPrincipal * (loan.interest_rate / 100);
         const newOutstanding = newPrincipal + newInterest;
@@ -245,7 +235,6 @@ export default function LoanManagement() {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl p-6 max-w-md w-full">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Record Repayment</h2>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="bg-blue-50 rounded-xl p-4 mb-4">
               <p className="text-sm text-gray-600 mb-1">Outstanding Balance</p>
@@ -295,7 +284,6 @@ export default function LoanManagement() {
     );
   };
 
-  // --- Helpers ---
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending': return <Clock className="w-4 h-4" />;
@@ -330,9 +318,7 @@ export default function LoanManagement() {
             </div>
             <span className="text-sm font-medium text-gray-600">Pending</span>
           </div>
-          <p className="text-2xl font-bold text-gray-800">
-            {loans.filter(l => l.status === 'pending').length}
-          </p>
+          <p className="text-2xl font-bold text-gray-800">{loans.filter(l => l.status === 'pending').length}</p>
         </div>
 
         <div className="bg-white rounded-2xl p-5 card-shadow">
@@ -342,9 +328,7 @@ export default function LoanManagement() {
             </div>
             <span className="text-sm font-medium text-gray-600">Active</span>
           </div>
-          <p className="text-2xl font-bold text-gray-800">
-            {loans.filter(l => l.status === 'disbursed').length}
-          </p>
+          <p className="text-2xl font-bold text-gray-800">{loans.filter(l => l.status === 'disbursed').length}</p>
         </div>
 
         <div className="bg-white rounded-2xl p-5 card-shadow">
@@ -355,10 +339,7 @@ export default function LoanManagement() {
             <span className="text-sm font-medium text-gray-600">Total Outstanding</span>
           </div>
           <p className="text-2xl font-bold text-[#008080]">
-            UGX {loans
-              .filter(l => l.status === 'disbursed')
-              .reduce((sum, l) => sum + Number(l.outstanding_balance || 0), 0)
-              .toLocaleString('en-UG')}
+            UGX {loans.filter(l => l.status === 'disbursed').reduce((sum, l) => sum + Number(l.outstanding_balance || 0), 0).toLocaleString('en-UG')}
           </p>
         </div>
       </div>
@@ -368,7 +349,6 @@ export default function LoanManagement() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Loan #</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Amount</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
@@ -379,7 +359,6 @@ export default function LoanManagement() {
             <tbody className="divide-y divide-gray-200">
               {loans.map((loan) => (
                 <tr key={loan.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-800">{loan.loan_number}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">
                     {loan.members?.profiles?.full_name}
                     <div className="text-xs text-gray-500">{loan.members?.member_number}</div>
