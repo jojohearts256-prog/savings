@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, Member } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { DollarSign, Printer, Banknote } from 'lucide-react';
+import { DollarSign, Printer, Banknote, Download } from 'lucide-react';
 
 export default function ProfitManagement() {
   const { profile } = useAuth();
@@ -9,10 +9,11 @@ export default function ProfitManagement() {
   const [profits, setProfits] = useState<any[]>([]);
   const [showDistributeModal, setShowDistributeModal] = useState(false);
   const [totalProfit, setTotalProfit] = useState('');
-  const [selectedLoanId, setSelectedLoanId] = useState<string>(''); // new
+  const [selectedLoanId, setSelectedLoanId] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  const formatUGX = (amount: any) => `UGX ${Math.round(Number(amount ?? 0)).toLocaleString('en-UG')}`;
+  const formatUGX = (amount: any) =>
+    `UGX ${Math.round(Number(amount ?? 0)).toLocaleString('en-UG')}`;
 
   // Load members
   const loadMembers = async () => {
@@ -33,7 +34,10 @@ export default function ProfitManagement() {
     try {
       const { data, error } = await supabase
         .from('profits')
-        .select('*')
+        .select(`
+          *,
+          loan:loans!profits_loan_id_fkey(loan_number, amount_approved, interest_rate, repayment_period_months)
+        `)
         .order('created_at', { ascending: false });
       if (error) throw error;
       setProfits(data || []);
@@ -48,7 +52,7 @@ export default function ProfitManagement() {
     loadProfits();
   }, []);
 
-  // New: Distribute profits for a specific loan
+  // Distribute profits
   const distributeProfits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLoanId) {
@@ -59,9 +63,13 @@ export default function ProfitManagement() {
     setLoading(true);
     try {
       const profitAmount = parseFloat(totalProfit);
-      if (isNaN(profitAmount) || profitAmount <= 0) throw new Error('Invalid profit amount');
+      if (isNaN(profitAmount) || profitAmount <= 0)
+        throw new Error('Invalid profit amount');
 
-      const totalBalances = members.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
+      const totalBalances = members.reduce(
+        (sum, m) => sum + Number(m.account_balance || 0),
+        0
+      );
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
       const inserts: any[] = [];
@@ -73,7 +81,7 @@ export default function ProfitManagement() {
         inserts.push({
           member_id: member.id,
           full_name: member.full_name,
-          loan_id: selectedLoanId,   // key fix: include the loan_id
+          loan_id: selectedLoanId,
           profit_amount: memberShare,
           recorded_by: profile?.id,
         });
@@ -95,20 +103,48 @@ export default function ProfitManagement() {
     }
   };
 
+  // Printable receipt as a new window
   const handlePrint = (profit: any) => {
     const content = `
-      <div style="font-family: Arial; padding: 20px;">
-        <h2 style="color:#008080">Profit Receipt</h2>
-        <p>Date: ${new Date(profit.created_at).toLocaleString()}</p>
-        <p>Member: ${profit.full_name}</p>
-        <p>Amount: ${formatUGX(profit.profit_amount)}</p>
-      </div>
+      <html>
+      <head>
+        <title>Profit Receipt</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 30px; color: #333; }
+          .receipt { max-width: 500px; border: 1px solid #008080; border-radius: 15px; padding: 20px; margin: auto; }
+          h2 { color: #008080; margin-bottom: 15px; text-align: center; }
+          .info { margin-bottom: 10px; }
+          .info strong { display: inline-block; width: 150px; }
+          .amount { font-size: 1.2rem; color: green; font-weight: bold; margin-top: 15px; text-align: center; }
+          .footer { margin-top: 20px; text-align: center; font-size: 0.9rem; color: gray; }
+          button { margin: 5px; padding: 8px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+          .print-btn { background-color: #008080; color: white; }
+          .download-btn { background-color: #006666; color: white; }
+        </style>
+      </head>
+      <body>
+        <div class="receipt">
+          <h2>Profit Distribution Receipt</h2>
+          <div class="info"><strong>Date:</strong> ${new Date(profit.created_at).toLocaleString()}</div>
+          <div class="info"><strong>Member:</strong> ${profit.full_name}</div>
+          <div class="info"><strong>Loan Number:</strong> ${profit.loan?.loan_number || '-'}</div>
+          <div class="info"><strong>Loan Amount:</strong> ${formatUGX(profit.loan?.amount_approved || 0)}</div>
+          <div class="info"><strong>Interest Rate:</strong> ${profit.loan?.interest_rate ?? 0}%</div>
+          <div class="info"><strong>Repayment Period:</strong> ${profit.loan?.repayment_period_months ?? 0} months</div>
+          <div class="amount">Profit Amount: ${formatUGX(profit.profit_amount)}</div>
+          <div class="footer">Recorded by: ${profile?.full_name || 'Admin'}<br/>Thank you for participating!</div>
+        </div>
+        <div style="text-align:center; margin-top:20px;">
+          <button class="print-btn" onclick="window.print()">Print</button>
+          <button class="download-btn" onclick="window.close()">Close</button>
+        </div>
+      </body>
+      </html>
     `;
+
     const w = window.open('', '', 'width=600,height=800');
     w?.document.write(content);
     w?.document.close();
-    w?.focus();
-    w?.print();
   };
 
   return (
@@ -132,6 +168,7 @@ export default function ProfitManagement() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Date</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Profit Amount</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Loan Number</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Receipt</th>
               </tr>
             </thead>
@@ -141,6 +178,7 @@ export default function ProfitManagement() {
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(p.created_at).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">{p.full_name}</td>
                   <td className="px-6 py-4 text-sm font-semibold text-green-600">{formatUGX(p.profit_amount)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-700">{p.loan?.loan_number || '-'}</td>
                   <td className="px-6 py-4">
                     <button
                       onClick={() => handlePrint(p)}
