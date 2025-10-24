@@ -8,7 +8,6 @@ export default function ProfitManagement() {
   const [members, setMembers] = useState<Member[]>([]);
   const [profits, setProfits] = useState<any[]>([]);
   const [showDistributeModal, setShowDistributeModal] = useState(false);
-  const [selectedProfit, setSelectedProfit] = useState<any>(null);
   const [totalProfit, setTotalProfit] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -33,18 +32,10 @@ export default function ProfitManagement() {
     try {
       const { data, error } = await supabase
         .from('profits')
-        .select(`
-          *,
-          member:members!profits_member_id_fkey(full_name, member_number)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      const flattened = (data || []).map((p: any) => ({
-        ...p,
-        member_name: p.member?.full_name || '-',
-        member_number: p.member?.member_number || '-',
-      }));
-      setProfits(flattened);
+      setProfits(data || []);
     } catch (err: any) {
       console.error('Error loading profits:', err.message);
       setProfits([]);
@@ -66,8 +57,8 @@ export default function ProfitManagement() {
       const totalBalances = members.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
-      const inserts = [];
-      const updates = [];
+      const inserts: any[] = [];
+      const updates: any[] = [];
 
       for (const member of members) {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
@@ -75,6 +66,7 @@ export default function ProfitManagement() {
 
         inserts.push({
           member_id: member.id,
+          full_name: member.full_name, // store full_name directly
           profit_amount: memberShare,
           recorded_by: profile?.id,
         });
@@ -111,7 +103,7 @@ export default function ProfitManagement() {
       <div style="font-family: Arial; padding: 20px;">
         <h2 style="color:#008080">Profit Receipt</h2>
         <p>Date: ${new Date(profit.created_at).toLocaleString()}</p>
-        <p>Member: ${profit.member_name}</p>
+        <p>Member: ${profit.full_name}</p>
         <p>Amount: ${formatUGX(profit.profit_amount)}</p>
       </div>
     `;
@@ -150,10 +142,7 @@ export default function ProfitManagement() {
               {profits.map((p) => (
                 <tr key={p.id} className="hover:bg-[#f0f8f8] transition-colors cursor-pointer">
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(p.created_at).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm text-gray-800">
-                    {p.member_name}
-                    <div className="text-xs text-gray-500 italic">{p.member_number}</div>
-                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-800">{p.full_name}</td>
                   <td className="px-6 py-4 text-sm font-semibold text-green-600">{formatUGX(p.profit_amount)}</td>
                   <td className="px-6 py-4">
                     <button
