@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase, Member } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { DollarSign, Printer, Banknote } from 'lucide-react';
+import { DollarSign, Banknote, Printer } from 'lucide-react';
 
 export default function ProfitManagement() {
   const { profile } = useAuth();
@@ -11,12 +11,18 @@ export default function ProfitManagement() {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedProfit, setSelectedProfit] = useState<any>(null);
   const [totalProfit, setTotalProfit] = useState('');
-  const [selectedLoanId, setSelectedLoanId] = useState<string>('');
+  const [selectedLoanId, setSelectedLoanId] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   const formatUGX = (amount: any) => `UGX ${Math.round(Number(amount ?? 0)).toLocaleString('en-UG')}`;
 
-  // Load members
+  useEffect(() => {
+    loadMembers();
+    loadProfits();
+  }, []);
+
   const loadMembers = async () => {
     try {
       const { data, error } = await supabase
@@ -26,11 +32,9 @@ export default function ProfitManagement() {
       setMembers(data || []);
     } catch (err: any) {
       console.error(err);
-      setMembers([]);
     }
   };
 
-  // Load profits
   const loadProfits = async () => {
     try {
       const { data, error } = await supabase
@@ -41,23 +45,15 @@ export default function ProfitManagement() {
       setProfits(data || []);
     } catch (err: any) {
       console.error(err);
-      setProfits([]);
     }
   };
 
-  useEffect(() => {
-    loadMembers();
-    loadProfits();
-  }, []);
-
-  // Distribute profits
   const distributeProfits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLoanId) {
       alert('Please select a completed loan to distribute profits.');
       return;
     }
-
     setLoading(true);
     try {
       const profitAmount = parseFloat(totalProfit);
@@ -97,73 +93,49 @@ export default function ProfitManagement() {
     }
   };
 
-  // --- Receipt Modal ---
-  const ReceiptModal = () => {
+  const handlePrint = () => {
+    if (!receiptRef.current) return;
+    const printContents = receiptRef.current.innerHTML;
+    const originalContents = document.body.innerHTML;
+
+    document.body.innerHTML = printContents;
+    window.print();
+    document.body.innerHTML = originalContents;
+    window.location.reload(); // restores JS state
+  };
+
+  const ProfitReceiptModal = () => {
     if (!selectedProfit) return null;
-
-    const profit = selectedProfit;
-
-    const handlePrint = () => {
-      const content = document.getElementById('profit-receipt')?.innerHTML;
-      if (content) {
-        const w = window.open('', '', 'width=600,height=800');
-        w?.document.write(`
-          <html>
-            <head>
-              <title>Profit Receipt</title>
-              <style>
-                body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
-                .receipt { max-width: 500px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                .header { text-align: center; margin-bottom: 20px; }
-                .header h1 { margin: 0; color: #008080; }
-                .header p { margin: 2px 0; color: #555; font-size: 14px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-                th { background-color: #f0f0f0; }
-                .total { font-weight: bold; color: #008080; }
-                .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #555; }
-              </style>
-            </head>
-            <body>
-              <div class="receipt">${content}</div>
-            </body>
-          </html>
-        `);
-        w?.document.close();
-        w?.focus();
-        w?.print();
-      }
-    };
-
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-          <div id="profit-receipt" className="text-sm text-gray-800">
-            <div className="header">
-              <h1>Profit Distribution Receipt</h1>
-              <p>{new Date(profit.created_at).toLocaleString()}</p>
+          <div ref={receiptRef} className="text-sm text-gray-800">
+            <div className="header text-center mb-4">
+              <h1 className="text-2xl font-bold text-[#008080]">Profit Distribution Receipt</h1>
+              <p>Profit Record</p>
+              <p>{new Date(selectedProfit.created_at).toLocaleString()}</p>
             </div>
-            <table>
+            <table className="w-full table-auto border-collapse border border-gray-300 mb-4">
               <tbody>
                 <tr>
-                  <th>Member</th>
-                  <td>{profit.full_name}</td>
+                  <th className="border px-2 py-1 text-left">Member</th>
+                  <td className="border px-2 py-1">{selectedProfit.full_name}</td>
                 </tr>
                 <tr>
-                  <th>Profit Amount</th>
-                  <td className="total">{formatUGX(profit.profit_amount)}</td>
+                  <th className="border px-2 py-1 text-left">Loan ID</th>
+                  <td className="border px-2 py-1">{selectedProfit.loan_id}</td>
                 </tr>
                 <tr>
-                  <th>Recorded By</th>
-                  <td>{profile?.full_name || '-'}</td>
+                  <th className="border px-2 py-1 text-left">Profit Amount</th>
+                  <td className="border px-2 py-1">{formatUGX(selectedProfit.profit_amount)}</td>
                 </tr>
                 <tr>
-                  <th>Loan ID</th>
-                  <td>{profit.loan_id}</td>
+                  <th className="border px-2 py-1 text-left">Recorded By</th>
+                  <td className="border px-2 py-1">{profile?.full_name || '-'}</td>
                 </tr>
               </tbody>
             </table>
-            <div className="footer">Thank you for using our system!</div>
+            <div className="text-center text-xs text-gray-500">Thank you for using our system!</div>
           </div>
           <div className="flex gap-3 pt-4">
             <button onClick={handlePrint} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors">
@@ -182,7 +154,10 @@ export default function ProfitManagement() {
     <div className="p-4">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Profit Management</h2>
-        <button onClick={() => setShowDistributeModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors">
+        <button
+          onClick={() => setShowDistributeModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors"
+        >
           <Banknote className="w-5 h-5" /> Distribute Profits
         </button>
       </div>
@@ -205,8 +180,11 @@ export default function ProfitManagement() {
                   <td className="px-6 py-4 text-sm text-gray-800">{p.full_name}</td>
                   <td className="px-6 py-4 text-sm font-semibold text-green-600">{formatUGX(p.profit_amount)}</td>
                   <td className="px-6 py-4">
-                    <button onClick={() => { setSelectedProfit(p); setShowReceiptModal(true); }} className="flex items-center gap-1 px-3 py-1 bg-[#008080] text-white rounded-xl text-sm hover:bg-[#006666] transition-colors">
-                      <Printer className="w-4 h-4" /> View
+                    <button
+                      onClick={() => { setSelectedProfit(p); setShowReceiptModal(true); }}
+                      className="flex items-center gap-1 px-3 py-1 bg-[#008080] text-white rounded-xl text-sm hover:bg-[#006666] transition-colors"
+                    >
+                      <Printer className="w-4 h-4" /> Print
                     </button>
                   </td>
                 </tr>
@@ -222,7 +200,7 @@ export default function ProfitManagement() {
             <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Distribute Profits</h2>
             <form onSubmit={distributeProfits} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Loan ID</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Completed Loan (Loan ID)</label>
                 <input
                   type="text"
                   value={selectedLoanId}
@@ -245,10 +223,18 @@ export default function ProfitManagement() {
                 />
               </div>
               <div className="flex gap-3 pt-4">
-                <button type="submit" disabled={loading} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors shadow-md">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors shadow-md"
+                >
                   {loading ? 'Distributing...' : 'Distribute'}
                 </button>
-                <button type="button" onClick={() => setShowDistributeModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">
+                <button
+                  type="button"
+                  onClick={() => setShowDistributeModal(false)}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                >
                   Cancel
                 </button>
               </div>
@@ -257,7 +243,7 @@ export default function ProfitManagement() {
         </div>
       )}
 
-      {showReceiptModal && <ReceiptModal />}
+      {showReceiptModal && <ProfitReceiptModal />}
     </div>
   );
 }
