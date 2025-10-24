@@ -24,6 +24,9 @@ export default function LoanManagement() {
 
   const handleLoanAction = async (loanId: string, action: 'approve' | 'reject', approvedAmount?: number, interestRate?: number) => {
     try {
+      const loan = loans.find(l => l.id === loanId);
+      if (!loan) return;
+
       if (action === 'approve' && approvedAmount && interestRate !== undefined) {
         const totalRepayable = approvedAmount + (approvedAmount * interestRate / 100);
 
@@ -40,7 +43,6 @@ export default function LoanManagement() {
           })
           .eq('id', loanId);
 
-        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_approved',
@@ -56,7 +58,6 @@ export default function LoanManagement() {
           })
           .eq('id', loanId);
 
-        const loan = loans.find(l => l.id === loanId);
         await supabase.from('notifications').insert({
           member_id: loan.member_id,
           type: 'loan_rejected',
@@ -74,6 +75,7 @@ export default function LoanManagement() {
   const handleDisburse = async (loanId: string) => {
     try {
       const loan = loans.find(l => l.id === loanId);
+      if (!loan) return;
 
       await supabase
         .from('loans')
