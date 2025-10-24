@@ -11,7 +11,8 @@ export default function ProfitManagement() {
   const [totalProfit, setTotalProfit] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const formatUGX = (amount: any) => `UGX ${Math.round(Number(amount ?? 0)).toLocaleString('en-UG')}`;
+  const formatUGX = (amount: any) =>
+    `UGX ${Math.round(Number(amount ?? 0)).toLocaleString('en-UG')}`;
 
   // Load all members
   const loadMembers = async () => {
@@ -27,15 +28,31 @@ export default function ProfitManagement() {
     }
   };
 
-  // Load all profits
+  // Load accumulated profits per member
   const loadProfits = async () => {
     try {
+      // Sum profits for each member
       const { data, error } = await supabase
         .from('profits')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('member_id, full_name, profit_amount')
+        .order('created_at', { ascending: true });
+
       if (error) throw error;
-      setProfits(data || []);
+
+      // Aggregate profits per member
+      const profitMap: Record<string, any> = {};
+      (data || []).forEach((p: any) => {
+        if (!profitMap[p.member_id]) {
+          profitMap[p.member_id] = {
+            member_id: p.member_id,
+            full_name: p.full_name,
+            total_profit: 0,
+          };
+        }
+        profitMap[p.member_id].total_profit += Number(p.profit_amount || 0);
+      });
+
+      setProfits(Object.values(profitMap));
     } catch (err: any) {
       console.error('Error loading profits:', err.message);
       setProfits([]);
@@ -47,26 +64,32 @@ export default function ProfitManagement() {
     loadProfits();
   }, []);
 
+  // Manual distribution (optional)
   const distributeProfits = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       const profitAmount = parseFloat(totalProfit);
-      if (isNaN(profitAmount) || profitAmount <= 0) throw new Error('Invalid profit amount');
+      if (isNaN(profitAmount) || profitAmount <= 0)
+        throw new Error('Invalid profit amount');
 
-      const totalBalances = members.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
-      if (totalBalances === 0) throw new Error('No balances to distribute profits to');
+      const totalBalances = members.reduce(
+        (sum, m) => sum + Number(m.account_balance || 0),
+        0
+      );
+      if (totalBalances === 0) throw new Error('No balances to distribute profits');
 
       const inserts: any[] = [];
       const updates: any[] = [];
 
       for (const member of members) {
-        const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
+        const memberShare =
+          (Number(member.account_balance || 0) / totalBalances) * profitAmount;
         if (memberShare <= 0) continue;
 
         inserts.push({
           member_id: member.id,
-          full_name: member.full_name, // store full_name directly
+          full_name: member.full_name,
           profit_amount: memberShare,
           recorded_by: profile?.id,
         });
@@ -82,7 +105,6 @@ export default function ProfitManagement() {
       const { error: insertError } = await supabase.from('profits').insert(inserts);
       if (insertError) throw insertError;
 
-      // Update member balances
       for (const u of updates) await u;
 
       setTotalProfit('');
@@ -102,9 +124,8 @@ export default function ProfitManagement() {
     const content = `
       <div style="font-family: Arial; padding: 20px;">
         <h2 style="color:#008080">Profit Receipt</h2>
-        <p>Date: ${new Date(profit.created_at).toLocaleString()}</p>
         <p>Member: ${profit.full_name}</p>
-        <p>Amount: ${formatUGX(profit.profit_amount)}</p>
+        <p>Total Profit: ${formatUGX(profit.total_profit)}</p>
       </div>
     `;
     const w = window.open('', '', 'width=600,height=800');
@@ -132,18 +153,16 @@ export default function ProfitManagement() {
           <table className="w-full min-w-max">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Date</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Profit Amount</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Accumulated Profit</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Receipt</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {profits.map((p) => (
-                <tr key={p.id} className="hover:bg-[#f0f8f8] transition-colors cursor-pointer">
-                  <td className="px-6 py-4 text-sm text-gray-600">{new Date(p.created_at).toLocaleString()}</td>
+                <tr key={p.member_id} className="hover:bg-[#f0f8f8] transition-colors cursor-pointer">
                   <td className="px-6 py-4 text-sm text-gray-800">{p.full_name}</td>
-                  <td className="px-6 py-4 text-sm font-semibold text-green-600">{formatUGX(p.profit_amount)}</td>
+                  <td className="px-6 py-4 text-sm font-semibold text-green-600">{formatUGX(p.total_profit)}</td>
                   <td className="px-6 py-4">
                     <button
                       onClick={() => handlePrint(p)}
