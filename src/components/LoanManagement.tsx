@@ -15,7 +15,7 @@ export default function LoanManagement() {
 
   const loadLoans = async () => {
     const { data, error } = await supabase
-      .from('loans_with_member_name') // Use the SQL view that includes full_name and member_number
+      .from('loans_with_member_name') // SQL view with full_name & member_number
       .select('*')
       .order('requested_date', { ascending: false });
 
@@ -23,7 +23,6 @@ export default function LoanManagement() {
       console.error('Error fetching loans:', error);
       return;
     }
-
     setLoans(data || []);
   };
 
@@ -71,7 +70,7 @@ export default function LoanManagement() {
         });
       }
 
-      loadLoans();
+      loadLoans(); // <-- refresh table after approve/reject
     } catch (err) {
       console.error('Error processing loan:', err);
     }
@@ -114,7 +113,7 @@ export default function LoanManagement() {
         message: `Your loan of UGX ${loan.amount_approved.toLocaleString('en-UG')} has been disbursed to your account.`,
       });
 
-      loadLoans();
+      loadLoans(); // <-- refresh table after disbursement
     } catch (err) {
       console.error('Error disbursing loan:', err);
     }
@@ -227,7 +226,7 @@ export default function LoanManagement() {
         });
 
         onClose();
-        loadLoans();
+        loadLoans(); // <-- refresh table after repayment
       } catch (err) {
         console.error('Error recording repayment:', err);
       } finally {
