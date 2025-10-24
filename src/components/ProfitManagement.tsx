@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, Member } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Banknote, Printer } from 'lucide-react';
+import { DollarSign, Banknote, Printer } from 'lucide-react';
 
 export default function ProfitManagement() {
   const { profile } = useAuth();
@@ -23,7 +23,6 @@ export default function ProfitManagement() {
     loadProfits();
   }, []);
 
-  // --- Load Members ---
   const loadMembers = async () => {
     try {
       const { data, error } = await supabase
@@ -36,7 +35,6 @@ export default function ProfitManagement() {
     }
   };
 
-  // --- Load Profits ---
   const loadProfits = async () => {
     try {
       const { data, error } = await supabase
@@ -44,13 +42,25 @@ export default function ProfitManagement() {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setProfits(data || []);
+
+      // Aggregate profits by member + loan
+      const aggregated: any[] = [];
+      (data || []).forEach((p) => {
+        const existing = aggregated.find(a => a.member_id === p.member_id && a.loan_id === p.loan_id);
+        if (existing) {
+          existing.profit_amount += Number(p.profit_amount);
+        } else {
+          aggregated.push({ ...p, profit_amount: Number(p.profit_amount) });
+        }
+      });
+
+      setProfits(aggregated);
     } catch (err: any) {
       console.error(err);
+      setProfits([]);
     }
   };
 
-  // --- Distribute Profits (accumulate per member per loan) ---
   const distributeProfits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLoanId) {
@@ -65,38 +75,23 @@ export default function ProfitManagement() {
       const totalBalances = members.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
-      await loadProfits(); // Refresh profits from DB
-
       const inserts: any[] = [];
 
       for (const member of members) {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
         if (memberShare <= 0) continue;
 
-        const existingProfit = profits.find(p => p.member_id === member.id && p.loan_id === selectedLoanId);
-
-        if (!existingProfit) {
-          inserts.push({
-            member_id: member.id,
-            full_name: member.full_name,
-            loan_id: selectedLoanId,
-            profit_amount: memberShare,
-            recorded_by: profile?.id,
-          });
-        } else {
-          // Update existing profit amount (accumulate)
-          const { error: updateError } = await supabase
-            .from('profits')
-            .update({ profit_amount: Number(existingProfit.profit_amount) + memberShare })
-            .eq('id', existingProfit.id);
-          if (updateError) throw updateError;
-        }
+        inserts.push({
+          member_id: member.id,
+          full_name: member.full_name,
+          loan_id: selectedLoanId,
+          profit_amount: memberShare,
+          recorded_by: profile?.id,
+        });
       }
 
-      if (inserts.length > 0) {
-        const { error: insertError } = await supabase.from('profits').insert(inserts);
-        if (insertError) throw insertError;
-      }
+      const { error: insertError } = await supabase.from('profits').insert(inserts);
+      if (insertError) throw insertError;
 
       setTotalProfit('');
       setSelectedLoanId('');
@@ -111,7 +106,6 @@ export default function ProfitManagement() {
     }
   };
 
-  // --- Print / Download Receipt ---
   const handlePrint = () => {
     if (!receiptRef.current) return;
     const printContents = receiptRef.current.innerHTML;
@@ -120,10 +114,9 @@ export default function ProfitManagement() {
     document.body.innerHTML = printContents;
     window.print();
     document.body.innerHTML = originalContents;
-    window.location.reload();
+    window.location.reload(); // restores JS state
   };
 
-  // --- Receipt Modal ---
   const ProfitReceiptModal = () => {
     if (!selectedProfit) return null;
     return (
@@ -146,7 +139,7 @@ export default function ProfitManagement() {
                   <td className="border px-2 py-1">{selectedProfit.loan_id}</td>
                 </tr>
                 <tr>
-                  <th className="border px-2 py-1 text-left">Total Profit</th>
+                  <th className="border px-2 py-1 text-left">Profit Amount</th>
                   <td className="border px-2 py-1">{formatUGX(selectedProfit.profit_amount)}</td>
                 </tr>
                 <tr>
@@ -169,17 +162,6 @@ export default function ProfitManagement() {
       </div>
     );
   };
-
-  // --- Aggregate profits for table (per member per loan) ---
-  const aggregatedProfits = profits.reduce((acc: any[], p) => {
-    const existing = acc.find(a => a.member_id === p.member_id && a.loan_id === p.loan_id);
-    if (existing) {
-      existing.profit_amount += Number(p.profit_amount);
-    } else {
-      acc.push({ ...p, profit_amount: Number(p.profit_amount) });
-    }
-    return acc;
-  }, []);
 
   return (
     <div className="p-4">
@@ -205,7 +187,7 @@ export default function ProfitManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {aggregatedProfits.map((p) => (
+              {profits.map((p) => (
                 <tr key={`${p.member_id}-${p.loan_id}`} className="hover:bg-[#f0f8f8] transition-colors cursor-pointer">
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(p.created_at).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">{p.full_name}</td>
@@ -225,7 +207,6 @@ export default function ProfitManagement() {
         </div>
       </div>
 
-      {/* --- Distribute Modal --- */}
       {showDistributeModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl">
