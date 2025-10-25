@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member, Transaction, Loan, Notification } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { DollarSign, TrendingUp, CreditCard, Bell, LogOut, FileText, Send, Edit3, Save } from 'lucide-react';
+import { DollarSign, TrendingUp, CreditCard, Bell, LogOut, FileText, Send } from 'lucide-react';
 
 export default function MemberDashboard() {
   const { profile, signOut } = useAuth();
@@ -11,19 +11,10 @@ export default function MemberDashboard() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showLoanModal, setShowLoanModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [editedData, setEditedData] = useState({ phone: '', address: '' });
 
   useEffect(() => {
     loadMemberData();
   }, [profile]);
-
-  const formatName = (name: string) => {
-    return name
-      .split(' ')
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-      .join(' ');
-  };
 
   const loadMemberData = async () => {
     if (!profile) return;
@@ -39,12 +30,10 @@ export default function MemberDashboard() {
 
       const fetchedMember = {
         ...memberRes.data,
-        full_name: formatName(memberRes.data.full_name),
-        account_balance: Math.floor(Number(memberRes.data.account_balance)),
-        total_contributions: Math.floor(Number(memberRes.data.total_contributions)),
+        account_balance: Number(memberRes.data.account_balance),
+        total_contributions: Number(memberRes.data.total_contributions),
       };
       setMember(fetchedMember);
-      setEditedData({ phone: fetchedMember.phone || '', address: fetchedMember.address || '' });
 
       const [txRes, loanRes, notifRes] = await Promise.all([
         supabase
@@ -71,26 +60,6 @@ export default function MemberDashboard() {
       setNotifications(notifRes.data || []);
     } catch (err) {
       console.error('Failed to load member data:', err);
-    }
-  };
-
-  const handleSaveEdit = async () => {
-    if (!member) return;
-    try {
-      const { error } = await supabase
-        .from('members')
-        .update({
-          phone: editedData.phone,
-          address: editedData.address,
-        })
-        .eq('id', member.id);
-
-      if (error) throw error;
-
-      setEditing(false);
-      loadMemberData();
-    } catch (err) {
-      console.error('Failed to save edits:', err);
     }
   };
 
@@ -236,15 +205,9 @@ export default function MemberDashboard() {
                 )}
               </button>
               <div className="text-right">
-                <p className="text-sm font-medium text-white">{member?.full_name}</p>
+                <p className="text-sm font-medium text-white">{profile?.full_name}</p>
                 <p className="text-xs text-white/80">{member?.member_number}</p>
               </div>
-              <button
-                onClick={() => setEditing(!editing)}
-                className="p-2 text-white hover:text-yellow-400 hover:bg-white/20 rounded-xl transition-transform duration-300 hover:scale-105"
-              >
-                <Edit3 className="w-5 h-5" />
-              </button>
               <button
                 onClick={() => signOut()}
                 className="p-2 text-white hover:text-red-600 hover:bg-white/20 rounded-xl transition-transform duration-300 hover:scale-105"
@@ -255,44 +218,6 @@ export default function MemberDashboard() {
           </div>
         </div>
       </nav>
-
-      {/* Edit Member Info */}
-      {editing && (
-        <div className="max-w-md mx-auto bg-white p-6 mt-6 rounded-2xl shadow-lg">
-          <h3 className="font-bold text-gray-800 mb-4">Edit Your Details</h3>
-          <div className="space-y-3">
-            <input
-              type="text"
-              placeholder="Phone Number"
-              value={editedData.phone}
-              onChange={(e) => setEditedData({ ...editedData, phone: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#007B8A]"
-            />
-            <input
-              type="text"
-              placeholder="Address"
-              value={editedData.address}
-              onChange={(e) => setEditedData({ ...editedData, address: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#007B8A]"
-            />
-            <div className="flex gap-3 pt-3">
-              <button
-                onClick={handleSaveEdit}
-                className="flex items-center gap-2 px-4 py-2 bg-[#007B8A] text-white rounded-xl"
-              >
-                <Save className="w-4 h-4" />
-                Save Changes
-              </button>
-              <button
-                onClick={() => setEditing(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Notifications */}
       {showNotifications && (
@@ -337,7 +262,7 @@ export default function MemberDashboard() {
             </div>
             <p className="text-sm text-gray-600 mb-1">Account Balance (UGX)</p>
             <h3 className="text-3xl font-bold text-[#007B8A]">
-              {member ? Math.floor(member.account_balance).toLocaleString() : '0'}
+              {member ? member.account_balance.toLocaleString() : '0'}
             </h3>
           </div>
 
@@ -350,7 +275,7 @@ export default function MemberDashboard() {
             </div>
             <p className="text-sm text-gray-600 mb-1">Total Contributions (UGX)</p>
             <h3 className="text-3xl font-bold text-[#007B8A]">
-              {member ? Math.floor(member.total_contributions).toLocaleString() : '0'}
+              {member ? member.total_contributions.toLocaleString() : '0'}
             </h3>
           </div>
 
@@ -390,10 +315,10 @@ export default function MemberDashboard() {
                       }`}
                     >
                       {tx.transaction_type === 'withdrawal' ? '-' : '+'}
-                      {Math.floor(Number(tx.amount)).toLocaleString()} UGX
+                      {Number(tx.amount).toLocaleString()} UGX
                     </p>
                     <p className="text-xs text-gray-600">
-                      Bal: {Math.floor(Number(tx.balance_after)).toLocaleString()} UGX
+                      Bal: {Number(tx.balance_after).toLocaleString()} UGX
                     </p>
                   </div>
                 </div>
@@ -444,11 +369,11 @@ export default function MemberDashboard() {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>
-                        Amount: {Math.floor(Number(loan.amount_approved || loan.amount_requested)).toLocaleString()} UGX
+                        Amount: {Number(loan.amount_approved || loan.amount_requested).toLocaleString()} UGX
                       </span>
                       {loan.outstanding_balance !== null && (
                         <span className="font-semibold text-[#007B8A]">
-                          Outstanding: {Math.floor(Number(loan.outstanding_balance)).toLocaleString()} UGX
+                          Outstanding: {Number(loan.outstanding_balance).toLocaleString()} UGX
                         </span>
                       )}
                     </div>
