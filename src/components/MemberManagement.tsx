@@ -350,7 +350,8 @@ export default function MemberManagement() {
         </table>
       </div>
 
-      {showAddModal && (console.log('Rendering AddMemberModal'), <AddMemberModal />)}
+      {/* ✅ Fixed rendering issue here */}
+      {showAddModal && <AddMemberModal />}
 
       {showDetailsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
