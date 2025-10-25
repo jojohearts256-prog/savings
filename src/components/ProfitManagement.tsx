@@ -68,6 +68,7 @@ export default function ProfitManagement() {
       return;
     }
     setLoading(true);
+
     try {
       const profitAmount = parseFloat(totalProfit);
       if (isNaN(profitAmount) || profitAmount <= 0) throw new Error('Invalid profit amount');
@@ -75,29 +76,56 @@ export default function ProfitManagement() {
       const totalBalances = members.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
-      const inserts: any[] = [];
+      // 1️⃣ Fetch existing profits for this loan
+      const { data: existingProfits, error: fetchError } = await supabase
+        .from('profits')
+        .select('*')
+        .eq('loan_id', selectedLoanId);
+      if (fetchError) throw fetchError;
 
+      const profitMap: Record<string, any> = {};
+      (existingProfits || []).forEach(p => {
+        profitMap[p.member_id] = p;
+      });
+
+      // 2️⃣ Prepare inserts/upserts with accumulation
+      const upserts: any[] = [];
       for (const member of members) {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
         if (memberShare <= 0) continue;
 
-        inserts.push({
-          member_id: member.id,
-          full_name: member.full_name,
-          loan_id: selectedLoanId,
-          profit_amount: memberShare,
-          recorded_by: profile?.id,
-        });
+        if (profitMap[member.id]) {
+          // Add to existing profit_amount
+          upserts.push({
+            id: profitMap[member.id].id, // ensures upsert updates this row
+            profit_amount: profitMap[member.id].profit_amount + memberShare,
+            full_name: member.full_name,
+            recorded_by: profile?.id,
+            loan_id: selectedLoanId,
+          });
+        } else {
+          // New profit entry
+          upserts.push({
+            member_id: member.id,
+            full_name: member.full_name,
+            profit_amount: memberShare,
+            recorded_by: profile?.id,
+            loan_id: selectedLoanId,
+          });
+        }
       }
 
-      const { error: insertError } = await supabase.from('profits').insert(inserts);
-      if (insertError) throw insertError;
+      const { error: upsertError } = await supabase
+        .from('profits')
+        .upsert(upserts, { onConflict: ['id'], returning: 'minimal' }); // accumulate or insert
+
+      if (upsertError) throw upsertError;
 
       setTotalProfit('');
       setSelectedLoanId('');
       setShowDistributeModal(false);
       await loadProfits();
-      alert('Profits distributed successfully!');
+      alert('Profits distributed and accumulated successfully!');
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'Failed to distribute profits');
@@ -114,7 +142,7 @@ export default function ProfitManagement() {
     document.body.innerHTML = printContents;
     window.print();
     document.body.innerHTML = originalContents;
-    window.location.reload(); // restores JS state
+    window.location.reload();
   };
 
   const ProfitReceiptModal = () => {
