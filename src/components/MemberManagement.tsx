@@ -109,7 +109,6 @@ export default function MemberManagement() {
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
-        {/* ↑ increased z-index so it's never hidden */}
         <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Add New Member</h2>
 
@@ -251,15 +250,13 @@ export default function MemberManagement() {
     setLoading(false);
   };
 
-  console.log("👀 showAddModal:", showAddModal); // ✅ Debug line to see state changes
-
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Member Management</h2>
         <button
           onClick={() => {
-            console.log("🟢 Add Member button clicked"); // ✅ Debug log to confirm click works
+            console.log('Add Member clicked');
             setShowAddModal(true);
           }}
           className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl"
@@ -353,10 +350,10 @@ export default function MemberManagement() {
         </table>
       </div>
 
-      {showAddModal && <AddMemberModal />}
+      {showAddModal && (console.log('Rendering AddMemberModal'), <AddMemberModal />)}
 
       {showDetailsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 relative">
             <h2 className="text-xl font-bold mb-4">Member Details</h2>
             <div className="space-y-2 text-gray-700">
