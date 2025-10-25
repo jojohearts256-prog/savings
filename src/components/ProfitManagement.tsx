@@ -37,24 +37,25 @@ export default function ProfitManagement() {
 
   const loadProfits = async () => {
     try {
+      // Aggregate profits per member (accumulated)
       const { data, error } = await supabase
         .from('profits')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
       if (error) throw error;
 
-      // Aggregate profits by member + loan
-      const aggregated: any[] = [];
+      const aggregated: Record<string, any> = {};
       (data || []).forEach((p) => {
-        const existing = aggregated.find(a => a.member_id === p.member_id && a.loan_id === p.loan_id);
-        if (existing) {
-          existing.profit_amount += Number(p.profit_amount);
+        if (aggregated[p.member_id]) {
+          aggregated[p.member_id].profit_amount += Number(p.profit_amount);
+          if (new Date(p.created_at) > new Date(aggregated[p.member_id].created_at)) {
+            aggregated[p.member_id].created_at = p.created_at;
+          }
         } else {
-          aggregated.push({ ...p, profit_amount: Number(p.profit_amount) });
+          aggregated[p.member_id] = { ...p, profit_amount: Number(p.profit_amount) };
         }
       });
 
-      setProfits(aggregated);
+      setProfits(Object.values(aggregated));
     } catch (err: any) {
       console.error(err);
       setProfits([]);
@@ -68,7 +69,6 @@ export default function ProfitManagement() {
       return;
     }
     setLoading(true);
-
     try {
       const profitAmount = parseFloat(totalProfit);
       if (isNaN(profitAmount) || profitAmount <= 0) throw new Error('Invalid profit amount');
@@ -76,56 +76,54 @@ export default function ProfitManagement() {
       const totalBalances = members.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
-      // 1️⃣ Fetch existing profits for this loan
-      const { data: existingProfits, error: fetchError } = await supabase
-        .from('profits')
-        .select('*')
-        .eq('loan_id', selectedLoanId);
-      if (fetchError) throw fetchError;
-
-      const profitMap: Record<string, any> = {};
-      (existingProfits || []).forEach(p => {
-        profitMap[p.member_id] = p;
-      });
-
-      // 2️⃣ Prepare inserts/upserts with accumulation
-      const upserts: any[] = [];
       for (const member of members) {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
         if (memberShare <= 0) continue;
 
-        if (profitMap[member.id]) {
-          // Add to existing profit_amount
-          upserts.push({
-            id: profitMap[member.id].id, // ensures upsert updates this row
-            profit_amount: profitMap[member.id].profit_amount + memberShare,
-            full_name: member.full_name,
-            recorded_by: profile?.id,
-            loan_id: selectedLoanId,
-          });
+        // Check if a profit row already exists for this member
+        const { data: existingProfit, error: selectError } = await supabase
+          .from('profits')
+          .select('*')
+          .eq('member_id', member.id)
+          .single();
+
+        if (selectError && selectError.code !== 'PGRST116') { // ignore "no rows found"
+          throw selectError;
+        }
+
+        if (existingProfit) {
+          // Update existing profit row (add to total)
+          const { error: updateError } = await supabase
+            .from('profits')
+            .update({
+              profit_amount: Number(existingProfit.profit_amount) + memberShare,
+              loan_id: selectedLoanId,
+              recorded_by: profile?.id,
+              created_at: new Date().toISOString(),
+            })
+            .eq('id', existingProfit.id);
+
+          if (updateError) throw updateError;
         } else {
-          // New profit entry
-          upserts.push({
-            member_id: member.id,
-            full_name: member.full_name,
-            profit_amount: memberShare,
-            recorded_by: profile?.id,
-            loan_id: selectedLoanId,
-          });
+          // Insert new profit row if none exists
+          const { error: insertError } = await supabase
+            .from('profits')
+            .insert({
+              member_id: member.id,
+              full_name: member.full_name,
+              loan_id: selectedLoanId,
+              profit_amount: memberShare,
+              recorded_by: profile?.id,
+            });
+          if (insertError) throw insertError;
         }
       }
-
-      const { error: upsertError } = await supabase
-        .from('profits')
-        .upsert(upserts, { onConflict: ['id'], returning: 'minimal' }); // accumulate or insert
-
-      if (upsertError) throw upsertError;
 
       setTotalProfit('');
       setSelectedLoanId('');
       setShowDistributeModal(false);
       await loadProfits();
-      alert('Profits distributed and accumulated successfully!');
+      alert('Profits distributed successfully!');
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'Failed to distribute profits');
@@ -142,7 +140,7 @@ export default function ProfitManagement() {
     document.body.innerHTML = printContents;
     window.print();
     document.body.innerHTML = originalContents;
-    window.location.reload();
+    window.location.reload(); // restores JS state
   };
 
   const ProfitReceiptModal = () => {
@@ -216,7 +214,7 @@ export default function ProfitManagement() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {profits.map((p) => (
-                <tr key={`${p.member_id}-${p.loan_id}`} className="hover:bg-[#f0f8f8] transition-colors cursor-pointer">
+                <tr key={p.member_id} className="hover:bg-[#f0f8f8] transition-colors cursor-pointer">
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(p.created_at).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">{p.full_name}</td>
                   <td className="px-6 py-4 text-sm font-semibold text-green-600">{formatUGX(p.profit_amount)}</td>
