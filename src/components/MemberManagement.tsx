@@ -6,10 +6,10 @@ export default function MemberManagement() {
   const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState<Member | null>(null);
-  const [showEditModal, setShowEditModal] = useState<Member | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ✅ Load members when component mounts
   useEffect(() => {
     loadMembers();
   }, []);
@@ -19,6 +19,7 @@ export default function MemberManagement() {
       .from('members')
       .select('*, profiles(*)')
       .order('created_at', { ascending: false });
+
     if (error) console.error('Error loading members:', error.message);
     setMembers(data || []);
   };
@@ -32,7 +33,7 @@ export default function MemberManagement() {
       (m.profiles?.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
-  // ✅ Add Member Modal (unchanged)
+  // ✅ Modal for adding new members
   const AddMemberModal = () => {
     const [formData, setFormData] = useState({
       email: '',
@@ -47,11 +48,12 @@ export default function MemberManagement() {
     const [success, setSuccess] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setError('');
       setSuccess(false);
       setSubmitting(true);
+
       try {
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`,
@@ -73,17 +75,33 @@ export default function MemberManagement() {
             }),
           }
         );
+
         const result = await response.json();
+        console.log('Response from Edge Function:', result);
+
         if (!result.success) throw new Error(result.error || 'Registration failed');
+
         await new Promise((res) => setTimeout(res, 800));
         await loadMembers();
+
         setSuccess(true);
+
         setTimeout(() => {
-          setShowAddModal(false);
+          setFormData({
+            email: '',
+            password: '',
+            full_name: '',
+            phone: '',
+            id_number: '',
+            address: '',
+            date_of_birth: '',
+          });
           setSuccess(false);
-        }, 1500);
-      } catch (err) {
-        setError(err.message);
+          setShowAddModal(false);
+        }, 2000);
+      } catch (err: any) {
+        console.error('Registration error:', err.message);
+        setError(err.message || 'Failed to register member');
       } finally {
         setSubmitting(false);
       }
@@ -93,111 +111,127 @@ export default function MemberManagement() {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Add New Member</h2>
-          {error && <div className="p-3 bg-red-50 text-red-700 mb-4 rounded-xl">{error}</div>}
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
+              {error}
+            </div>
+          )}
           {success && (
-            <div className="p-3 bg-green-50 text-green-700 mb-4 rounded-xl flex items-center gap-2">
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 flex items-center gap-2">
               <CheckCircle className="w-5 h-5" /> Member registered successfully!
             </div>
           )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* inputs same as before */}
-          </form>
-        </div>
-      </div>
-    );
-  };
-
-  // ✅ Edit Member Modal
-  const EditMemberModal = ({ member, onClose }) => {
-    const [formData, setFormData] = useState({
-      full_name: '',
-      email: '',
-      phone: '',
-      id_number: '',
-      date_of_birth: '',
-      address: '',
-    });
-    const [saving, setSaving] = useState(false);
-    const [success, setSuccess] = useState(false);
-    const [error, setError] = useState('');
-
-    useEffect(() => {
-      setFormData({
-        full_name: member.profiles?.full_name || '',
-        email: member.profiles?.email || '',
-        phone: member.profiles?.phone || '',
-        id_number: member.profiles?.id_number || '',
-        date_of_birth: member.profiles?.date_of_birth || '',
-        address: member.profiles?.address || '',
-      });
-    }, [member]);
-
-    const handleSave = async (e) => {
-      e.preventDefault();
-      setSaving(true);
-      setError('');
-      try {
-        const { error } = await supabase
-          .from('profiles')
-          .update(formData)
-          .eq('id', member.profile_id); // ✅ Correct fix
-        if (error) throw error;
-        setSuccess(true);
-        await loadMembers();
-        setTimeout(() => {
-          setSuccess(false);
-          onClose();
-        }, 1000);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setSaving(false);
-      }
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl p-6 max-w-xl w-full">
-          <h2 className="text-2xl font-bold mb-4">Edit Member</h2>
-          {error && <div className="p-3 bg-red-50 text-red-700 mb-3 rounded-xl">{error}</div>}
-          {success && (
-            <div className="p-3 bg-green-50 text-green-700 mb-3 rounded-xl flex items-center gap-2">
-              <CheckCircle className="w-5 h-5" /> Saved successfully!
-            </div>
-          )}
-          <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              ['Full Name', 'full_name', 'text'],
-              ['Email', 'email', 'email'],
-              ['Phone', 'phone', 'tel'],
-              ['ID Number', 'id_number', 'text'],
-              ['Date of Birth', 'date_of_birth', 'date'],
-              ['Address', 'address', 'text'],
-            ].map(([label, key, type]) => (
-              <div key={key} className={key === 'address' ? 'md:col-span-2' : ''}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                 <input
-                  type={type}
-                  value={formData[key]}
-                  onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
+                  type="text"
+                  value={formData.full_name}
+                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
                 />
               </div>
-            ))}
-            <div className="flex justify-end gap-3 mt-6 md:col-span-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-5 py-2 border rounded-xl text-gray-700 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">ID Number</label>
+                <input
+                  type="text"
+                  value={formData.id_number}
+                  onChange={(e) => setFormData({ ...formData, id_number: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                <input
+                  type="date"
+                  value={formData.date_of_birth}
+                  onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <textarea
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+                rows={2}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-4">
               <button
                 type="submit"
-                disabled={saving}
-                className="px-5 py-2 rounded-xl bg-[#008080] text-white font-medium hover:bg-[#006666] disabled:opacity-50"
+                disabled={submitting}
+                className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {saving ? 'Saving...' : 'Save Changes'}
+                {submitting && (
+                  <svg
+                    className="animate-spin h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    ></path>
+                  </svg>
+                )}
+                {submitting ? 'Adding...' : 'Add Member'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
+              >
+                Cancel
               </button>
             </div>
           </form>
@@ -206,12 +240,13 @@ export default function MemberManagement() {
     );
   };
 
-  // ✅ Delete
-  const deleteMember = async (memberId) => {
-    if (!confirm('Are you sure you want to delete this member?')) return;
+  const deleteMember = async (memberId: string) => {
+    const confirmDelete = confirm('Are you sure you want to delete this member?');
+    if (!confirmDelete) return;
     setLoading(true);
     const { error } = await supabase.from('members').delete().eq('id', memberId);
-    if (!error) setMembers((prev) => prev.filter((m) => m.id !== memberId));
+    if (error) alert('Failed to delete member: ' + error.message);
+    else setMembers((prev) => prev.filter((m) => m.id !== memberId));
     setLoading(false);
   };
 
@@ -227,7 +262,6 @@ export default function MemberManagement() {
         </button>
       </div>
 
-      {/* Search */}
       <div className="mb-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -241,7 +275,6 @@ export default function MemberManagement() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl card-shadow overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -271,7 +304,7 @@ export default function MemberManagement() {
                   {member.profiles?.phone || member.phone || '-'}
                 </td>
                 <td className="px-6 py-4 text-sm font-semibold text-[#008080]">
-                  UGX {Number(member.account_balance || 0).toLocaleString('en-UG')}
+                  ${Number(member.account_balance).toLocaleString()}
                 </td>
                 <td className="px-6 py-4">
                   <span
@@ -294,7 +327,9 @@ export default function MemberManagement() {
                     <Eye className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => setShowEditModal(member)}
+                    onClick={() =>
+                      alert('Edit ' + (member.profiles?.full_name || member.full_name))
+                    }
                     className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -313,20 +348,48 @@ export default function MemberManagement() {
       </div>
 
       {showAddModal && <AddMemberModal />}
+
       {showDetailsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 relative">
             <h2 className="text-xl font-bold mb-4">Member Details</h2>
             <div className="space-y-2 text-gray-700">
-              <p><strong>Full Name:</strong> {showDetailsModal.profiles?.full_name || '-'}</p>
-              <p><strong>Email:</strong> {showDetailsModal.profiles?.email || '-'}</p>
-              <p><strong>Phone:</strong> {showDetailsModal.profiles?.phone || '-'}</p>
-              <p><strong>ID Number:</strong> {showDetailsModal.profiles?.id_number || '-'}</p>
-              <p><strong>Date of Birth:</strong> {showDetailsModal.profiles?.date_of_birth || '-'}</p>
-              <p><strong>Address:</strong> {showDetailsModal.profiles?.address || '-'}</p>
-              <p><strong>Member Number:</strong> {showDetailsModal.member_number}</p>
-              <p><strong>Balance:</strong> UGX {Number(showDetailsModal.account_balance || 0).toLocaleString('en-UG')}</p>
-              <p><strong>Status:</strong> {showDetailsModal.status}</p>
+              <p>
+                <strong>Full Name:</strong>{' '}
+                {showDetailsModal.profiles?.full_name || showDetailsModal.full_name || '-'}
+              </p>
+              <p>
+                <strong>Email:</strong>{' '}
+                {showDetailsModal.profiles?.email || showDetailsModal.email || '-'}
+              </p>
+              <p>
+                <strong>Phone:</strong>{' '}
+                {showDetailsModal.profiles?.phone || showDetailsModal.phone || '-'}
+              </p>
+              <p>
+                <strong>ID Number:</strong>{' '}
+                {showDetailsModal.profiles?.id_number || showDetailsModal.id_number || '-'}
+              </p>
+              <p>
+                <strong>Date of Birth:</strong>{' '}
+                {showDetailsModal.profiles?.date_of_birth ||
+                  showDetailsModal.date_of_birth ||
+                  '-'}
+              </p>
+              <p>
+                <strong>Address:</strong>{' '}
+                {showDetailsModal.profiles?.address || showDetailsModal.address || '-'}
+              </p>
+              <p>
+                <strong>Member Number:</strong> {showDetailsModal.member_number}
+              </p>
+              <p>
+                <strong>Balance:</strong> $
+                {Number(showDetailsModal.account_balance).toLocaleString()}
+              </p>
+              <p>
+                <strong>Status:</strong> {showDetailsModal.status}
+              </p>
             </div>
             <button
               onClick={() => setShowDetailsModal(null)}
@@ -336,13 +399,6 @@ export default function MemberManagement() {
             </button>
           </div>
         </div>
-      )}
-
-      {showEditModal && (
-        <EditMemberModal
-          member={showEditModal}
-          onClose={() => setShowEditModal(null)}
-        />
       )}
     </div>
   );
