@@ -6,7 +6,7 @@ export default function MemberManagement() {
   const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState<Member | null>(null);
-  const [showEditModal, setShowEditModal] = useState<Profile | null>(null);
+  const [editModal, setEditModal] = useState<Member | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -203,6 +203,28 @@ export default function MemberManagement() {
                 disabled={submitting}
                 className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
               >
+                {submitting && (
+                  <svg
+                    className="animate-spin h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    ></path>
+                  </svg>
+                )}
                 {submitting ? 'Adding...' : 'Add Member'}
               </button>
               <button
@@ -219,92 +241,117 @@ export default function MemberManagement() {
     );
   };
 
-  // ✅ Modal for editing profile
-  const EditMemberModal = ({ profile }: { profile: Profile }) => {
+  // ✅ Edit Member Modal
+  const EditMemberModal = ({ member, onClose }: any) => {
     const [formData, setFormData] = useState({
-      full_name: profile.full_name || '',
-      email: profile.email || '',
-      phone: profile.phone || '',
-      address: profile.address || '',
-      date_of_birth: profile.date_of_birth || '',
+      full_name: member?.profiles?.full_name || '',
+      email: member?.profiles?.email || '',
+      phone: member?.profiles?.phone || '',
+      address: member?.profiles?.address || '',
+      date_of_birth: member?.profiles?.date_of_birth || '',
     });
-    const [saving, setSaving] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
 
-    const handleUpdate = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: any) => {
       e.preventDefault();
-      setSaving(true);
+      setLoading(true);
       setError('');
+      setSuccess(false);
 
-      const { error } = await supabase
-        .from('profiles')
-        .update(formData)
-        .eq('id', profile.id);
+      try {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            full_name: formData.full_name,
+            email: formData.email,
+            phone: formData.phone,
+            address: formData.address,
+            date_of_birth: formData.date_of_birth,
+          })
+          .eq('id', member.profiles.id);
 
-      if (error) {
-        console.error(error.message);
-        setError(error.message);
-      } else {
+        if (updateError) throw updateError;
         await loadMembers();
-        setShowEditModal(null);
+        setSuccess(true);
+        setTimeout(() => {
+          setSuccess(false);
+          onClose();
+        }, 1500);
+      } catch (err: any) {
+        setError(err.message || 'Failed to update profile');
+      } finally {
+        setLoading(false);
       }
-      setSaving(false);
     };
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
-        <div className="bg-white rounded-2xl p-6 max-w-lg w-full">
-          <h2 className="text-xl font-bold mb-4">Edit Member Info</h2>
-          {error && <div className="mb-3 text-red-600 text-sm">{error}</div>}
-          <form onSubmit={handleUpdate} className="space-y-3">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+        <div className="bg-white rounded-2xl p-6 w-full max-w-lg relative">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Edit Member</h2>
+
+          {error && (
+            <div className="mb-3 p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="mb-3 p-3 bg-green-50 text-green-700 border border-green-200 rounded-xl">
+              Profile updated successfully!
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-3">
             <input
               type="text"
-              placeholder="Full Name"
               value={formData.full_name}
               onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2"
+              placeholder="Full Name"
+              className="w-full border px-4 py-2 rounded-xl focus:ring-2 focus:ring-[#008080]"
             />
             <input
               type="email"
-              placeholder="Email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2"
+              placeholder="Email"
+              className="w-full border px-4 py-2 rounded-xl focus:ring-2 focus:ring-[#008080]"
             />
             <input
               type="text"
-              placeholder="Phone"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2"
+              placeholder="Phone"
+              className="w-full border px-4 py-2 rounded-xl focus:ring-2 focus:ring-[#008080]"
+            />
+            <input
+              type="text"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              placeholder="Address"
+              className="w-full border px-4 py-2 rounded-xl focus:ring-2 focus:ring-[#008080]"
             />
             <input
               type="date"
-              placeholder="Date of Birth"
               value={formData.date_of_birth}
               onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2"
+              className="w-full border px-4 py-2 rounded-xl focus:ring-2 focus:ring-[#008080]"
             />
-            <textarea
-              placeholder="Address"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2"
-            />
-            <div className="flex gap-3 pt-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex-1 bg-[#008080] text-white py-2 rounded-xl"
-              >
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
+
+            <div className="flex justify-end gap-3 mt-4">
               <button
                 type="button"
-                onClick={() => setShowEditModal(null)}
-                className="flex-1 border border-gray-300 py-2 rounded-xl"
+                onClick={onClose}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50"
               >
                 Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 bg-[#008080] text-white rounded-xl hover:bg-[#006666]"
+              >
+                {loading ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </form>
@@ -384,15 +431,13 @@ export default function MemberManagement() {
                     className={`status-badge ${
                       member.status === 'active'
                         ? 'bg-green-100 text-green-800'
-                        : member.status === 'inactive'
-                        ? 'bg-gray-100 text-gray-800'
-                        : 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-600'
                     }`}
                   >
-                    {member.status}
+                    {member.status || 'N/A'}
                   </span>
                 </td>
-                <td className="px-6 py-4 flex gap-2">
+                <td className="px-6 py-4 flex items-center gap-2">
                   <button
                     onClick={() => setShowDetailsModal(member)}
                     className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition"
@@ -400,14 +445,14 @@ export default function MemberManagement() {
                     <Eye className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => member.profiles && setShowEditModal(member.profiles)}
+                    onClick={() => setEditModal(member)}
                     className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => deleteMember(member.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                    className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -418,36 +463,8 @@ export default function MemberManagement() {
         </table>
       </div>
 
-      {/* ✅ Modals */}
       {showAddModal && <AddMemberModal />}
-      {showEditModal && <EditMemberModal profile={showEditModal} />}
-      {showDetailsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 relative">
-            <h2 className="text-xl font-bold mb-4">Member Details</h2>
-            <div className="space-y-2 text-gray-700">
-              <p>
-                <strong>Name:</strong> {showDetailsModal.profiles?.full_name || '-'}
-              </p>
-              <p>
-                <strong>Email:</strong> {showDetailsModal.profiles?.email || '-'}
-              </p>
-              <p>
-                <strong>Phone:</strong> {showDetailsModal.profiles?.phone || '-'}
-              </p>
-              <p>
-                <strong>Address:</strong> {showDetailsModal.profiles?.address || '-'}
-              </p>
-            </div>
-            <button
-              onClick={() => setShowDetailsModal(null)}
-              className="absolute top-3 right-4 text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
+      {editModal && <EditMemberModal member={editModal} onClose={() => setEditModal(null)} />}
     </div>
   );
 }
