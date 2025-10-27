@@ -6,6 +6,7 @@ export default function MemberManagement() {
   const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState<Member | null>(null);
+  const [showEditModal, setShowEditModal] = useState<Profile | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -202,34 +203,106 @@ export default function MemberManagement() {
                 disabled={submitting}
                 className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {submitting && (
-                  <svg
-                    className="animate-spin h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                    ></path>
-                  </svg>
-                )}
                 {submitting ? 'Adding...' : 'Add Member'}
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
                 className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // ✅ Modal for editing profile
+  const EditMemberModal = ({ profile }: { profile: Profile }) => {
+    const [formData, setFormData] = useState({
+      full_name: profile.full_name || '',
+      email: profile.email || '',
+      phone: profile.phone || '',
+      address: profile.address || '',
+      date_of_birth: profile.date_of_birth || '',
+    });
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleUpdate = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setSaving(true);
+      setError('');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(formData)
+        .eq('id', profile.id);
+
+      if (error) {
+        console.error(error.message);
+        setError(error.message);
+      } else {
+        await loadMembers();
+        setShowEditModal(null);
+      }
+      setSaving(false);
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
+        <div className="bg-white rounded-2xl p-6 max-w-lg w-full">
+          <h2 className="text-xl font-bold mb-4">Edit Member Info</h2>
+          {error && <div className="mb-3 text-red-600 text-sm">{error}</div>}
+          <form onSubmit={handleUpdate} className="space-y-3">
+            <input
+              type="text"
+              placeholder="Full Name"
+              value={formData.full_name}
+              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2"
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2"
+            />
+            <input
+              type="text"
+              placeholder="Phone"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2"
+            />
+            <input
+              type="date"
+              placeholder="Date of Birth"
+              value={formData.date_of_birth}
+              onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2"
+            />
+            <textarea
+              placeholder="Address"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2"
+            />
+            <div className="flex gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-1 bg-[#008080] text-white py-2 rounded-xl"
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowEditModal(null)}
+                className="flex-1 border border-gray-300 py-2 rounded-xl"
               >
                 Cancel
               </button>
@@ -255,10 +328,7 @@ export default function MemberManagement() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Member Management</h2>
         <button
-          onClick={() => {
-            console.log('Add Member clicked');
-            setShowAddModal(true);
-          }}
+          onClick={() => setShowAddModal(true)}
           className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl"
         >
           <UserPlus className="w-5 h-5" /> Add Member
@@ -330,9 +400,7 @@ export default function MemberManagement() {
                     <Eye className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() =>
-                      alert('Edit ' + (member.profiles?.full_name || member.full_name))
-                    }
+                    onClick={() => member.profiles && setShowEditModal(member.profiles)}
                     className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -350,56 +418,32 @@ export default function MemberManagement() {
         </table>
       </div>
 
-      {/* ✅ Fixed rendering issue here */}
+      {/* ✅ Modals */}
       {showAddModal && <AddMemberModal />}
-
+      {showEditModal && <EditMemberModal profile={showEditModal} />}
       {showDetailsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 relative">
             <h2 className="text-xl font-bold mb-4">Member Details</h2>
             <div className="space-y-2 text-gray-700">
               <p>
-                <strong>Full Name:</strong>{' '}
-                {showDetailsModal.profiles?.full_name || showDetailsModal.full_name || '-'}
+                <strong>Name:</strong> {showDetailsModal.profiles?.full_name || '-'}
               </p>
               <p>
-                <strong>Email:</strong>{' '}
-                {showDetailsModal.profiles?.email || showDetailsModal.email || '-'}
+                <strong>Email:</strong> {showDetailsModal.profiles?.email || '-'}
               </p>
               <p>
-                <strong>Phone:</strong>{' '}
-                {showDetailsModal.profiles?.phone || showDetailsModal.phone || '-'}
+                <strong>Phone:</strong> {showDetailsModal.profiles?.phone || '-'}
               </p>
               <p>
-                <strong>ID Number:</strong>{' '}
-                {showDetailsModal.profiles?.id_number || showDetailsModal.id_number || '-'}
-              </p>
-              <p>
-                <strong>Date of Birth:</strong>{' '}
-                {showDetailsModal.profiles?.date_of_birth ||
-                  showDetailsModal.date_of_birth ||
-                  '-'}
-              </p>
-              <p>
-                <strong>Address:</strong>{' '}
-                {showDetailsModal.profiles?.address || showDetailsModal.address || '-'}
-              </p>
-              <p>
-                <strong>Member Number:</strong> {showDetailsModal.member_number}
-              </p>
-              <p>
-                <strong>Balance:</strong> $
-                {Number(showDetailsModal.account_balance).toLocaleString()}
-              </p>
-              <p>
-                <strong>Status:</strong> {showDetailsModal.status}
+                <strong>Address:</strong> {showDetailsModal.profiles?.address || '-'}
               </p>
             </div>
             <button
               onClick={() => setShowDetailsModal(null)}
-              className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 font-bold text-xl"
+              className="absolute top-3 right-4 text-gray-500 hover:text-gray-700"
             >
-              &times;
+              ✕
             </button>
           </div>
         </div>
