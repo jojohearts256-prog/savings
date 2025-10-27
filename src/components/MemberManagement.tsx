@@ -5,12 +5,12 @@ import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle } from 'lucide-react'
 export default function MemberManagement() {
   const [members, setMembers] = useState<(Member & { profiles: Profile | null })[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState<Member | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState<Member | null>(null);
+  const [editModal, setEditModal] = useState<Member | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Load members on mount
+  // ✅ Load members when component mounts
   useEffect(() => {
     loadMembers();
   }, []);
@@ -34,7 +34,7 @@ export default function MemberManagement() {
       (m.profiles?.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
-  // Add Member Modal
+  // ✅ Modal for adding new members
   const AddMemberModal = () => {
     const [formData, setFormData] = useState({
       email: '',
@@ -78,12 +78,15 @@ export default function MemberManagement() {
         );
 
         const result = await response.json();
+        console.log('Response from Edge Function:', result);
+
         if (!result.success) throw new Error(result.error || 'Registration failed');
 
         await new Promise((res) => setTimeout(res, 800));
         await loadMembers();
 
         setSuccess(true);
+
         setTimeout(() => {
           setFormData({
             email: '',
@@ -98,6 +101,7 @@ export default function MemberManagement() {
           setShowAddModal(false);
         }, 2000);
       } catch (err: any) {
+        console.error('Registration error:', err.message);
         setError(err.message || 'Failed to register member');
       } finally {
         setSubmitting(false);
@@ -240,29 +244,17 @@ export default function MemberManagement() {
   // ✅ Edit Member Modal
   const EditMemberModal = ({ member, onClose }: any) => {
     const [formData, setFormData] = useState({
-      full_name: '',
-      email: '',
-      phone: '',
-      address: '',
-      date_of_birth: '',
+      full_name: member?.profiles?.full_name || '',
+      email: member?.profiles?.email || '',
+      phone: member?.profiles?.phone || '',
+      address: member?.profiles?.address || '',
+      date_of_birth: member?.profiles?.date_of_birth || '',
     });
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-      if (member?.profiles) {
-        setFormData({
-          full_name: member.profiles.full_name || '',
-          email: member.profiles.email || '',
-          phone: member.profiles.phone || '',
-          address: member.profiles.address || '',
-          date_of_birth: member.profiles.date_of_birth || '',
-        });
-      }
-    }, [member]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: any) => {
       e.preventDefault();
       setLoading(true);
       setError('');
@@ -281,8 +273,6 @@ export default function MemberManagement() {
           .eq('id', member.profiles.id);
 
         if (updateError) throw updateError;
-
-        await new Promise((res) => setTimeout(res, 500));
         await loadMembers();
         setSuccess(true);
         setTimeout(() => {
@@ -297,109 +287,71 @@ export default function MemberManagement() {
     };
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
-        <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Edit Member</h2>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+        <div className="bg-white rounded-2xl p-6 w-full max-w-lg relative">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Edit Member</h2>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
+            <div className="mb-3 p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl">
               {error}
             </div>
           )}
           {success && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 flex items-center gap-2">
-              <CheckCircle className="w-5 h-5" /> Member updated successfully!
+            <div className="mb-3 p-3 bg-green-50 text-green-700 border border-green-200 rounded-xl">
+              Profile updated successfully!
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  value={formData.full_name}
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-                <input
-                  type="date"
-                  value={formData.date_of_birth}
-                  onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                />
-              </div>
-            </div>
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <input
+              type="text"
+              value={formData.full_name}
+              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+              placeholder="Full Name"
+              className="w-full border px-4 py-2 rounded-xl focus:ring-2 focus:ring-[#008080]"
+            />
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="Email"
+              className="w-full border px-4 py-2 rounded-xl focus:ring-2 focus:ring-[#008080]"
+            />
+            <input
+              type="text"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              placeholder="Phone"
+              className="w-full border px-4 py-2 rounded-xl focus:ring-2 focus:ring-[#008080]"
+            />
+            <input
+              type="text"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              placeholder="Address"
+              className="w-full border px-4 py-2 rounded-xl focus:ring-2 focus:ring-[#008080]"
+            />
+            <input
+              type="date"
+              value={formData.date_of_birth}
+              onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+              className="w-full border px-4 py-2 rounded-xl focus:ring-2 focus:ring-[#008080]"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-              <textarea
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                rows={2}
-              />
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading && (
-                  <svg
-                    className="animate-spin h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                    ></path>
-                  </svg>
-                )}
-                {loading ? 'Saving...' : 'Save Changes'}
-              </button>
+            <div className="flex justify-end gap-3 mt-4">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50"
               >
                 Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 bg-[#008080] text-white rounded-xl hover:bg-[#006666]"
+              >
+                {loading ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </form>
@@ -448,28 +400,61 @@ export default function MemberManagement() {
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member #</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Full Name</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Name</th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Phone</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Balance</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-gray-200">
             {filteredMembers.map((member) => (
-              <tr key={member.id} className="border-b border-gray-100">
-                <td className="px-6 py-4 text-sm text-gray-700">{member.member_number}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{member.profiles?.full_name || '-'}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{member.profiles?.email || '-'}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{member.profiles?.phone || '-'}</td>
-                <td className="px-6 py-4 text-sm text-gray-700 flex gap-2">
-                  <button onClick={() => setShowEditModal(member)}>
-                    <Edit2 className="w-5 h-5 text-blue-600 hover:text-blue-800" />
+              <tr key={member.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 text-sm font-medium text-gray-800">
+                  {member.member_number}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-800">
+                  {member.profiles?.full_name || member.full_name || '-'}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  {member.profiles?.email || member.email || '-'}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  {member.profiles?.phone || member.phone || '-'}
+                </td>
+                <td className="px-6 py-4 text-sm font-semibold text-[#008080]">
+                  ${Number(member.account_balance).toLocaleString()}
+                </td>
+                <td className="px-6 py-4">
+                  <span
+                    className={`status-badge ${
+                      member.status === 'active'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {member.status || 'N/A'}
+                  </span>
+                </td>
+                <td className="px-6 py-4 flex items-center gap-2">
+                  <button
+                    onClick={() => setShowDetailsModal(member)}
+                    className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition"
+                  >
+                    <Eye className="w-4 h-4" />
                   </button>
-                  <button onClick={() => deleteMember(member.id)}>
-                    <Trash2 className="w-5 h-5 text-red-600 hover:text-red-800" />
+                  <button
+                    onClick={() => setEditModal(member)}
+                    className="p-2 text-gray-600 hover:text-[#008080] hover:bg-blue-50 rounded-lg transition"
+                  >
+                    <Edit2 className="w-4 h-4" />
                   </button>
-                  <button onClick={() => setShowDetailsModal(member)}>
-                    <Eye className="w-5 h-5 text-gray-600 hover:text-gray-800" />
+                  <button
+                    onClick={() => deleteMember(member.id)}
+                    className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </td>
               </tr>
@@ -479,7 +464,7 @@ export default function MemberManagement() {
       </div>
 
       {showAddModal && <AddMemberModal />}
-      {showEditModal && <EditMemberModal member={showEditModal} onClose={() => setShowEditModal(null)} />}
+      {editModal && <EditMemberModal member={editModal} onClose={() => setEditModal(null)} />}
     </div>
   );
 }
