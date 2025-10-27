@@ -10,7 +10,7 @@ export default function MemberManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // ✅ Load members when component mounts
+  // Load members on mount
   useEffect(() => {
     loadMembers();
   }, []);
@@ -34,7 +34,7 @@ export default function MemberManagement() {
       (m.profiles?.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
-  // ✅ Modal for adding new members
+  // Add Member Modal
   const AddMemberModal = () => {
     const [formData, setFormData] = useState({
       email: '',
@@ -78,13 +78,10 @@ export default function MemberManagement() {
         );
 
         const result = await response.json();
-        console.log('Response from Edge Function:', result);
-
         if (!result.success) throw new Error(result.error || 'Registration failed');
 
         await new Promise((res) => setTimeout(res, 800));
         await loadMembers();
-
         setSuccess(true);
 
         setTimeout(() => {
@@ -101,7 +98,6 @@ export default function MemberManagement() {
           setShowAddModal(false);
         }, 2000);
       } catch (err: any) {
-        console.error('Registration error:', err.message);
         setError(err.message || 'Failed to register member');
       } finally {
         setSubmitting(false);
@@ -203,28 +199,6 @@ export default function MemberManagement() {
                 disabled={submitting}
                 className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {submitting && (
-                  <svg
-                    className="animate-spin h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                    ></path>
-                  </svg>
-                )}
                 {submitting ? 'Adding...' : 'Add Member'}
               </button>
               <button
@@ -241,12 +215,12 @@ export default function MemberManagement() {
     );
   };
 
-  // ✅ Edit Member Modal
+  // Edit Member Modal (fixed)
   const EditMemberModal = ({ member, onClose }: any) => {
     const [formData, setFormData] = useState({
-      full_name: member?.profiles?.full_name || '',
-      email: member?.profiles?.email || '',
-      phone: member?.profiles?.phone || '',
+      full_name: member?.profiles?.full_name || member.full_name || '',
+      email: member?.profiles?.email || member.email || '',
+      phone: member?.profiles?.phone || member.phone || '',
       address: member?.profiles?.address || '',
       date_of_birth: member?.profiles?.date_of_birth || '',
     });
@@ -411,9 +385,7 @@ export default function MemberManagement() {
           <tbody className="divide-y divide-gray-200">
             {filteredMembers.map((member) => (
               <tr key={member.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium text-gray-800">
-                  {member.member_number}
-                </td>
+                <td className="px-6 py-4 text-sm font-medium text-gray-800">{member.member_number}</td>
                 <td className="px-6 py-4 text-sm text-gray-800">
                   {member.profiles?.full_name || member.full_name || '-'}
                 </td>
@@ -465,6 +437,9 @@ export default function MemberManagement() {
 
       {showAddModal && <AddMemberModal />}
       {editModal && <EditMemberModal member={editModal} onClose={() => setEditModal(null)} />}
+      {showDetailsModal && (
+        <div> {/* Your details modal code here, can also use member.profiles for info */} </div>
+      )}
     </div>
   );
 }
