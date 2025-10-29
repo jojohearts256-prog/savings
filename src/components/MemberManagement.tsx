@@ -64,14 +64,14 @@ export default function MemberManagement() {
               Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             },
             body: JSON.stringify({
-              ...formData,
+              full_name: formData.full_name,
+              email: formData.email,
+              password: formData.password,
+              phone: formData.phone,
+              id_number: formData.id_number,
+              address: formData.address,           // ✅ top-level
+              date_of_birth: formData.date_of_birth, // ✅ top-level
               role: 'member',
-              member_data: {
-                address: formData.address,
-                date_of_birth: formData.date_of_birth,
-                phone: formData.phone,
-                id_number: formData.id_number,
-              },
             }),
           }
         );
@@ -318,7 +318,7 @@ export default function MemberManagement() {
             <p><strong>ID Number:</strong> {member.id_number || '-'}</p>
             <p><strong>Address:</strong> {member.address || '-'}</p>
             <p><strong>Date of Birth:</strong> {member.date_of_birth || '-'}</p>
-            <p><strong>Balance:</strong> ${Number(member.account_balance).toLocaleString()}</p>
+            <p><strong>Balance:</strong> UGX {Math.floor(Number(member.account_balance)).toLocaleString()}</p>
             <p><strong>Status:</strong> {member.status || '-'}</p>
           </div>
           <div className="flex justify-end mt-4">
