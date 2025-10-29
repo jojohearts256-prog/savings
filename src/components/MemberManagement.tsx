@@ -55,7 +55,6 @@ export default function MemberManagement() {
       setSubmitting(true);
 
       try {
-        // Send top-level fields directly
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`,
           {
@@ -78,13 +77,10 @@ export default function MemberManagement() {
         );
 
         const result = await response.json();
-        console.log('Response from Edge Function:', result);
-
         if (!result.success) throw new Error(result.error || 'Registration failed');
 
         await new Promise((res) => setTimeout(res, 800));
         await loadMembers();
-
         setSuccess(true);
 
         setTimeout(() => {
@@ -120,7 +116,7 @@ export default function MemberManagement() {
           )}
           {success && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 flex items-center gap-2">
-              <CheckCircle className="w-5 h-5" /> Member registered successfully!
+              <CheckCircle className="w-5 h-5" /> Member Registered Successfully!
             </div>
           )}
 
@@ -240,12 +236,33 @@ export default function MemberManagement() {
       setSuccess(false);
 
       try {
-        const { error: updateError } = await supabase
-          .from('members')
-          .update({ ...formData })
-          .eq('id', member.id);
+        // 🔹 Use Edge Function to update both members + profiles
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({
+              user_id: member.profile_id,
+              full_name: formData.full_name,
+              email: formData.email,
+              phone: formData.phone,
+              id_number: formData.id_number,
+              role: 'member',
+              member_data: {
+                address: formData.address,
+                date_of_birth: formData.date_of_birth,
+              },
+            }),
+          }
+        );
 
-        if (updateError) throw updateError;
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error || 'Update failed');
+
         await loadMembers();
         setSuccess(true);
         setTimeout(() => {
@@ -264,44 +281,94 @@ export default function MemberManagement() {
         <div className="bg-white rounded-2xl p-6 max-w-2xl max-h-[90vh] overflow-y-auto">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Edit Member</h2>
 
-          {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-800">{error}</div>}
-          {success && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-800 flex items-center gap-2"><CheckCircle className="w-5 h-5" /> Member updated successfully!</div>}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-800">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-800 flex items-center gap-2">
+              <CheckCircle className="w-5 h-5" /> Member Updated Successfully!
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                <input type="text" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]" required />
+                <input
+                  type="text"
+                  value={formData.full_name}
+                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
+                  required
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]" required />
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
+                  required
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input type="text" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]" />
+                <input
+                  type="text"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">ID Number</label>
-                <input type="text" value={formData.id_number} onChange={(e) => setFormData({ ...formData, id_number: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]" />
+                <input
+                  type="text"
+                  value={formData.id_number}
+                  onChange={(e) => setFormData({ ...formData, id_number: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-                <input type="date" value={formData.date_of_birth} onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]" />
+                <input
+                  type="date"
+                  value={formData.date_of_birth}
+                  onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
+                />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-              <textarea value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]" rows={2} />
+              <textarea
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
+                rows={2}
+              />
             </div>
 
             <div className="flex gap-3 pt-4">
-              <button type="submit" disabled={loading} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+              >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                 {loading ? 'Saving...' : 'Save Changes'}
               </button>
-              <button type="button" onClick={onClose} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">Cancel</button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
+              >
+                Cancel
+              </button>
             </div>
           </form>
         </div>
@@ -327,7 +394,12 @@ export default function MemberManagement() {
             <p><strong>Status:</strong> {member.status || '-'}</p>
           </div>
           <div className="flex justify-end mt-4">
-            <button onClick={onClose} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">Close</button>
+            <button
+              onClick={onClose}
+              className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
+            >
+              Close
+            </button>
           </div>
         </div>
       </div>
@@ -349,7 +421,10 @@ export default function MemberManagement() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Member Management</h2>
-        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl">
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl"
+        >
           <UserPlus className="w-5 h-5" /> Add Member
         </button>
       </div>
@@ -359,7 +434,7 @@ export default function MemberManagement() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search members..."
+            placeholder="Search Members..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
@@ -388,9 +463,15 @@ export default function MemberManagement() {
                 <td className="px-6 py-4 text-sm">{m.phone || '-'}</td>
                 <td className="px-6 py-4 text-sm">UGX {Math.floor(Number(m.account_balance)).toLocaleString()}</td>
                 <td className="px-6 py-4 text-sm flex gap-2">
-                  <button onClick={() => setViewModal(m)} className="p-1 text-gray-500 hover:text-gray-800"><Eye className="w-4 h-4" /></button>
-                  <button onClick={() => setEditModal(m)} className="p-1 text-gray-500 hover:text-gray-800"><Edit2 className="w-4 h-4" /></button>
-                  <button onClick={() => deleteMember(m.id)} className="p-1 text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={() => setViewModal(m)} className="p-1 text-gray-500 hover:text-gray-800">
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setEditModal(m)} className="p-1 text-gray-500 hover:text-gray-800">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => deleteMember(m.id)} className="p-1 text-red-500 hover:text-red-700">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </td>
               </tr>
             ))}
