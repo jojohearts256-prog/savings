@@ -10,6 +10,16 @@ export default function MemberManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ---------------- Helper: Format Name ----------------
+  const formatName = (name: string | undefined) => {
+    if (!name) return '-';
+    return name
+      .toLowerCase()
+      .split(' ')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  };
+
   // Load members
   useEffect(() => {
     loadMembers();
@@ -236,7 +246,6 @@ export default function MemberManagement() {
       setSuccess(false);
 
       try {
-        // 🔹 Use Edge Function to update both members + profiles
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`,
           {
@@ -384,7 +393,7 @@ export default function MemberManagement() {
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Member Details</h2>
           <div className="space-y-2 text-gray-700">
             <p><strong>Member #:</strong> {member.member_number}</p>
-            <p><strong>Full Name:</strong> {member.full_name || '-'}</p>
+            <p><strong>Full Name:</strong> {formatName(member.full_name)}</p>
             <p><strong>Email:</strong> {member.email || '-'}</p>
             <p><strong>Phone:</strong> {member.phone || '-'}</p>
             <p><strong>ID Number:</strong> {member.id_number || '-'}</p>
@@ -458,7 +467,7 @@ export default function MemberManagement() {
             {filteredMembers.map((m) => (
               <tr key={m.id} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="px-6 py-4 text-sm">{m.member_number}</td>
-                <td className="px-6 py-4 text-sm">{m.full_name || '-'}</td>
+                <td className="px-6 py-4 text-sm">{formatName(m.full_name)}</td>
                 <td className="px-6 py-4 text-sm">{m.email || '-'}</td>
                 <td className="px-6 py-4 text-sm">{m.phone || '-'}</td>
                 <td className="px-6 py-4 text-sm">UGX {Math.floor(Number(m.account_balance)).toLocaleString()}</td>
