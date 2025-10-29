@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
 
     let currentUserId = user_id;
 
-    // ✅ Step 1: Create user if not exists
+    // ✅ Step 1: Check or create auth user
     if (!currentUserId) {
       const { data: existingUserData, error: existingUserError } =
         await supabase.auth.admin.listUsers();
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ✅ Step 2: Check or create profile
+    // ✅ Step 2: Create or update profile
     const { data: existingProfile } = await supabase
       .from("profiles")
       .select("id")
@@ -69,8 +69,8 @@ Deno.serve(async (req) => {
         phone,
         role,
         id_number,
-        address, // <- top-level
-        date_of_birth, // <- top-level
+        address,
+        date_of_birth,
       });
       if (profileError) throw profileError;
     } else {
@@ -80,8 +80,8 @@ Deno.serve(async (req) => {
           full_name,
           phone,
           id_number,
-          address, // <- top-level
-          date_of_birth, // <- top-level
+          address,
+          date_of_birth,
         })
         .eq("id", currentUserId);
       if (updateProfileError) throw updateProfileError;
@@ -106,27 +106,69 @@ Deno.serve(async (req) => {
           full_name,
           email,
           phone,
-          address, // <- top-level
-          date_of_birth, // <- top-level
+          address,
+          date_of_birth,
           id_number,
           status: "active",
           account_balance: 0,
         });
         if (memberError) throw memberError;
       } else {
+        // ✅ Update existing member
         const { error: updateMemberError } = await supabase
           .from("members")
           .update({
             full_name,
             email,
             phone,
-            address, // <- top-level
-            date_of_birth, // <- top-level
+            address,
+            date_of_birth,
             id_number,
           })
           .eq("profile_id", currentUserId);
         if (updateMemberError) throw updateMemberError;
       }
+    }
+
+    // ✅ Step 4: Two-way synchronization logic
+    // Keep both tables always consistent
+    // (If the profile exists but member doesn’t, create; if both exist, make sure fields match)
+
+    const { data: memberCheck } = await supabase
+      .from("members")
+      .select("*")
+      .eq("profile_id", currentUserId)
+      .maybeSingle();
+
+    const { data: profileCheck } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", currentUserId)
+      .maybeSingle();
+
+    if (memberCheck && profileCheck) {
+      // 🔁 Ensure data consistency both ways
+      await supabase
+        .from("profiles")
+        .update({
+          full_name: memberCheck.full_name || profileCheck.full_name,
+          phone: memberCheck.phone || profileCheck.phone,
+          id_number: memberCheck.id_number || profileCheck.id_number,
+          address: memberCheck.address || profileCheck.address,
+          date_of_birth: memberCheck.date_of_birth || profileCheck.date_of_birth,
+        })
+        .eq("id", currentUserId);
+
+      await supabase
+        .from("members")
+        .update({
+          full_name: profileCheck.full_name || memberCheck.full_name,
+          phone: profileCheck.phone || memberCheck.phone,
+          id_number: profileCheck.id_number || memberCheck.id_number,
+          address: profileCheck.address || memberCheck.address,
+          date_of_birth: profileCheck.date_of_birth || memberCheck.date_of_birth,
+        })
+        .eq("profile_id", currentUserId);
     }
 
     // ✅ Success Response
