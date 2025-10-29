@@ -33,7 +33,7 @@ export default function Reports() {
     const [transactionsRes, loansRes, membersRes] = await Promise.all([
       supabase.from('transactions').select('*').gte('transaction_date', startDate.toISOString()).lte('transaction_date', endDate.toISOString()),
       supabase.from('loans').select('*').gte('requested_date', startDate.toISOString()).lte('requested_date', endDate.toISOString()),
-      supabase.from('members').select('account_balance'),
+      supabase.from('members').select('*, profiles(*)'),
     ]);
     const transactions = transactionsRes.data || [];
     const loans = loansRes.data || [];
@@ -52,6 +52,9 @@ export default function Reports() {
       loansApproved: loans.filter(l => l.status === 'approved' || l.status === 'disbursed').length,
       totalLoanAmount: loans.filter(l => l.status !== 'rejected').reduce((sum, l) => sum + Number(l.amount_approved || l.amount_requested), 0),
       currentBalance: members.reduce((sum, m) => sum + Number(m.account_balance), 0),
+      members,
+      transactions,
+      loans,
     });
   };
 
@@ -61,7 +64,7 @@ export default function Reports() {
     const [transactionsRes, loansRes, membersRes] = await Promise.all([
       supabase.from('transactions').select('*').gte('transaction_date', startDate.toISOString()).lte('transaction_date', endDate.toISOString()),
       supabase.from('loans').select('*').gte('requested_date', startDate.toISOString()).lte('requested_date', endDate.toISOString()),
-      supabase.from('members').select('account_balance, total_contributions'),
+      supabase.from('members').select('*, profiles(*)'),
     ]);
     const transactions = transactionsRes.data || [];
     const loans = loansRes.data || [];
@@ -79,6 +82,9 @@ export default function Reports() {
       totalLoanAmount: loans.filter(l => l.status !== 'rejected').reduce((sum, l) => sum + Number(l.amount_approved || l.amount_requested), 0),
       currentBalance: members.reduce((sum, m) => sum + Number(m.account_balance), 0),
       totalContributionsAllTime: members.reduce((sum, m) => sum + Number(m.total_contributions), 0),
+      members,
+      transactions,
+      loans,
     });
   };
 
@@ -106,7 +112,7 @@ export default function Reports() {
     }
   };
 
-  // --- PDF Download for individual card ---
+  // --- PDF Download for individual metrics ---
   const downloadMetricPDF = (label: string, value: any) => {
     if (!reportData) return;
 
@@ -123,6 +129,67 @@ export default function Reports() {
     });
 
     doc.save(`${label.replace(/\s+/g, '-')}-report.pdf`);
+  };
+
+  // --- PDF Download for full detailed report ---
+  const downloadFullReportPDF = () => {
+    if (!reportData) return;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(`${reportType === 'member' ? reportData.member.profiles.full_name : reportData.period} Detailed Report`, 14, 22);
+
+    let yOffset = 30;
+
+    // --- Members Table ---
+    if (reportType !== 'member') {
+      doc.setFontSize(14);
+      doc.text("Members Overview", 14, yOffset);
+      yOffset += 6;
+      doc.autoTable({
+        startY: yOffset,
+        head: [['Name', 'Member #', 'Balance', 'Total Contributions']],
+        body: reportData.members.map((m: any) => [
+          m.profiles.full_name,
+          m.member_number,
+          `$${Number(m.account_balance).toLocaleString()}`,
+          `$${Number(m.total_contributions).toLocaleString()}`
+        ]),
+      });
+      yOffset = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // --- Transactions Table ---
+    doc.setFontSize(14);
+    doc.text("Transactions", 14, yOffset);
+    yOffset += 6;
+    doc.autoTable({
+      startY: yOffset,
+      head: [['Date', 'Member', 'Type', 'Amount']],
+      body: reportData.transactions.map((t: any) => [
+        new Date(t.transaction_date).toLocaleDateString(),
+        reportType === 'member' ? reportData.member.profiles.full_name : members.find(m => m.id === t.member_id)?.profiles.full_name || 'N/A',
+        t.transaction_type,
+        `$${Number(t.amount).toLocaleString()}`
+      ]),
+    });
+    yOffset = (doc as any).lastAutoTable.finalY + 10;
+
+    // --- Loans Table ---
+    doc.setFontSize(14);
+    doc.text("Loans", 14, yOffset);
+    yOffset += 6;
+    doc.autoTable({
+      startY: yOffset,
+      head: [['Date', 'Member', 'Amount', 'Status']],
+      body: reportData.loans.map((l: any) => [
+        new Date(l.requested_date).toLocaleDateString(),
+        reportType === 'member' ? reportData.member.profiles.full_name : members.find(m => m.id === l.member_id)?.profiles.full_name || 'N/A',
+        `$${Number(l.amount_approved || l.amount_requested).toLocaleString()}`,
+        l.status
+      ]),
+    });
+
+    doc.save(`${reportType}-detailed-report.pdf`);
   };
 
   // --- StatCard Component ---
@@ -190,6 +257,12 @@ export default function Reports() {
             </div>
           )}
         </div>
+        {/* Full Download Button */}
+        {reportData && (
+          <button onClick={downloadFullReportPDF} className="px-4 py-2 rounded-xl bg-[#008080] text-white hover:bg-teal-700">
+            <Download className="inline w-4 h-4 mr-2" /> Download Detailed Report
+          </button>
+        )}
       </div>
 
       {/* Reports */}
