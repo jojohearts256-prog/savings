@@ -9,10 +9,7 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders
-    });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -20,47 +17,60 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { email, password, full_name, phone, role, id_number, member_data } = await req.json();
+    const { email, password, full_name, phone, role, id_number, member_data, user_id } = await req.json();
 
-    // ✅ Step 1: Check if user already exists
-    const { data: existingUserData, error: existingUserError } = await supabase.auth.admin.listUsers();
-    if (existingUserError) throw existingUserError;
+    let currentUserId = user_id;
 
-    const existingUser = existingUserData.users.find((u) => u.email === email);
+    // If user_id is not provided, create a new user
+    if (!currentUserId) {
+      // ✅ Step 1: Check if user exists
+      const { data: existingUserData, error: existingUserError } = await supabase.auth.admin.listUsers();
+      if (existingUserError) throw existingUserError;
 
-    let userId;
+      const existingUser = existingUserData.users.find((u) => u.email === email);
 
-    if (existingUser) {
-      userId = existingUser.id;
-      console.log("Reusing existing user:", userId);
-    } else {
-      // ✅ Step 2: Create a new auth user
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true
-      });
-      if (authError) throw authError;
-      userId = authData.user.id;
+      if (existingUser) {
+        currentUserId = existingUser.id;
+      } else {
+        // ✅ Step 2: Create auth user
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true
+        });
+        if (authError) throw authError;
+        currentUserId = authData.user.id;
+      }
     }
 
     // ✅ Step 3: Check or create profile
     const { data: existingProfile } = await supabase
       .from("profiles")
       .select("id")
-      .eq("id", userId)
+      .eq("id", currentUserId)
       .maybeSingle();
 
     if (!existingProfile) {
       const { error: profileError } = await supabase.from("profiles").insert({
-        id: userId,
+        id: currentUserId,
         email,
         full_name,
         phone,
         role,
-        id_number
+        id_number,
+        address: member_data?.address || null,
+        date_of_birth: member_data?.date_of_birth || null
       });
       if (profileError) throw profileError;
+    } else {
+      // ✅ Update profile if user_id exists (edit)
+      await supabase.from("profiles").update({
+        full_name,
+        phone,
+        id_number,
+        address: member_data?.address || null,
+        date_of_birth: member_data?.date_of_birth || null
+      }).eq("id", currentUserId);
     }
 
     // ✅ Step 4: Only create a member if not existing
@@ -68,14 +78,14 @@ Deno.serve(async (req) => {
       const { data: existingMember } = await supabase
         .from("members")
         .select("id")
-        .eq("profile_id", userId)
+        .eq("profile_id", currentUserId)
         .maybeSingle();
 
       if (!existingMember) {
         const { data: memberNumberData } = await supabase.rpc("generate_member_number");
 
         const { error: memberError } = await supabase.from("members").insert({
-          profile_id: userId,
+          profile_id: currentUserId,
           member_number: memberNumberData,
           full_name,
           email,
@@ -87,19 +97,26 @@ Deno.serve(async (req) => {
           account_balance: 0
         });
         if (memberError) throw memberError;
+      } else {
+        // ✅ Update member record if exists (edit)
+        await supabase.from("members").update({
+          full_name,
+          email,
+          phone,
+          address: member_data?.address || null,
+          date_of_birth: member_data?.date_of_birth || null,
+          id_number
+        }).eq("profile_id", currentUserId);
       }
     }
 
     return new Response(JSON.stringify({
       success: true,
-      user_id: userId,
+      user_id: currentUserId,
       email,
       id_number
     }), {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json"
-      }
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
 
   } catch (error) {
@@ -109,10 +126,7 @@ Deno.serve(async (req) => {
       error: error.message
     }), {
       status: 400,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json"
-      }
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
 });
