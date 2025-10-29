@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member } from '../lib/supabase';
-import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle } from 'lucide-react';
+import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, Loader2 } from 'lucide-react';
 
 export default function MemberManagement() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -55,6 +55,7 @@ export default function MemberManagement() {
       setSubmitting(true);
 
       try {
+        // Send top-level fields directly
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`,
           {
@@ -64,14 +65,14 @@ export default function MemberManagement() {
               Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             },
             body: JSON.stringify({
-              ...formData,
+              full_name: formData.full_name,
+              email: formData.email,
+              password: formData.password,
+              phone: formData.phone,
+              id_number: formData.id_number,
+              address: formData.address,
+              date_of_birth: formData.date_of_birth,
               role: 'member',
-              member_data: {
-                address: formData.address,
-                date_of_birth: formData.date_of_birth,
-                phone: formData.phone,
-                id_number: formData.id_number,
-              },
             }),
           }
         );
@@ -199,8 +200,9 @@ export default function MemberManagement() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50"
+                className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
               >
+                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 {submitting ? 'Adding...' : 'Add Member'}
               </button>
               <button
@@ -295,7 +297,10 @@ export default function MemberManagement() {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <button type="submit" disabled={loading} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50">{loading ? 'Saving...' : 'Save Changes'}</button>
+              <button type="submit" disabled={loading} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2">
+                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
               <button type="button" onClick={onClose} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">Cancel</button>
             </div>
           </form>
