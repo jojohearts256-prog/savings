@@ -318,7 +318,7 @@ export default function MemberManagement() {
             <p><strong>ID Number:</strong> {member.id_number || '-'}</p>
             <p><strong>Address:</strong> {member.address || '-'}</p>
             <p><strong>Date of Birth:</strong> {member.date_of_birth || '-'}</p>
-            <p><strong>Balance:</strong> ${Number(member.account_balance).toLocaleString()}</p>
+            <p><strong>Balance:</strong> UGX {Math.floor(Number(member.account_balance)).toLocaleString()}</p>
             <p><strong>Status:</strong> {member.status || '-'}</p>
           </div>
           <div className="flex justify-end mt-4">
@@ -370,20 +370,22 @@ export default function MemberManagement() {
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Name</th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Phone</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Balance</th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredMembers.map((m) => (
-              <tr key={m.id} className="border-b border-gray-200 hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm text-gray-700">{m.member_number}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{m.full_name}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{m.email}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{m.phone}</td>
-                <td className="px-6 py-4 text-sm text-gray-700 flex gap-2">
-                  <button onClick={() => setViewModal(m)} title="View"><Eye className="w-5 h-5 text-blue-500" /></button>
-                  <button onClick={() => setEditModal(m)} title="Edit"><Edit2 className="w-5 h-5 text-green-500" /></button>
-                  <button onClick={() => deleteMember(m.id)} title="Delete"><Trash2 className="w-5 h-5 text-red-500" /></button>
+              <tr key={m.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <td className="px-6 py-4 text-sm">{m.member_number}</td>
+                <td className="px-6 py-4 text-sm">{m.full_name || '-'}</td>
+                <td className="px-6 py-4 text-sm">{m.email || '-'}</td>
+                <td className="px-6 py-4 text-sm">{m.phone || '-'}</td>
+                <td className="px-6 py-4 text-sm">UGX {Math.floor(Number(m.account_balance)).toLocaleString()}</td>
+                <td className="px-6 py-4 text-sm flex gap-2">
+                  <button onClick={() => setViewModal(m)} className="p-1 text-gray-500 hover:text-gray-800"><Eye className="w-4 h-4" /></button>
+                  <button onClick={() => setEditModal(m)} className="p-1 text-gray-500 hover:text-gray-800"><Edit2 className="w-4 h-4" /></button>
+                  <button onClick={() => deleteMember(m.id)} className="p-1 text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
                 </td>
               </tr>
             ))}
@@ -392,8 +394,8 @@ export default function MemberManagement() {
       </div>
 
       {showAddModal && <AddMemberModal />}
-      {editModal && <EditMemberModal member={editModal} onClose={() => setEditModal(null)} />}
       {viewModal && <ViewMemberModal member={viewModal} onClose={() => setViewModal(null)} />}
+      {editModal && <EditMemberModal member={editModal} onClose={() => setEditModal(null)} />}
     </div>
   );
 }
