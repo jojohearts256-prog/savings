@@ -84,14 +84,6 @@ export default function ProfitManagement() {
       const selectedLoan = loans.find((l) => l.id === selectedLoanId);
       if (!selectedLoan) throw new Error('Selected loan not found');
 
-      // Check if profits already allocated
-      const existingProfits = profits.filter((p) => p.loan_id === selectedLoanId);
-      if (existingProfits.length > 0) {
-        alert('Profits for this loan have already been allocated!');
-        setLoading(false);
-        return;
-      }
-
       const profitAmount = Number(selectedLoan.profit_amount);
       const totalBalances = members.reduce(
         (sum, m) => sum + Number(m.account_balance || 0),
@@ -99,21 +91,27 @@ export default function ProfitManagement() {
       );
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
-      const insertPromises = members.map((member) => {
+      // UPSERT (insert or update if exists)
+      const upsertPromises = members.map((member) => {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
         if (memberShare <= 0) return Promise.resolve(null);
 
-        return supabase.from('profits').insert({
-          member_id: member.id,
-          full_name: member.full_name,
-          loan_id: selectedLoanId,
-          profit_amount: memberShare,
-          recorded_by: profile?.id,
-          status: 'allocated',
-        });
+        return supabase
+          .from('profits')
+          .upsert(
+            {
+              member_id: member.id,
+              full_name: member.full_name,
+              loan_id: selectedLoanId,
+              profit_amount: memberShare,
+              recorded_by: profile?.id,
+              status: 'allocated',
+            },
+            { onConflict: ['member_id', 'loan_id'] }
+          );
       });
 
-      const results = await Promise.all(insertPromises);
+      const results = await Promise.all(upsertPromises);
       results.forEach((r: any) => {
         if (r?.error) throw r.error;
       });
@@ -318,20 +316,11 @@ export default function ProfitManagement() {
                   required
                 >
                   <option value="">-- Select Loan --</option>
-                  {loans.map((loan) => {
-                    const alreadyAllocated = profits.some((p) => p.loan_id === loan.id);
-                    return (
-                      <option
-                        key={loan.id}
-                        value={loan.id}
-                        disabled={alreadyAllocated}
-                      >
-                        {`${loan.loan_number} – Profit ${formatUGX(loan.profit_amount)}${
-                          alreadyAllocated ? ' (Already Allocated)' : ''
-                        }`}
-                      </option>
-                    );
-                  })}
+                  {loans.map((loan) => (
+                    <option key={loan.id} value={loan.id}>
+                      {`${loan.loan_number} – Profit ${formatUGX(loan.profit_amount)}`}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="flex gap-3 pt-4">
