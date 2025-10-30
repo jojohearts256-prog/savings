@@ -49,19 +49,18 @@ export default function ProfitManagement() {
     }
   };
 
-  // Load completed loans with computed profits
+  // Load completed loans and compute profit if null
   const loadCompletedLoans = async () => {
     try {
       const { data, error } = await supabase
         .from('loans')
-        .select('id, loan_number, member_id, full_name, profit_amount, completed_date, status, total_repayable, amount_approved')
+        .select('id, loan_number, member_id, full_name, profit_amount, status, total_repayable, amount_approved')
         .eq('status', 'completed');
       if (error) throw error;
 
-      // For safety, compute profit if null
       const updated = data?.map((loan: any) => ({
         ...loan,
-        profit_amount: loan.profit_amount ?? (loan.total_repayable - loan.amount_approved),
+        profit_amount: loan.profit_amount ?? (Number(loan.total_repayable || 0) - Number(loan.amount_approved || 0)),
       }));
       setLoans(updated || []);
     } catch (err: any) {
