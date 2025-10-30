@@ -95,41 +95,51 @@ export default function ProfitManagement() {
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
       // UPSERT profits for each member, adding to existing if present
-      const upsertPromises = members.map((member) => {
+      const upsertPromises = members.map(async (member) => {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
-        if (memberShare <= 0) return Promise.resolve(null);
+        if (memberShare <= 0) return;
 
-        // Check if existing profit for this member+loan
+        // Accumulate: increment if record exists, otherwise insert
         const existing = profits.find(
           (p) => p.member_id === member.id && p.loan_id === selectedLoanId
         );
-        const newProfitAmount = (existing?.profit_amount || 0) + memberShare;
 
-        return supabase
-          .from('profits')
-          .upsert(
-            {
+        if (existing) {
+          // Update existing profit
+          const { error: updateError } = await supabase
+            .from('profits')
+            .update({
+              profit_amount: existing.profit_amount + memberShare,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Insert new profit record
+          const { error: insertError } = await supabase
+            .from('profits')
+            .insert({
               member_id: member.id,
               full_name: member.full_name,
               loan_id: selectedLoanId,
-              profit_amount: newProfitAmount,
+              profit_amount: memberShare,
               recorded_by: profile?.id,
               status: 'allocated',
+              created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
-            },
-            { onConflict: ['member_id', 'loan_id'] }
-          );
+            });
+
+          if (insertError) throw insertError;
+        }
       });
 
-      const results = await Promise.all(upsertPromises);
-      results.forEach((r: any) => {
-        if (r?.error) throw r.error;
-      });
+      await Promise.all(upsertPromises);
 
       await loadProfits();
       setSelectedLoanId('');
       setShowDistributeModal(false);
-      alert('Profits allocated successfully! They have been added to existing profits if present.');
+      alert('Profits allocated successfully and accumulated if already present.');
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'Failed to allocate profits');
