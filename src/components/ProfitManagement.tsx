@@ -71,6 +71,7 @@ export default function ProfitManagement() {
     }
   };
 
+  // --- DISTRIBUTE PROFITS WITH UPSERT ---
   const distributeProfits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLoanId) {
@@ -90,22 +91,26 @@ export default function ProfitManagement() {
       );
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
-      // Use Promise.all to insert profits safely
-      const insertPromises = members.map((member) => {
+      const upsertPromises = members.map((member) => {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
         if (memberShare <= 0) return Promise.resolve(null);
 
-        return supabase.from('profits').insert({
-          member_id: member.id,
-          full_name: member.full_name,
-          loan_id: selectedLoanId,
-          profit_amount: memberShare,
-          recorded_by: profile?.id,
-          status: 'allocated',
-        });
+        return supabase
+          .from('profits')
+          .upsert(
+            {
+              member_id: member.id,
+              full_name: member.full_name,
+              loan_id: selectedLoanId,
+              profit_amount: memberShare,
+              recorded_by: profile?.id,
+              status: 'allocated',
+            },
+            { onConflict: ['member_id', 'loan_id'] } // <-- safe upsert
+          );
       });
 
-      const results = await Promise.all(insertPromises);
+      const results = await Promise.all(upsertPromises);
       results.forEach((r: any) => {
         if (r?.error) throw r.error;
       });
