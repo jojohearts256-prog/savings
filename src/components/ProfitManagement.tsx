@@ -71,7 +71,7 @@ export default function ProfitManagement() {
     }
   };
 
-  // --- DISTRIBUTE PROFITS WITH UPSERT ---
+  // --------------------- PROFIT DISTRIBUTION ---------------------
   const distributeProfits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLoanId) {
@@ -91,6 +91,7 @@ export default function ProfitManagement() {
       );
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
+      // UPSERT (insert or update if exists)
       const upsertPromises = members.map((member) => {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
         if (memberShare <= 0) return Promise.resolve(null);
@@ -106,7 +107,7 @@ export default function ProfitManagement() {
               recorded_by: profile?.id,
               status: 'allocated',
             },
-            { onConflict: ['member_id', 'loan_id'] } // <-- safe upsert
+            { onConflict: ['member_id', 'loan_id'] }
           );
       });
 
@@ -127,6 +128,7 @@ export default function ProfitManagement() {
     }
   };
 
+  // --------------------- DEPOSIT PROFITS ---------------------
   const depositProfits = async () => {
     setLoading(true);
     try {
@@ -161,6 +163,7 @@ export default function ProfitManagement() {
     }
   };
 
+  // --------------------- PRINT ---------------------
   const handlePrint = () => {
     if (!receiptRef.current) return;
     const printContents = receiptRef.current.innerHTML;
