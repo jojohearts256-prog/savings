@@ -16,7 +16,8 @@ export default function ProfitManagement() {
 
   const receiptRef = useRef<HTMLDivElement>(null);
 
-  const formatUGX = (amount: any) => `UGX ${Math.round(Number(amount ?? 0)).toLocaleString('en-UG')}`;
+  const formatUGX = (amount: any) =>
+    `UGX ${Math.round(Number(amount ?? 0)).toLocaleString('en-UG')}`;
 
   useEffect(() => {
     loadMembers();
@@ -24,7 +25,6 @@ export default function ProfitManagement() {
     loadCompletedLoans();
   }, []);
 
-  // Load all members
   const loadMembers = async () => {
     try {
       const { data, error } = await supabase
@@ -37,7 +37,6 @@ export default function ProfitManagement() {
     }
   };
 
-  // Load all profits
   const loadProfits = async () => {
     try {
       const { data, error } = await supabase.from('profits').select('*');
@@ -49,18 +48,21 @@ export default function ProfitManagement() {
     }
   };
 
-  // Load completed loans and compute profit if null
   const loadCompletedLoans = async () => {
     try {
       const { data, error } = await supabase
         .from('loans')
-        .select('id, loan_number, member_id, full_name, profit_amount, status, total_repayable, amount_approved')
+        .select(
+          'id, loan_number, member_id, full_name, profit_amount, status, total_repayable, amount_approved'
+        )
         .eq('status', 'completed');
       if (error) throw error;
 
       const updated = data?.map((loan: any) => ({
         ...loan,
-        profit_amount: loan.profit_amount ?? (Number(loan.total_repayable || 0) - Number(loan.amount_approved || 0)),
+        profit_amount:
+          loan.profit_amount ??
+          (Number(loan.total_repayable || 0) - Number(loan.amount_approved || 0)),
       }));
       setLoans(updated || []);
     } catch (err: any) {
@@ -69,7 +71,6 @@ export default function ProfitManagement() {
     }
   };
 
-  // Allocate profits to members (admin controlled)
   const distributeProfits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLoanId) {
@@ -77,19 +78,24 @@ export default function ProfitManagement() {
       return;
     }
     setLoading(true);
+
     try {
       const selectedLoan = loans.find((l) => l.id === selectedLoanId);
       if (!selectedLoan) throw new Error('Selected loan not found');
 
       const profitAmount = Number(selectedLoan.profit_amount);
-      const totalBalances = members.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
+      const totalBalances = members.reduce(
+        (sum, m) => sum + Number(m.account_balance || 0),
+        0
+      );
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
-      for (const member of members) {
+      // Use Promise.all to insert profits safely
+      const insertPromises = members.map((member) => {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
-        if (memberShare <= 0) continue;
+        if (memberShare <= 0) return Promise.resolve(null);
 
-        const { error: insertError } = await supabase.from('profits').insert({
+        return supabase.from('profits').insert({
           member_id: member.id,
           full_name: member.full_name,
           loan_id: selectedLoanId,
@@ -97,12 +103,16 @@ export default function ProfitManagement() {
           recorded_by: profile?.id,
           status: 'allocated',
         });
-        if (insertError) throw insertError;
-      }
+      });
 
+      const results = await Promise.all(insertPromises);
+      results.forEach((r: any) => {
+        if (r?.error) throw r.error;
+      });
+
+      await loadProfits();
       setSelectedLoanId('');
       setShowDistributeModal(false);
-      await loadProfits();
       alert('Profits allocated successfully! Now deposit them to accounts.');
     } catch (err: any) {
       console.error(err);
@@ -112,31 +122,29 @@ export default function ProfitManagement() {
     }
   };
 
-  // Deposit allocated profits to members
   const depositProfits = async () => {
     setLoading(true);
     try {
       const allocatedProfits = profits.filter((p) => p.status === 'allocated');
 
-      for (const profit of allocatedProfits) {
+      const depositPromises = allocatedProfits.map(async (profit) => {
         const member = members.find((m) => m.id === profit.member_id);
-        if (!member) continue;
+        if (!member) return;
 
-        // Update member balance
         const { error: updateMemberError } = await supabase
           .from('members')
           .update({ account_balance: Number(member.account_balance) + Number(profit.profit_amount) })
           .eq('id', member.id);
         if (updateMemberError) throw updateMemberError;
 
-        // Mark profit as paid
         const { error: updateProfitError } = await supabase
           .from('profits')
           .update({ status: 'paid' })
           .eq('id', profit.id);
         if (updateProfitError) throw updateProfitError;
-      }
+      });
 
+      await Promise.all(depositPromises);
       await loadMembers();
       await loadProfits();
       alert('Allocated profits successfully deposited to member accounts!');
@@ -192,10 +200,16 @@ export default function ProfitManagement() {
             <div className="text-center text-xs text-gray-500">Thank you for using our system!</div>
           </div>
           <div className="flex gap-3 pt-4">
-            <button onClick={handlePrint} className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors">
+            <button
+              onClick={handlePrint}
+              className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors"
+            >
               Print / Download
             </button>
-            <button onClick={() => setShowReceiptModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">
+            <button
+              onClick={() => setShowReceiptModal(false)}
+              className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
+            >
               Cancel
             </button>
           </div>
@@ -204,7 +218,6 @@ export default function ProfitManagement() {
     );
   };
 
-  // Combine members + profits for display
   const displayList = members.map((m) => {
     const profit = profits.find((p) => p.member_id === m.id);
     return {
@@ -262,7 +275,10 @@ export default function ProfitManagement() {
                   <td className="px-6 py-4">
                     {p.profit_id && (
                       <button
-                        onClick={() => { setSelectedProfit(p); setShowReceiptModal(true); }}
+                        onClick={() => {
+                          setSelectedProfit(p);
+                          setShowReceiptModal(true);
+                        }}
                         className="flex items-center gap-1 px-3 py-1 bg-[#008080] text-white rounded-xl text-sm hover:bg-[#006666] transition-colors"
                       >
                         <Printer className="w-4 h-4" /> Print
@@ -282,7 +298,9 @@ export default function ProfitManagement() {
             <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Distribute Profits</h2>
             <form onSubmit={distributeProfits} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Completed Loan</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select Completed Loan
+                </label>
                 <select
                   value={selectedLoanId}
                   onChange={(e) => setSelectedLoanId(e.target.value)}
