@@ -41,19 +41,7 @@ export default function ProfitManagement() {
     try {
       const { data, error } = await supabase.from('profits').select('*');
       if (error) throw error;
-      // Flatten numeric values to avoid vstack issues
-      setProfits(
-        (data || []).map((p: any) => ({
-          id: p.id,
-          member_id: p.member_id,
-          loan_id: p.loan_id,
-          full_name: p.full_name,
-          profit_amount: Number(p.profit_amount || 0),
-          status: p.status || 'Not allocated',
-          created_at: p.created_at || new Date().toISOString(),
-          updated_at: p.updated_at || new Date().toISOString(),
-        }))
-      );
+      setProfits(data || []);
     } catch (err: any) {
       console.error(err);
       setProfits([]);
@@ -73,7 +61,7 @@ export default function ProfitManagement() {
       const updated = data?.map((loan: any) => ({
         ...loan,
         profit_amount:
-          Number(loan.profit_amount) ||
+          loan.profit_amount ??
           (Number(loan.total_repayable || 0) - Number(loan.amount_approved || 0)),
       }));
       setLoans(updated || []);
@@ -106,7 +94,7 @@ export default function ProfitManagement() {
       );
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
-      // UPSERT profits for each member
+      // UPSERT profits for each member, adding to existing if present
       const upsertPromises = members.map((member) => {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
         if (memberShare <= 0) return Promise.resolve(null);
@@ -141,7 +129,7 @@ export default function ProfitManagement() {
       await loadProfits();
       setSelectedLoanId('');
       setShowDistributeModal(false);
-      alert('Profits allocated successfully! Now deposit them to accounts.');
+      alert('Profits allocated successfully! They have been added to existing profits if present.');
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'Failed to allocate profits');
@@ -168,7 +156,7 @@ export default function ProfitManagement() {
 
         const { error: updateProfitError } = await supabase
           .from('profits')
-          .update({ status: 'paid', updated_at: new Date().toISOString() })
+          .update({ status: 'paid' })
           .eq('id', profit.id);
         if (updateProfitError) throw updateProfitError;
       });
