@@ -24,6 +24,7 @@ export default function ProfitManagement() {
     loadLoans();
   }, []);
 
+  // Fetch members
   const loadMembers = async () => {
     try {
       const { data, error } = await supabase
@@ -36,6 +37,7 @@ export default function ProfitManagement() {
     }
   };
 
+  // Fetch profits
   const loadProfits = async () => {
     try {
       const { data, error } = await supabase.from('profits').select('*');
@@ -47,12 +49,13 @@ export default function ProfitManagement() {
     }
   };
 
+  // Fetch completed loans
   const loadLoans = async () => {
     try {
       const { data, error } = await supabase
         .from('loans')
         .select('*')
-        .eq('status', 'paid'); // only completed loans
+        .eq('status', 'completed'); // <-- Fixed: matches your DB
       if (error) throw error;
       setLoans(data || []);
     } catch (err: any) {
@@ -61,7 +64,7 @@ export default function ProfitManagement() {
     }
   };
 
-  // Step 1: Allocate profits proportionally to members
+  // Allocate profits
   const distributeProfits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLoanId) {
@@ -87,7 +90,7 @@ export default function ProfitManagement() {
           loan_id: selectedLoanId,
           profit_amount: memberShare,
           recorded_by: profile?.id,
-          status: 'allocated', // not yet deposited
+          status: 'allocated',
         });
         if (insertError) throw insertError;
       }
@@ -104,7 +107,7 @@ export default function ProfitManagement() {
     }
   };
 
-  // Step 2: Deposit allocated profits to member accounts
+  // Deposit allocated profits
   const depositProfits = async () => {
     setLoading(true);
     try {
@@ -194,7 +197,7 @@ export default function ProfitManagement() {
     );
   };
 
-  // Combine members + profits for display
+  // Merge members with profits for display
   const displayList = members.map((m) => {
     const profit = profits.find((p) => p.member_id === m.id);
     return {
@@ -282,7 +285,7 @@ export default function ProfitManagement() {
                   <option value="">-- Select Loan --</option>
                   {loans.map((loan) => (
                     <option key={loan.id} value={loan.id}>
-                      {`${loan.loan_number} – Paid on ${new Date(loan.paid_on).toLocaleDateString()} – Profit ${formatUGX(loan.profit_amount)}`}
+                      {`${loan.loan_number} – Completed on ${new Date(loan.paid_on).toLocaleDateString()} – Profit ${formatUGX(loan.profit_amount)}`}
                     </option>
                   ))}
                 </select>
