@@ -7,10 +7,10 @@ export default function ProfitManagement() {
   const { profile } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [profits, setProfits] = useState<any[]>([]);
+  const [loans, setLoans] = useState<any[]>([]);
   const [showDistributeModal, setShowDistributeModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedProfit, setSelectedProfit] = useState<any>(null);
-  const [totalProfit, setTotalProfit] = useState('');
   const [selectedLoanId, setSelectedLoanId] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -21,8 +21,10 @@ export default function ProfitManagement() {
   useEffect(() => {
     loadMembers();
     loadProfits();
+    loadLoans();
   }, []);
 
+  // Load members
   const loadMembers = async () => {
     try {
       const { data, error } = await supabase
@@ -35,33 +37,35 @@ export default function ProfitManagement() {
     }
   };
 
+  // Load profits
   const loadProfits = async () => {
     try {
-      // Aggregate profits per member (accumulated)
-      const { data, error } = await supabase
-        .from('profits')
-        .select('*');
+      const { data, error } = await supabase.from('profits').select('*');
       if (error) throw error;
 
-      const aggregated: Record<string, any> = {};
-      (data || []).forEach((p) => {
-        if (aggregated[p.member_id]) {
-          aggregated[p.member_id].profit_amount += Number(p.profit_amount);
-          if (new Date(p.created_at) > new Date(aggregated[p.member_id].created_at)) {
-            aggregated[p.member_id].created_at = p.created_at;
-          }
-        } else {
-          aggregated[p.member_id] = { ...p, profit_amount: Number(p.profit_amount) };
-        }
-      });
-
-      setProfits(Object.values(aggregated));
+      setProfits(data || []);
     } catch (err: any) {
       console.error(err);
       setProfits([]);
     }
   };
 
+  // Load completed loans
+  const loadLoans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('loans')
+        .select('*')
+        .eq('status', 'paid'); // only completed loans
+      if (error) throw error;
+      setLoans(data || []);
+    } catch (err: any) {
+      console.error(err);
+      setLoans([]);
+    }
+  };
+
+  // Allocate profits proportionally to members (step 1)
   const distributeProfits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLoanId) {
@@ -70,9 +74,10 @@ export default function ProfitManagement() {
     }
     setLoading(true);
     try {
-      const profitAmount = parseFloat(totalProfit);
-      if (isNaN(profitAmount) || profitAmount <= 0) throw new Error('Invalid profit amount');
+      const selectedLoan = loans.find((l) => l.id === selectedLoanId);
+      if (!selectedLoan) throw new Error('Selected loan not found');
 
+      const profitAmount = Number(selectedLoan.profit_amount);
       const totalBalances = members.reduce((sum, m) => sum + Number(m.account_balance || 0), 0);
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
@@ -80,53 +85,60 @@ export default function ProfitManagement() {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
         if (memberShare <= 0) continue;
 
-        // Check if a profit row already exists for this member
-        const { data: existingProfit, error: selectError } = await supabase
-          .from('profits')
-          .select('*')
-          .eq('member_id', member.id)
-          .single();
-
-        if (selectError && selectError.code !== 'PGRST116') { // ignore "no rows found"
-          throw selectError;
-        }
-
-        if (existingProfit) {
-          // Update existing profit row (add to total)
-          const { error: updateError } = await supabase
-            .from('profits')
-            .update({
-              profit_amount: Number(existingProfit.profit_amount) + memberShare,
-              loan_id: selectedLoanId,
-              recorded_by: profile?.id,
-              created_at: new Date().toISOString(),
-            })
-            .eq('id', existingProfit.id);
-
-          if (updateError) throw updateError;
-        } else {
-          // Insert new profit row if none exists
-          const { error: insertError } = await supabase
-            .from('profits')
-            .insert({
-              member_id: member.id,
-              full_name: member.full_name,
-              loan_id: selectedLoanId,
-              profit_amount: memberShare,
-              recorded_by: profile?.id,
-            });
-          if (insertError) throw insertError;
-        }
+        const { error: insertError } = await supabase.from('profits').insert({
+          member_id: member.id,
+          full_name: member.full_name,
+          loan_id: selectedLoanId,
+          profit_amount: memberShare,
+          recorded_by: profile?.id,
+          status: 'allocated', // mark as allocated, not yet deposited
+        });
+        if (insertError) throw insertError;
       }
 
-      setTotalProfit('');
       setSelectedLoanId('');
       setShowDistributeModal(false);
       await loadProfits();
-      alert('Profits distributed successfully!');
+      alert('Profits allocated successfully! Now deposit them to accounts.');
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Failed to distribute profits');
+      alert(err.message || 'Failed to allocate profits');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Deposit allocated profits to members’ accounts (step 2)
+  const depositProfits = async () => {
+    setLoading(true);
+    try {
+      const allocatedProfits = profits.filter((p) => p.status === 'allocated');
+
+      for (const profit of allocatedProfits) {
+        const member = members.find((m) => m.id === profit.member_id);
+        if (!member) continue;
+
+        // Update member balance
+        const { error: updateMemberError } = await supabase
+          .from('members')
+          .update({ account_balance: Number(member.account_balance) + Number(profit.profit_amount) })
+          .eq('id', member.id);
+        if (updateMemberError) throw updateMemberError;
+
+        // Mark profit as paid
+        const { error: updateProfitError } = await supabase
+          .from('profits')
+          .update({ status: 'paid' })
+          .eq('id', profit.id);
+        if (updateProfitError) throw updateProfitError;
+      }
+
+      await loadMembers();
+      await loadProfits();
+      alert('Allocated profits successfully deposited to member accounts!');
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Failed to deposit profits');
     } finally {
       setLoading(false);
     }
@@ -140,7 +152,7 @@ export default function ProfitManagement() {
     document.body.innerHTML = printContents;
     window.print();
     document.body.innerHTML = originalContents;
-    window.location.reload(); // restores JS state
+    window.location.reload();
   };
 
   const ProfitReceiptModal = () => {
@@ -169,8 +181,8 @@ export default function ProfitManagement() {
                   <td className="border px-2 py-1">{formatUGX(selectedProfit.profit_amount)}</td>
                 </tr>
                 <tr>
-                  <th className="border px-2 py-1 text-left">Recorded By</th>
-                  <td className="border px-2 py-1">{profile?.full_name || '-'}</td>
+                  <th className="border px-2 py-1 text-left">Status</th>
+                  <td className="border px-2 py-1">{selectedProfit.status}</td>
                 </tr>
               </tbody>
             </table>
@@ -193,12 +205,21 @@ export default function ProfitManagement() {
     <div className="p-4">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Profit Management</h2>
-        <button
-          onClick={() => setShowDistributeModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors"
-        >
-          <Banknote className="w-5 h-5" /> Distribute Profits
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowDistributeModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors"
+          >
+            <Banknote className="w-5 h-5" /> Distribute Profits
+          </button>
+          <button
+            onClick={depositProfits}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-medium rounded-xl hover:bg-green-700 transition-colors"
+          >
+            <DollarSign className="w-5 h-5" /> Deposit Allocated Profits
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl card-shadow overflow-hidden shadow-md">
@@ -209,15 +230,17 @@ export default function ProfitManagement() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Date</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Member</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Profit Amount</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Receipt</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {profits.map((p) => (
-                <tr key={p.member_id} className="hover:bg-[#f0f8f8] transition-colors cursor-pointer">
+                <tr key={p.id} className="hover:bg-[#f0f8f8] transition-colors cursor-pointer">
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(p.created_at).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-800">{p.full_name}</td>
                   <td className="px-6 py-4 text-sm font-semibold text-green-600">{formatUGX(p.profit_amount)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-800">{p.status}</td>
                   <td className="px-6 py-4">
                     <button
                       onClick={() => { setSelectedProfit(p); setShowReceiptModal(true); }}
@@ -239,27 +262,20 @@ export default function ProfitManagement() {
             <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Distribute Profits</h2>
             <form onSubmit={distributeProfits} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Completed Loan (Loan ID)</label>
-                <input
-                  type="text"
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Completed Loan</label>
+                <select
                   value={selectedLoanId}
                   onChange={(e) => setSelectedLoanId(e.target.value)}
-                  placeholder="Enter completed loan UUID"
                   className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
                   required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Total Profit Amount</label>
-                <input
-                  type="number"
-                  step="1"
-                  min="1"
-                  value={totalProfit}
-                  onChange={(e) => setTotalProfit(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                  required
-                />
+                >
+                  <option value="">-- Select Loan --</option>
+                  {loans.map((loan) => (
+                    <option key={loan.id} value={loan.id}>
+                      {`${loan.loan_number} – Paid on ${new Date(loan.paid_on).toLocaleDateString()} – Profit ${formatUGX(loan.profit_amount)}`}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="flex gap-3 pt-4">
                 <button
@@ -267,7 +283,7 @@ export default function ProfitManagement() {
                   disabled={loading}
                   className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors shadow-md"
                 >
-                  {loading ? 'Distributing...' : 'Distribute'}
+                  {loading ? 'Allocating...' : 'Allocate Profit'}
                 </button>
                 <button
                   type="button"
