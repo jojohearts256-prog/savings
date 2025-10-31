@@ -12,10 +12,13 @@ export default function Reports() {
   const [members, setMembers] = useState<any[]>([]);
   const [reportData, setReportData] = useState<any>(null);
 
+  const [transactionFilter, setTransactionFilter] = useState('');
+  const [loanFilter, setLoanFilter] = useState('');
+  const [profitFilter, setProfitFilter] = useState('');
+
   useEffect(() => { loadMembers(); }, []);
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
-  // Load members for dropdown
   const loadMembers = async () => {
     const { data, error } = await supabase
       .from('members')
@@ -24,7 +27,6 @@ export default function Reports() {
     else setMembers(data || []);
   };
 
-  // Fetch report based on type
   const generateReport = async () => {
     if (reportType === 'monthly') await fetchMonthlyReport();
     else if (reportType === 'yearly') await fetchYearlyReport();
@@ -50,85 +52,6 @@ export default function Reports() {
     else setReportData(data?.[0] || null);
   };
 
-  // Download PDF
-  const downloadFullReportPDF = () => {
-    if (!reportData) return;
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text(`${reportType === 'member' ? reportData.full_name : reportData.period} Detailed Report`, 14, 22);
-
-    let yOffset = 30;
-
-    // --- Summary Table ---
-    const summaryRows = Object.keys(reportData)
-      .filter(k => typeof reportData[k] !== 'object')
-      .map(k => [k.replace(/_/g, ' '), Number(reportData[k]).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' })]);
-    doc.autoTable({
-      startY: yOffset,
-      head: [['Metric', 'Value']],
-      body: summaryRows,
-    });
-    yOffset = (doc as any).lastAutoTable.finalY + 10;
-
-    // --- Transactions Table ---
-    if (reportData.transactions?.length > 0) {
-      doc.setFontSize(14);
-      doc.text('Transactions', 14, yOffset);
-      yOffset += 6;
-      doc.autoTable({
-        startY: yOffset,
-        head: [['Date', 'Type', 'Amount (UGX)', 'Member', 'Recorded By']],
-        body: reportData.transactions.map((t: any) => [
-          new Date(t.date).toLocaleDateString(),
-          t.type,
-          Number(t.amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' }),
-          t.member_name || '-',
-          t.recorded_by || '-'
-        ]),
-      });
-      yOffset = (doc as any).lastAutoTable.finalY + 10;
-    }
-
-    // --- Loans Table ---
-    if (reportData.loans?.length > 0) {
-      doc.setFontSize(14);
-      doc.text('Loans', 14, yOffset);
-      yOffset += 6;
-      doc.autoTable({
-        startY: yOffset,
-        head: [['Date', 'Amount Requested (UGX)', 'Amount Approved (UGX)', 'Status', 'Member', 'Recorded By']],
-        body: reportData.loans.map((l: any) => [
-          new Date(l.date).toLocaleDateString(),
-          Number(l.amount_requested).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' }),
-          Number(l.amount_approved || 0).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' }),
-          l.status,
-          l.member_name || '-',
-          l.recorded_by || '-'
-        ]),
-      });
-      yOffset = (doc as any).lastAutoTable.finalY + 10;
-    }
-
-    // --- Profits Table ---
-    if (reportData.profits?.length > 0) {
-      doc.setFontSize(14);
-      doc.text('Profits', 14, yOffset);
-      yOffset += 6;
-      doc.autoTable({
-        startY: yOffset,
-        head: [['Source', 'Profit Amount (UGX)', 'Member', 'Recorded By']],
-        body: reportData.profits.map((p: any) => [
-          p.source,
-          Number(p.profit_amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' }),
-          p.member_name || '-',
-          p.recorded_by || '-'
-        ]),
-      });
-    }
-
-    doc.save(`${reportType}-detailed-report.pdf`);
-  };
-
   const StatCard = ({ label, value, icon: Icon, color }: any) => (
     <div className="bg-white rounded-xl p-4 card-shadow relative">
       <div className="flex items-center gap-3 mb-2">
@@ -141,16 +64,94 @@ export default function Reports() {
     </div>
   );
 
+  const formatCurrency = (amount: number) =>
+    Number(amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' });
+
+  const downloadFullReportPDF = () => {
+    if (!reportData) return;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(`${reportType === 'member' ? reportData.full_name : reportData.period || reportData.year} Report`, 14, 22);
+
+    let yOffset = 30;
+    const summaryRows = Object.keys(reportData)
+      .filter(k => typeof reportData[k] !== 'object')
+      .map(k => [k.replace(/_/g, ' '), formatCurrency(reportData[k])]);
+    doc.autoTable({ startY: yOffset, head: [['Metric', 'Value']], body: summaryRows });
+    yOffset = (doc as any).lastAutoTable.finalY + 10;
+
+    const renderTable = (title: string, head: string[], rows: any[]) => {
+      if (!rows || rows.length === 0) return;
+      doc.setFontSize(14);
+      doc.text(title, 14, yOffset);
+      yOffset += 6;
+      doc.autoTable({ startY: yOffset, head: [head], body: rows });
+      yOffset = (doc as any).lastAutoTable.finalY + 10;
+    };
+
+    renderTable(
+      'Transactions',
+      ['Date', 'Type', 'Amount (UGX)', 'Member', 'Recorded By'],
+      reportData.transactions?.map((t: any) => [
+        new Date(t.transaction_date || t.date).toLocaleDateString(),
+        t.transaction_type || t.type,
+        formatCurrency(t.amount),
+        t.member_name || '-',
+        t.recorded_by || '-',
+      ])
+    );
+
+    renderTable(
+      'Loans',
+      ['Date', 'Amount Requested (UGX)', 'Amount Approved (UGX)', 'Status', 'Member', 'Recorded By'],
+      reportData.loans?.map((l: any) => [
+        new Date(l.requested_date || l.date).toLocaleDateString(),
+        formatCurrency(l.amount_requested),
+        formatCurrency(l.amount_approved || 0),
+        l.status,
+        l.member_name || '-',
+        l.recorded_by || '-',
+      ])
+    );
+
+    renderTable(
+      'Profits',
+      ['Source', 'Profit Amount (UGX)', 'Member', 'Recorded By'],
+      reportData.profits?.map((p: any) => [
+        p.source,
+        formatCurrency(p.profit_amount),
+        p.member_name || '-',
+        p.recorded_by || '-',
+      ])
+    );
+
+    doc.save(`${reportType}-detailed-report.pdf`);
+  };
+
+  // --- FILTER FUNCTION ---
+  const filterData = (data: any[], filter: string, fields: string[]) => {
+    if (!data) return [];
+    if (!filter) return data;
+    const lowerFilter = filter.toLowerCase();
+    return data.filter(item =>
+      fields.some(field => (item[field] || '').toString().toLowerCase().includes(lowerFilter))
+    );
+  };
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Reports & Analytics</h2>
 
+      {/* Filters */}
       <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
-            <select value={reportType} onChange={(e) => setReportType(e.target.value as any)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none">
+            <select
+              value={reportType}
+              onChange={e => setReportType(e.target.value as any)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+            >
               <option value="monthly">Monthly Report</option>
               <option value="yearly">Yearly Report</option>
               <option value="member">Member Statement</option>
@@ -159,27 +160,36 @@ export default function Reports() {
           {reportType === 'monthly' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Month</label>
-              <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none" />
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+              />
             </div>
           )}
           {reportType === 'yearly' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
-              <input type="number" value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none" />
+              <input
+                type="number"
+                value={selectedYear}
+                onChange={e => setSelectedYear(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+              />
             </div>
           )}
           {reportType === 'member' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Member</label>
-              <select value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none">
+              <select
+                value={selectedMemberId}
+                onChange={e => setSelectedMemberId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
+              >
                 <option value="">Select member</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.profiles.full_name} - {member.member_number}
-                  </option>
+                {members.map(m => (
+                  <option key={m.id} value={m.id}>{m.profiles.full_name} - {m.member_number}</option>
                 ))}
               </select>
             </div>
@@ -187,7 +197,10 @@ export default function Reports() {
         </div>
 
         {reportData && (
-          <button onClick={downloadFullReportPDF} className="px-4 py-2 rounded-xl bg-[#008080] text-white hover:bg-teal-700">
+          <button
+            onClick={downloadFullReportPDF}
+            className="px-4 py-2 rounded-xl bg-[#008080] text-white hover:bg-teal-700"
+          >
             <Download className="inline w-4 h-4 mr-2" /> Download Detailed Report
           </button>
         )}
@@ -196,30 +209,34 @@ export default function Reports() {
       {reportData && (
         <div>
           <h3 className="text-xl font-bold text-gray-800 mb-4">
-            {reportType === 'member' ? reportData.full_name : reportData.period} Report
+            {reportType === 'member' ? reportData.full_name : reportData.period || reportData.year} Report
           </h3>
 
           {/* Metric Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {Object.keys(reportData)
               .filter(k => typeof reportData[k] !== 'object')
-              .map((key) => (
+              .map(key => (
                 <StatCard
                   key={key}
                   label={key.replace(/_/g, ' ')}
-                  value={typeof reportData[key] === 'number'
-                    ? Number(reportData[key]).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' })
-                    : reportData[key]}
+                  value={typeof reportData[key] === 'number' ? formatCurrency(reportData[key]) : reportData[key]}
                   icon={TrendingUp}
                   color="bg-[#008080]"
                 />
               ))}
           </div>
 
-          {/* Transactions Table */}
+          {/* Transactions Table with filter */}
           {reportData.transactions?.length > 0 && (
             <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
               <h4 className="text-lg font-bold mb-2">Transactions</h4>
+              <input
+                placeholder="Search Transactions..."
+                value={transactionFilter}
+                onChange={e => setTransactionFilter(e.target.value)}
+                className="mb-2 w-full px-2 py-1 border border-gray-300 rounded-lg"
+              />
               <table className="min-w-full border-collapse border border-gray-300">
                 <thead>
                   <tr>
@@ -231,26 +248,31 @@ export default function Reports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {reportData.transactions.map((t: any, i: number) => (
-                    <tr key={i}>
-                      <td className="border border-gray-300 px-2 py-1">{new Date(t.date).toLocaleDateString()}</td>
-                      <td className="border border-gray-300 px-2 py-1">{t.type}</td>
-                      <td className="border border-gray-300 px-2 py-1">
-                        {Number(t.amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' })}
-                      </td>
-                      <td className="border border-gray-300 px-2 py-1">{t.member_name || '-'}</td>
-                      <td className="border border-gray-300 px-2 py-1">{t.recorded_by || '-'}</td>
-                    </tr>
+                  {filterData(reportData.transactions, transactionFilter, ['transaction_type', 'member_name', 'recorded_by'])
+                    .map((t: any, i: number) => (
+                      <tr key={i}>
+                        <td className="border border-gray-300 px-2 py-1">{new Date(t.transaction_date || t.date).toLocaleDateString()}</td>
+                        <td className="border border-gray-300 px-2 py-1">{t.transaction_type || t.type}</td>
+                        <td className="border border-gray-300 px-2 py-1">{formatCurrency(t.amount)}</td>
+                        <td className="border border-gray-300 px-2 py-1">{t.member_name || '-'}</td>
+                        <td className="border border-gray-300 px-2 py-1">{t.recorded_by || '-'}</td>
+                      </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Loans Table */}
+          {/* Loans Table with filter */}
           {reportData.loans?.length > 0 && (
             <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
               <h4 className="text-lg font-bold mb-2">Loans</h4>
+              <input
+                placeholder="Search Loans..."
+                value={loanFilter}
+                onChange={e => setLoanFilter(e.target.value)}
+                className="mb-2 w-full px-2 py-1 border border-gray-300 rounded-lg"
+              />
               <table className="min-w-full border-collapse border border-gray-300">
                 <thead>
                   <tr>
@@ -263,29 +285,32 @@ export default function Reports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {reportData.loans.map((l: any, i: number) => (
-                    <tr key={i}>
-                      <td className="border border-gray-300 px-2 py-1">{new Date(l.date).toLocaleDateString()}</td>
-                      <td className="border border-gray-300 px-2 py-1">
-                        {Number(l.amount_requested).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' })}
-                      </td>
-                      <td className="border border-gray-300 px-2 py-1">
-                        {Number(l.amount_approved || 0).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' })}
-                      </td>
-                      <td className="border border-gray-300 px-2 py-1">{l.status}</td>
-                      <td className="border border-gray-300 px-2 py-1">{l.member_name || '-'}</td>
-                      <td className="border border-gray-300 px-2 py-1">{l.recorded_by || '-'}</td>
-                    </tr>
+                  {filterData(reportData.loans, loanFilter, ['status', 'member_name', 'recorded_by'])
+                    .map((l: any, i: number) => (
+                      <tr key={i}>
+                        <td className="border border-gray-300 px-2 py-1">{new Date(l.requested_date || l.date).toLocaleDateString()}</td>
+                        <td className="border border-gray-300 px-2 py-1">{formatCurrency(l.amount_requested)}</td>
+                        <td className="border border-gray-300 px-2 py-1">{formatCurrency(l.amount_approved || 0)}</td>
+                        <td className="border border-gray-300 px-2 py-1">{l.status}</td>
+                        <td className="border border-gray-300 px-2 py-1">{l.member_name || '-'}</td>
+                        <td className="border border-gray-300 px-2 py-1">{l.recorded_by || '-'}</td>
+                      </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Profits Table */}
+          {/* Profits Table with filter */}
           {reportData.profits?.length > 0 && (
             <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
               <h4 className="text-lg font-bold mb-2">Profits</h4>
+              <input
+                placeholder="Search Profits..."
+                value={profitFilter}
+                onChange={e => setProfitFilter(e.target.value)}
+                className="mb-2 w-full px-2 py-1 border border-gray-300 rounded-lg"
+              />
               <table className="min-w-full border-collapse border border-gray-300">
                 <thead>
                   <tr>
@@ -296,15 +321,14 @@ export default function Reports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {reportData.profits.map((p: any, i: number) => (
-                    <tr key={i}>
-                      <td className="border border-gray-300 px-2 py-1">{p.source}</td>
-                      <td className="border border-gray-300 px-2 py-1">
-                        {Number(p.profit_amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' })}
-                      </td>
-                      <td className="border border-gray-300 px-2 py-1">{p.member_name || '-'}</td>
-                      <td className="border border-gray-300 px-2 py-1">{p.recorded_by || '-'}</td>
-                    </tr>
+                  {filterData(reportData.profits, profitFilter, ['source', 'member_name', 'recorded_by'])
+                    .map((p: any, i: number) => (
+                      <tr key={i}>
+                        <td className="border border-gray-300 px-2 py-1">{p.source}</td>
+                        <td className="border border-gray-300 px-2 py-1">{formatCurrency(p.profit_amount)}</td>
+                        <td className="border border-gray-300 px-2 py-1">{p.member_name || '-'}</td>
+                        <td className="border border-gray-300 px-2 py-1">{p.recorded_by || '-'}</td>
+                      </tr>
                   ))}
                 </tbody>
               </table>
