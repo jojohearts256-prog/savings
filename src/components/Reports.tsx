@@ -12,6 +12,7 @@ export default function Reports() {
   const [members, setMembers] = useState<any[]>([]);
   const [reportData, setReportData] = useState<any>(null);
 
+  // Filter states
   const [transactionFilter, setTransactionFilter] = useState('');
   const [loanFilter, setLoanFilter] = useState('');
   const [profitFilter, setProfitFilter] = useState('');
@@ -19,6 +20,7 @@ export default function Reports() {
   useEffect(() => { loadMembers(); }, []);
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
+  // Load all members for the dropdown
   const loadMembers = async () => {
     const { data, error } = await supabase
       .from('members')
@@ -27,6 +29,7 @@ export default function Reports() {
     else setMembers(data || []);
   };
 
+  // Generate report based on type
   const generateReport = async () => {
     if (reportType === 'monthly') await fetchMonthlyReport();
     else if (reportType === 'yearly') await fetchYearlyReport();
@@ -52,21 +55,11 @@ export default function Reports() {
     else setReportData(data?.[0] || null);
   };
 
-  const StatCard = ({ label, value, icon: Icon, color }: any) => (
-    <div className="bg-white rounded-xl p-4 card-shadow relative">
-      <div className="flex items-center gap-3 mb-2">
-        <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center`}>
-          <Icon className="w-5 h-5 text-white" />
-        </div>
-        <span className="text-sm font-medium text-gray-600">{label}</span>
-      </div>
-      <p className="text-2xl font-bold text-gray-800">{value}</p>
-    </div>
-  );
-
+  // Utility to format currency
   const formatCurrency = (amount: number) =>
     Number(amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' });
 
+  // PDF download
   const downloadFullReportPDF = () => {
     if (!reportData) return;
     const doc = new jsPDF();
@@ -77,6 +70,7 @@ export default function Reports() {
     const summaryRows = Object.keys(reportData)
       .filter(k => typeof reportData[k] !== 'object')
       .map(k => [k.replace(/_/g, ' '), formatCurrency(reportData[k])]);
+
     doc.autoTable({ startY: yOffset, head: [['Metric', 'Value']], body: summaryRows });
     yOffset = (doc as any).lastAutoTable.finalY + 10;
 
@@ -128,7 +122,7 @@ export default function Reports() {
     doc.save(`${reportType}-detailed-report.pdf`);
   };
 
-  // --- FILTER FUNCTION ---
+  // Filter helper
   const filterData = (data: any[], filter: string, fields: string[]) => {
     if (!data) return [];
     if (!filter) return data;
@@ -138,55 +132,57 @@ export default function Reports() {
     );
   };
 
+  const StatCard = ({ label, value, icon: Icon, color }: any) => (
+    <div className="bg-white rounded-xl p-4 card-shadow relative">
+      <div className="flex items-center gap-3 mb-2">
+        <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center`}>
+          <Icon className="w-5 h-5 text-white" />
+        </div>
+        <span className="text-sm font-medium text-gray-600">{label}</span>
+      </div>
+      <p className="text-2xl font-bold text-gray-800">{value}</p>
+    </div>
+  );
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Reports & Analytics</h2>
 
-      {/* Filters */}
+      {/* Report Type & Filters */}
       <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* Report Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
-            <select
-              value={reportType}
-              onChange={e => setReportType(e.target.value as any)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-            >
+            <select value={reportType} onChange={e => setReportType(e.target.value as any)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none">
               <option value="monthly">Monthly Report</option>
               <option value="yearly">Yearly Report</option>
               <option value="member">Member Statement</option>
             </select>
           </div>
+          {/* Month */}
           {reportType === 'monthly' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Month</label>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={e => setSelectedMonth(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-              />
+              <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none" />
             </div>
           )}
+          {/* Year */}
           {reportType === 'yearly' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
-              <input
-                type="number"
-                value={selectedYear}
-                onChange={e => setSelectedYear(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-              />
+              <input type="number" value={selectedYear} onChange={e => setSelectedYear(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none" />
             </div>
           )}
+          {/* Member */}
           {reportType === 'member' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Member</label>
-              <select
-                value={selectedMemberId}
-                onChange={e => setSelectedMemberId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-              >
+              <select value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none">
                 <option value="">Select member</option>
                 {members.map(m => (
                   <option key={m.id} value={m.id}>{m.profiles.full_name} - {m.member_number}</option>
@@ -197,10 +193,7 @@ export default function Reports() {
         </div>
 
         {reportData && (
-          <button
-            onClick={downloadFullReportPDF}
-            className="px-4 py-2 rounded-xl bg-[#008080] text-white hover:bg-teal-700"
-          >
+          <button onClick={downloadFullReportPDF} className="px-4 py-2 rounded-xl bg-[#008080] text-white hover:bg-teal-700">
             <Download className="inline w-4 h-4 mr-2" /> Download Detailed Report
           </button>
         )}
@@ -208,132 +201,58 @@ export default function Reports() {
 
       {reportData && (
         <div>
-          <h3 className="text-xl font-bold text-gray-800 mb-4">
-            {reportType === 'member' ? reportData.full_name : reportData.period || reportData.year} Report
-          </h3>
-
           {/* Metric Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {Object.keys(reportData)
               .filter(k => typeof reportData[k] !== 'object')
               .map(key => (
-                <StatCard
-                  key={key}
-                  label={key.replace(/_/g, ' ')}
+                <StatCard key={key} label={key.replace(/_/g, ' ')}
                   value={typeof reportData[key] === 'number' ? formatCurrency(reportData[key]) : reportData[key]}
-                  icon={TrendingUp}
-                  color="bg-[#008080]"
-                />
+                  icon={TrendingUp} color="bg-[#008080]" />
               ))}
           </div>
 
-          {/* Transactions Table with filter */}
-          {reportData.transactions?.length > 0 && (
-            <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
-              <h4 className="text-lg font-bold mb-2">Transactions</h4>
-              <input
-                placeholder="Search Transactions..."
-                value={transactionFilter}
-                onChange={e => setTransactionFilter(e.target.value)}
-                className="mb-2 w-full px-2 py-1 border border-gray-300 rounded-lg"
-              />
-              <table className="min-w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr>
-                    <th className="border border-gray-300 px-2 py-1">Date</th>
-                    <th className="border border-gray-300 px-2 py-1">Type</th>
-                    <th className="border border-gray-300 px-2 py-1">Amount (UGX)</th>
-                    <th className="border border-gray-300 px-2 py-1">Member</th>
-                    <th className="border border-gray-300 px-2 py-1">Recorded By</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filterData(reportData.transactions, transactionFilter, ['transaction_type', 'member_name', 'recorded_by'])
-                    .map((t: any, i: number) => (
-                      <tr key={i}>
-                        <td className="border border-gray-300 px-2 py-1">{new Date(t.transaction_date || t.date).toLocaleDateString()}</td>
-                        <td className="border border-gray-300 px-2 py-1">{t.transaction_type || t.type}</td>
-                        <td className="border border-gray-300 px-2 py-1">{formatCurrency(t.amount)}</td>
-                        <td className="border border-gray-300 px-2 py-1">{t.member_name || '-'}</td>
-                        <td className="border border-gray-300 px-2 py-1">{t.recorded_by || '-'}</td>
-                      </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {/* Transactions, Loans & Profits with Filters */}
+          {['transactions', 'loans', 'profits'].map((section) => {
+            const data = reportData[section];
+            const filter = section === 'transactions' ? transactionFilter : section === 'loans' ? loanFilter : profitFilter;
+            const fields = section === 'transactions' ? ['transaction_type', 'member_name', 'recorded_by'] :
+                          section === 'loans' ? ['status', 'member_name', 'recorded_by'] : ['source', 'member_name', 'recorded_by'];
 
-          {/* Loans Table with filter */}
-          {reportData.loans?.length > 0 && (
-            <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
-              <h4 className="text-lg font-bold mb-2">Loans</h4>
-              <input
-                placeholder="Search Loans..."
-                value={loanFilter}
-                onChange={e => setLoanFilter(e.target.value)}
-                className="mb-2 w-full px-2 py-1 border border-gray-300 rounded-lg"
-              />
-              <table className="min-w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr>
-                    <th className="border border-gray-300 px-2 py-1">Date</th>
-                    <th className="border border-gray-300 px-2 py-1">Amount Requested (UGX)</th>
-                    <th className="border border-gray-300 px-2 py-1">Amount Approved (UGX)</th>
-                    <th className="border border-gray-300 px-2 py-1">Status</th>
-                    <th className="border border-gray-300 px-2 py-1">Member</th>
-                    <th className="border border-gray-300 px-2 py-1">Recorded By</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filterData(reportData.loans, loanFilter, ['status', 'member_name', 'recorded_by'])
-                    .map((l: any, i: number) => (
+            if (!data?.length) return null;
+            return (
+              <div key={section} className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
+                <h4 className="text-lg font-bold mb-2">{section.charAt(0).toUpperCase() + section.slice(1)}</h4>
+                <input placeholder={`Search ${section}...`} value={filter} onChange={e => {
+                  if (section === 'transactions') setTransactionFilter(e.target.value);
+                  else if (section === 'loans') setLoanFilter(e.target.value);
+                  else setProfitFilter(e.target.value);
+                }}
+                  className="mb-2 w-full px-2 py-1 border border-gray-300 rounded-lg" />
+                <table className="min-w-full border-collapse border border-gray-300">
+                  <thead>
+                    <tr>
+                      {Object.keys(data[0]).map(col => <th key={col} className="border border-gray-300 px-2 py-1">{col.replace(/_/g, ' ')}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filterData(data, filter, fields).map((row: any, i: number) => (
                       <tr key={i}>
-                        <td className="border border-gray-300 px-2 py-1">{new Date(l.requested_date || l.date).toLocaleDateString()}</td>
-                        <td className="border border-gray-300 px-2 py-1">{formatCurrency(l.amount_requested)}</td>
-                        <td className="border border-gray-300 px-2 py-1">{formatCurrency(l.amount_approved || 0)}</td>
-                        <td className="border border-gray-300 px-2 py-1">{l.status}</td>
-                        <td className="border border-gray-300 px-2 py-1">{l.member_name || '-'}</td>
-                        <td className="border border-gray-300 px-2 py-1">{l.recorded_by || '-'}</td>
+                        {Object.keys(row).map(col => (
+                          <td key={col} className="border border-gray-300 px-2 py-1">
+                            {['amount', 'amount_requested', 'amount_approved', 'profit_amount'].includes(col)
+                              ? formatCurrency(row[col])
+                              : row[col] instanceof Date ? new Date(row[col]).toLocaleDateString()
+                              : row[col] || '-'}
+                          </td>
+                        ))}
                       </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Profits Table with filter */}
-          {reportData.profits?.length > 0 && (
-            <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
-              <h4 className="text-lg font-bold mb-2">Profits</h4>
-              <input
-                placeholder="Search Profits..."
-                value={profitFilter}
-                onChange={e => setProfitFilter(e.target.value)}
-                className="mb-2 w-full px-2 py-1 border border-gray-300 rounded-lg"
-              />
-              <table className="min-w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr>
-                    <th className="border border-gray-300 px-2 py-1">Source</th>
-                    <th className="border border-gray-300 px-2 py-1">Profit Amount (UGX)</th>
-                    <th className="border border-gray-300 px-2 py-1">Member</th>
-                    <th className="border border-gray-300 px-2 py-1">Recorded By</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filterData(reportData.profits, profitFilter, ['source', 'member_name', 'recorded_by'])
-                    .map((p: any, i: number) => (
-                      <tr key={i}>
-                        <td className="border border-gray-300 px-2 py-1">{p.source}</td>
-                        <td className="border border-gray-300 px-2 py-1">{formatCurrency(p.profit_amount)}</td>
-                        <td className="border border-gray-300 px-2 py-1">{p.member_name || '-'}</td>
-                        <td className="border border-gray-300 px-2 py-1">{p.recorded_by || '-'}</td>
-                      </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
