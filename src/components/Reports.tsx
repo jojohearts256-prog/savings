@@ -29,7 +29,6 @@ export default function Reports() {
     const { data, error } = await supabase
       .from('members')
       .select('id, full_name, member_number');
-
     if (error) console.error('Load Members Error:', error);
     else setMembers(data || []);
   };
@@ -59,7 +58,6 @@ export default function Reports() {
     else setReportData(data?.[0] || null);
   };
 
-  // --- Card Component ---
   const StatCard = ({ label, value, icon: Icon, color }: any) => (
     <div className="bg-white rounded-xl p-4 card-shadow relative">
       <div className="flex items-center gap-3 mb-2">
@@ -75,7 +73,6 @@ export default function Reports() {
   const formatCurrency = (amount: number) =>
     Number(amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' });
 
-  // --- FILTER FUNCTION ---
   const filterData = (data: any[], filter: string, fields: string[]) => {
     if (!data) return [];
     if (!filter) return data;
@@ -85,14 +82,12 @@ export default function Reports() {
     );
   };
 
-  // --- PAGINATION FUNCTION ---
   const paginate = (data: any[], page: number) => {
     if (!data) return [];
     const start = (page - 1) * pageSize;
     return data.slice(start, start + pageSize);
   };
 
-  // --- PDF EXPORT ---
   const downloadFullReportPDF = () => {
     if (!reportData) return;
     const doc = new jsPDF();
@@ -153,7 +148,6 @@ export default function Reports() {
     doc.save(`${reportType}-detailed-report.pdf`);
   };
 
-  // --- Table Component ---
   const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
     const filtered = filterData(data, filter, fields);
     const paginated = paginate(filtered, page);
