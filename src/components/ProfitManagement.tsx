@@ -94,44 +94,34 @@ export default function ProfitManagement() {
       );
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
-      // UPSERT profits for each member, adding to existing if present
+      // UPSERT profits for each member, accumulating existing profits
       const upsertPromises = members.map(async (member) => {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
         if (memberShare <= 0) return;
 
-        // Accumulate: increment if record exists, otherwise insert
-        const existing = profits.find(
-          (p) => p.member_id === member.id && p.loan_id === selectedLoanId
-        );
+        // Find existing profit for this member + loan
+        const existing = profits.find(p => p.member_id === member.id && p.loan_id === selectedLoanId);
+        const newProfitAmount = existing ? existing.profit_amount + memberShare : memberShare;
 
-        if (existing) {
-          // Update existing profit
-          const { error: updateError } = await supabase
-            .from('profits')
-            .update({
-              profit_amount: existing.profit_amount + memberShare,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existing.id);
-
-          if (updateError) throw updateError;
-        } else {
-          // Insert new profit record
-          const { error: insertError } = await supabase
-            .from('profits')
-            .insert({
+        const { error } = await supabase
+          .from('profits')
+          .upsert(
+            {
               member_id: member.id,
-              full_name: member.full_name,
               loan_id: selectedLoanId,
-              profit_amount: memberShare,
+              full_name: member.full_name,
+              profit_amount: newProfitAmount,
               recorded_by: profile?.id,
               status: 'allocated',
-              created_at: new Date().toISOString(),
+              created_at: existing ? existing.created_at : new Date().toISOString(),
               updated_at: new Date().toISOString(),
-            });
-
-          if (insertError) throw insertError;
-        }
+            },
+            {
+              onConflict: ['member_id', 'loan_id'], 
+              ignoreDuplicates: false,
+            }
+          );
+        if (error) throw error;
       });
 
       await Promise.all(upsertPromises);
