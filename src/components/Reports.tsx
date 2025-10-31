@@ -29,7 +29,7 @@ export default function Reports() {
   const loadMembers = async () => {
     const { data, error } = await supabase
       .from('members')
-      .select('id, full_name, member_number'); // fields in members table only
+      .select('id, full_name, member_number');
 
     if (error) console.error('Load Members Error:', error);
     else setMembers(data || []);
@@ -122,21 +122,21 @@ export default function Reports() {
         new Date(t.transaction_date).toLocaleDateString(),
         t.transaction_type || '-',
         formatCurrency(t.amount || 0),
-        t.full_name || '-',      // directly from members table
+        t.full_name || '-',
         t.recorded_by || '-',
       ])
     );
 
     renderTable(
       'Loans',
-      ['Date', 'Amount Requested (UGX)', 'Amount Approved (UGX)', 'Status', 'Member', 'Recorded By'],
+      ['Date', 'Amount Requested (UGX)', 'Amount Approved (UGX)', 'Status', 'Member', 'Approved By'],
       reportData.loans?.map((l: any) => [
         new Date(l.requested_date).toLocaleDateString(),
         formatCurrency(l.amount_requested || 0),
         formatCurrency(l.amount_approved || 0),
         l.status || '-',
-        l.full_name || '-',      // directly from members table
-        l.recorded_by || '-',
+        l.full_name || '-',
+        l.approved_by || '-',
       ])
     );
 
@@ -146,7 +146,7 @@ export default function Reports() {
       reportData.profits?.map((p: any) => [
         p.source || '-',
         formatCurrency(p.profit_amount || 0),
-        p.full_name || '-',      // directly from members table
+        p.full_name || '-',
         p.recorded_by || '-',
       ])
     );
@@ -257,7 +257,7 @@ export default function Reports() {
               data={reportData.loans}
               filter={loanFilter}
               setFilter={setLoanFilter}
-              fields={['status', 'full_name', 'recorded_by']}
+              fields={['status', 'full_name', 'approved_by']}
               page={pageLoans}
               setPage={setPageLoans}
             />
