@@ -16,7 +16,6 @@ export default function Reports() {
   const [loanFilter, setLoanFilter] = useState('');
   const [profitFilter, setProfitFilter] = useState('');
 
-  // Pagination state
   const [pageTransactions, setPageTransactions] = useState(1);
   const [pageLoans, setPageLoans] = useState(1);
   const [pageProfits, setPageProfits] = useState(1);
@@ -25,11 +24,12 @@ export default function Reports() {
   useEffect(() => { loadMembers(); }, []);
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
-  // --- Load members directly from members table ---
+  // --- Load members ---
   const loadMembers = async () => {
     const { data, error } = await supabase
       .from('members')
       .select('id, full_name, member_number');
+
     if (error) console.error('Load Members Error:', error);
     else setMembers(data || []);
   };
@@ -59,6 +59,7 @@ export default function Reports() {
     else setReportData(data?.[0] || null);
   };
 
+  // --- Card Component ---
   const StatCard = ({ label, value, icon: Icon, color }: any) => (
     <div className="bg-white rounded-xl p-4 card-shadow relative">
       <div className="flex items-center gap-3 mb-2">
@@ -152,7 +153,7 @@ export default function Reports() {
     doc.save(`${reportType}-detailed-report.pdf`);
   };
 
-  // --- TABLE COMPONENT ---
+  // --- Table Component ---
   const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
     const filtered = filterData(data, filter, fields);
     const paginated = paginate(filtered, page);
@@ -263,7 +264,7 @@ export default function Reports() {
               data={reportData.profits}
               filter={profitFilter}
               setFilter={setProfitFilter}
-              fields={['full_name', 'recorded_by']}
+              fields={['profit_amount', 'full_name', 'recorded_by']}
               page={pageProfits}
               setPage={setPageProfits}
             />
