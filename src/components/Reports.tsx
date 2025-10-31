@@ -24,7 +24,6 @@ export default function Reports() {
   useEffect(() => { loadMembers(); }, []);
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
-  // --- Load members ---
   const loadMembers = async () => {
     const { data, error } = await supabase
       .from('members')
@@ -258,7 +257,7 @@ export default function Reports() {
               data={reportData.profits}
               filter={profitFilter}
               setFilter={setProfitFilter}
-              fields={['profit_amount', 'full_name', 'recorded_by']}
+              fields={['full_name', 'recorded_by']}
               page={pageProfits}
               setPage={setPageProfits}
             />
