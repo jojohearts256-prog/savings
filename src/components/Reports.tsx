@@ -15,12 +15,16 @@ export default function Reports() {
   useEffect(() => { loadMembers(); }, []);
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
+  // Load members for dropdown
   const loadMembers = async () => {
-    const { data, error } = await supabase.from('members').select('id, member_number, profiles!inner(id, full_name)');
+    const { data, error } = await supabase
+      .from('members')
+      .select('id, member_number, profiles!inner(id, full_name)');
     if (error) console.error('Load Members Error:', error);
     else setMembers(data || []);
   };
 
+  // Fetch report based on type
   const generateReport = async () => {
     if (reportType === 'monthly') await fetchMonthlyReport();
     else if (reportType === 'yearly') await fetchYearlyReport();
@@ -46,6 +50,7 @@ export default function Reports() {
     else setReportData(data?.[0] || null);
   };
 
+  // Download PDF
   const downloadFullReportPDF = () => {
     if (!reportData) return;
     const doc = new jsPDF();
@@ -55,7 +60,9 @@ export default function Reports() {
     let yOffset = 30;
 
     // --- Summary Table ---
-    const summaryRows = Object.keys(reportData).filter(k => typeof reportData[k] !== 'object').map(k => [k.replace(/_/g,' '), reportData[k]]);
+    const summaryRows = Object.keys(reportData)
+      .filter(k => typeof reportData[k] !== 'object')
+      .map(k => [k.replace(/_/g, ' '), Number(reportData[k]).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' })]);
     doc.autoTable({
       startY: yOffset,
       head: [['Metric', 'Value']],
@@ -70,11 +77,13 @@ export default function Reports() {
       yOffset += 6;
       doc.autoTable({
         startY: yOffset,
-        head: [['Date', 'Type', 'Amount']],
+        head: [['Date', 'Type', 'Amount (UGX)', 'Member', 'Recorded By']],
         body: reportData.transactions.map((t: any) => [
-          new Date(t.transaction_date).toLocaleDateString(),
-          t.transaction_type,
-          `$${Number(t.amount).toLocaleString()}`
+          new Date(t.date).toLocaleDateString(),
+          t.type,
+          Number(t.amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' }),
+          t.member_name || '-',
+          t.recorded_by || '-'
         ]),
       });
       yOffset = (doc as any).lastAutoTable.finalY + 10;
@@ -87,11 +96,32 @@ export default function Reports() {
       yOffset += 6;
       doc.autoTable({
         startY: yOffset,
-        head: [['Date', 'Amount', 'Status']],
+        head: [['Date', 'Amount Requested (UGX)', 'Amount Approved (UGX)', 'Status', 'Member', 'Recorded By']],
         body: reportData.loans.map((l: any) => [
-          new Date(l.requested_date).toLocaleDateString(),
-          `$${Number(l.amount_approved || l.amount_requested).toLocaleString()}`,
-          l.status
+          new Date(l.date).toLocaleDateString(),
+          Number(l.amount_requested).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' }),
+          Number(l.amount_approved || 0).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' }),
+          l.status,
+          l.member_name || '-',
+          l.recorded_by || '-'
+        ]),
+      });
+      yOffset = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // --- Profits Table ---
+    if (reportData.profits?.length > 0) {
+      doc.setFontSize(14);
+      doc.text('Profits', 14, yOffset);
+      yOffset += 6;
+      doc.autoTable({
+        startY: yOffset,
+        head: [['Source', 'Profit Amount (UGX)', 'Member', 'Recorded By']],
+        body: reportData.profits.map((p: any) => [
+          p.source,
+          Number(p.profit_amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' }),
+          p.member_name || '-',
+          p.recorded_by || '-'
         ]),
       });
     }
@@ -177,7 +207,9 @@ export default function Reports() {
                 <StatCard
                   key={key}
                   label={key.replace(/_/g, ' ')}
-                  value={typeof reportData[key] === 'number' ? `$${reportData[key].toLocaleString()}` : reportData[key]}
+                  value={typeof reportData[key] === 'number'
+                    ? Number(reportData[key]).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' })
+                    : reportData[key]}
                   icon={TrendingUp}
                   color="bg-[#008080]"
                 />
@@ -193,15 +225,21 @@ export default function Reports() {
                   <tr>
                     <th className="border border-gray-300 px-2 py-1">Date</th>
                     <th className="border border-gray-300 px-2 py-1">Type</th>
-                    <th className="border border-gray-300 px-2 py-1">Amount</th>
+                    <th className="border border-gray-300 px-2 py-1">Amount (UGX)</th>
+                    <th className="border border-gray-300 px-2 py-1">Member</th>
+                    <th className="border border-gray-300 px-2 py-1">Recorded By</th>
                   </tr>
                 </thead>
                 <tbody>
                   {reportData.transactions.map((t: any, i: number) => (
                     <tr key={i}>
-                      <td className="border border-gray-300 px-2 py-1">{new Date(t.transaction_date).toLocaleDateString()}</td>
-                      <td className="border border-gray-300 px-2 py-1">{t.transaction_type}</td>
-                      <td className="border border-gray-300 px-2 py-1">${Number(t.amount).toLocaleString()}</td>
+                      <td className="border border-gray-300 px-2 py-1">{new Date(t.date).toLocaleDateString()}</td>
+                      <td className="border border-gray-300 px-2 py-1">{t.type}</td>
+                      <td className="border border-gray-300 px-2 py-1">
+                        {Number(t.amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' })}
+                      </td>
+                      <td className="border border-gray-300 px-2 py-1">{t.member_name || '-'}</td>
+                      <td className="border border-gray-300 px-2 py-1">{t.recorded_by || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -217,16 +255,55 @@ export default function Reports() {
                 <thead>
                   <tr>
                     <th className="border border-gray-300 px-2 py-1">Date</th>
-                    <th className="border border-gray-300 px-2 py-1">Amount</th>
+                    <th className="border border-gray-300 px-2 py-1">Amount Requested (UGX)</th>
+                    <th className="border border-gray-300 px-2 py-1">Amount Approved (UGX)</th>
                     <th className="border border-gray-300 px-2 py-1">Status</th>
+                    <th className="border border-gray-300 px-2 py-1">Member</th>
+                    <th className="border border-gray-300 px-2 py-1">Recorded By</th>
                   </tr>
                 </thead>
                 <tbody>
                   {reportData.loans.map((l: any, i: number) => (
                     <tr key={i}>
-                      <td className="border border-gray-300 px-2 py-1">{new Date(l.requested_date).toLocaleDateString()}</td>
-                      <td className="border border-gray-300 px-2 py-1">${Number(l.amount_approved || l.amount_requested).toLocaleString()}</td>
+                      <td className="border border-gray-300 px-2 py-1">{new Date(l.date).toLocaleDateString()}</td>
+                      <td className="border border-gray-300 px-2 py-1">
+                        {Number(l.amount_requested).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' })}
+                      </td>
+                      <td className="border border-gray-300 px-2 py-1">
+                        {Number(l.amount_approved || 0).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' })}
+                      </td>
                       <td className="border border-gray-300 px-2 py-1">{l.status}</td>
+                      <td className="border border-gray-300 px-2 py-1">{l.member_name || '-'}</td>
+                      <td className="border border-gray-300 px-2 py-1">{l.recorded_by || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Profits Table */}
+          {reportData.profits?.length > 0 && (
+            <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
+              <h4 className="text-lg font-bold mb-2">Profits</h4>
+              <table className="min-w-full border-collapse border border-gray-300">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-300 px-2 py-1">Source</th>
+                    <th className="border border-gray-300 px-2 py-1">Profit Amount (UGX)</th>
+                    <th className="border border-gray-300 px-2 py-1">Member</th>
+                    <th className="border border-gray-300 px-2 py-1">Recorded By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.profits.map((p: any, i: number) => (
+                    <tr key={i}>
+                      <td className="border border-gray-300 px-2 py-1">{p.source}</td>
+                      <td className="border border-gray-300 px-2 py-1">
+                        {Number(p.profit_amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' })}
+                      </td>
+                      <td className="border border-gray-300 px-2 py-1">{p.member_name || '-'}</td>
+                      <td className="border border-gray-300 px-2 py-1">{p.recorded_by || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
