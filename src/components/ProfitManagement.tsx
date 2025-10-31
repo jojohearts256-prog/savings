@@ -13,6 +13,7 @@ export default function ProfitManagement() {
   const [selectedProfit, setSelectedProfit] = useState<any>(null);
   const [selectedLoanId, setSelectedLoanId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const receiptRef = useRef<HTMLDivElement>(null);
 
@@ -24,6 +25,12 @@ export default function ProfitManagement() {
     loadProfits();
     loadCompletedLoans();
   }, []);
+
+  // --------------------- NOTIFICATION ---------------------
+  const showNotification = (message: string, type: 'success' | 'error' = 'success', duration = 3000) => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), duration);
+  };
 
   const loadMembers = async () => {
     try {
@@ -75,7 +82,7 @@ export default function ProfitManagement() {
   const distributeProfits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLoanId) {
-      alert('Please select a completed loan to distribute profits.');
+      showNotification('Please select a completed loan to distribute profits.', 'error');
       return;
     }
     setLoading(true);
@@ -113,10 +120,10 @@ export default function ProfitManagement() {
       await loadProfits();
       setSelectedLoanId('');
       setShowDistributeModal(false);
-      alert('Profits allocated successfully and accumulated if already present.');
+      showNotification('Profits allocated successfully and accumulated if already present.', 'success');
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Failed to allocate profits');
+      showNotification(err.message || 'Failed to allocate profits', 'error');
     } finally {
       setLoading(false);
     }
@@ -148,10 +155,10 @@ export default function ProfitManagement() {
       await Promise.all(depositPromises);
       await loadMembers();
       await loadProfits();
-      alert('Allocated profits successfully deposited to member accounts!');
+      showNotification('Allocated profits successfully deposited to member accounts!', 'success');
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Failed to deposit profits');
+      showNotification(err.message || 'Failed to deposit profits', 'error');
     } finally {
       setLoading(false);
     }
@@ -222,7 +229,6 @@ export default function ProfitManagement() {
 
   // --------------------- DISPLAY ACCUMULATED PROFITS ---------------------
   const displayList = members.map((member) => {
-    // Sum all profits for this member
     const memberProfits = profits.filter((p) => p.member_id === member.id);
     const totalProfit = memberProfits.reduce((sum, p) => sum + Number(p.profit_amount || 0), 0);
     const latestProfit = memberProfits.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
@@ -239,6 +245,17 @@ export default function ProfitManagement() {
 
   return (
     <div className="p-4">
+      {/* --------------------- NOTIFICATION TOAST --------------------- */}
+      {notification && (
+        <div
+          className={`fixed top-4 right-4 px-4 py-2 rounded-lg shadow-md text-white font-medium z-50 transition-all transform ${
+            notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+          } animate-fadeInOut`}
+        >
+          {notification.message}
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Profit Management</h2>
         <div className="flex gap-3">
@@ -258,6 +275,7 @@ export default function ProfitManagement() {
         </div>
       </div>
 
+      {/* ---------- TABLE ---------- */}
       <div className="bg-white rounded-2xl card-shadow overflow-hidden shadow-md">
         <div className="overflow-x-auto">
           <table className="w-full min-w-max">
@@ -353,6 +371,21 @@ export default function ProfitManagement() {
       )}
 
       {showReceiptModal && <ProfitReceiptModal />}
+
+      {/* ---------- TOAST ANIMATION ---------- */}
+      <style>
+        {`
+          @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-10px); }
+            10% { opacity: 1; transform: translateY(0); }
+            90% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-10px); }
+          }
+          .animate-fadeInOut {
+            animation: fadeInOut 3s ease forwards;
+          }
+        `}
+      </style>
     </div>
   );
 }
