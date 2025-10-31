@@ -94,37 +94,21 @@ export default function ProfitManagement() {
       );
       if (totalBalances === 0) throw new Error('No balances to distribute profits to');
 
-      // UPSERT profits for each member, accumulating existing profits
-      const upsertPromises = members.map(async (member) => {
+      // ---------------- RPC-based accumulation ----------------
+      const rpcPromises = members.map((member) => {
         const memberShare = (Number(member.account_balance || 0) / totalBalances) * profitAmount;
-        if (memberShare <= 0) return;
+        if (memberShare <= 0) return null;
 
-        // Find existing profit for this member + loan
-        const existing = profits.find(p => p.member_id === member.id && p.loan_id === selectedLoanId);
-        const newProfitAmount = existing ? existing.profit_amount + memberShare : memberShare;
-
-        const { error } = await supabase
-          .from('profits')
-          .upsert(
-            {
-              member_id: member.id,
-              loan_id: selectedLoanId,
-              full_name: member.full_name,
-              profit_amount: newProfitAmount,
-              recorded_by: profile?.id,
-              status: 'allocated',
-              created_at: existing ? existing.created_at : new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            {
-              onConflict: ['member_id', 'loan_id'], 
-              ignoreDuplicates: false,
-            }
-          );
-        if (error) throw error;
+        return supabase.rpc('upsert_profit_accumulate', {
+          p_member_id: member.id,
+          p_loan_id: selectedLoanId,
+          p_full_name: member.full_name,
+          p_profit_amount: memberShare,
+          p_recorded_by: profile?.id
+        });
       });
 
-      await Promise.all(upsertPromises);
+      await Promise.all(rpcPromises);
 
       await loadProfits();
       setSelectedLoanId('');
@@ -236,15 +220,20 @@ export default function ProfitManagement() {
     );
   };
 
-  const displayList = members.map((m) => {
-    const profit = profits.find((p) => p.member_id === m.id);
+  // --------------------- DISPLAY ACCUMULATED PROFITS ---------------------
+  const displayList = members.map((member) => {
+    // Sum all profits for this member
+    const memberProfits = profits.filter((p) => p.member_id === member.id);
+    const totalProfit = memberProfits.reduce((sum, p) => sum + Number(p.profit_amount || 0), 0);
+    const latestProfit = memberProfits.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
     return {
-      ...m,
-      profit_amount: profit?.profit_amount ?? 0,
-      status: profit?.status ?? 'Not allocated',
-      profit_id: profit?.id ?? null,
-      loan_id: profit?.loan_id ?? '-',
-      created_at: profit?.created_at ?? new Date().toISOString(),
+      ...member,
+      profit_amount: totalProfit,
+      status: latestProfit?.status ?? 'Not allocated',
+      profit_id: latestProfit?.id ?? null,
+      loan_id: latestProfit?.loan_id ?? '-',
+      created_at: latestProfit?.created_at ?? new Date().toISOString(),
     };
   });
 
