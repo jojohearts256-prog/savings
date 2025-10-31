@@ -25,7 +25,7 @@ export default function Reports() {
   useEffect(() => { loadMembers(); }, []);
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
-  // --- Load members directly from members table ---
+  // --- Load members directly from members table (leave as is) ---
   const loadMembers = async () => {
     const { data, error } = await supabase
       .from('members')
@@ -41,8 +41,9 @@ export default function Reports() {
     else if (reportType === 'member' && selectedMemberId) await fetchMemberReport();
   };
 
+  // --- FIXED Monthly Report ---
   const fetchMonthlyReport = async () => {
-    const monthStart = selectedMonth + '-01';
+    const monthStart = selectedMonth; // 'YYYY-MM'
     const { data, error } = await supabase.rpc('monthly_report', { report_month: monthStart });
     if (error) console.error('Monthly Report Error:', error);
     else setReportData(data?.[0] || null);
@@ -75,7 +76,6 @@ export default function Reports() {
   const formatCurrency = (amount: number) =>
     Number(amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' });
 
-  // --- FILTER FUNCTION ---
   const filterData = (data: any[], filter: string, fields: string[]) => {
     if (!data) return [];
     if (!filter) return data;
@@ -85,7 +85,6 @@ export default function Reports() {
     );
   };
 
-  // --- PAGINATION FUNCTION ---
   const paginate = (data: any[], page: number) => {
     if (!data) return [];
     const start = (page - 1) * pageSize;
@@ -153,7 +152,6 @@ export default function Reports() {
     doc.save(`${reportType}-detailed-report.pdf`);
   };
 
-  // --- TABLE COMPONENT ---
   const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
     const filtered = filterData(data, filter, fields);
     const paginated = paginate(filtered, page);
@@ -264,7 +262,7 @@ export default function Reports() {
               data={reportData.profits}
               filter={profitFilter}
               setFilter={setProfitFilter}
-              fields={['full_name', 'recorded_by', 'profit_amount']}
+              fields={['profit_amount', 'full_name', 'recorded_by']}
               page={pageProfits}
               setPage={setPageProfits}
             />
