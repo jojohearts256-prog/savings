@@ -25,12 +25,11 @@ export default function Reports() {
   useEffect(() => { loadMembers(); }, []);
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
-  // --- Load members directly from members table (leave as is) ---
+  // --- Load members ---
   const loadMembers = async () => {
     const { data, error } = await supabase
       .from('members')
       .select('id, full_name, member_number');
-
     if (error) console.error('Load Members Error:', error);
     else setMembers(data || []);
   };
@@ -41,9 +40,9 @@ export default function Reports() {
     else if (reportType === 'member' && selectedMemberId) await fetchMemberReport();
   };
 
-  // --- FIXED Monthly Report ---
+  // --- FIXED: Monthly report converts YYYY-MM to proper date ---
   const fetchMonthlyReport = async () => {
-    const monthStart = selectedMonth; // 'YYYY-MM'
+    const monthStart = selectedMonth + '-01'; // e.g., "2025-10-01"
     const { data, error } = await supabase.rpc('monthly_report', { report_month: monthStart });
     if (error) console.error('Monthly Report Error:', error);
     else setReportData(data?.[0] || null);
@@ -91,7 +90,6 @@ export default function Reports() {
     return data.slice(start, start + pageSize);
   };
 
-  // --- PDF EXPORT ---
   const downloadFullReportPDF = () => {
     if (!reportData) return;
     const doc = new jsPDF();
@@ -262,7 +260,7 @@ export default function Reports() {
               data={reportData.profits}
               filter={profitFilter}
               setFilter={setProfitFilter}
-              fields={['profit_amount', 'full_name', 'recorded_by']}
+              fields={['full_name', 'recorded_by']}
               page={pageProfits}
               setPage={setPageProfits}
             />
