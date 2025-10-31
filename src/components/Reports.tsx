@@ -16,6 +16,7 @@ export default function Reports() {
   const [loanFilter, setLoanFilter] = useState('');
   const [profitFilter, setProfitFilter] = useState('');
 
+  // Pagination state
   const [pageTransactions, setPageTransactions] = useState(1);
   const [pageLoans, setPageLoans] = useState(1);
   const [pageProfits, setPageProfits] = useState(1);
@@ -24,10 +25,12 @@ export default function Reports() {
   useEffect(() => { loadMembers(); }, []);
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
+  // --- Load members directly from members table ---
   const loadMembers = async () => {
     const { data, error } = await supabase
       .from('members')
-      .select('id, profiles(full_name)'); // <- correct syntax
+      .select('id, full_name, member_number'); // fields in members table only
+
     if (error) console.error('Load Members Error:', error);
     else setMembers(data || []);
   };
@@ -72,6 +75,7 @@ export default function Reports() {
   const formatCurrency = (amount: number) =>
     Number(amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' });
 
+  // --- FILTER FUNCTION ---
   const filterData = (data: any[], filter: string, fields: string[]) => {
     if (!data) return [];
     if (!filter) return data;
@@ -81,12 +85,14 @@ export default function Reports() {
     );
   };
 
+  // --- PAGINATION FUNCTION ---
   const paginate = (data: any[], page: number) => {
     if (!data) return [];
     const start = (page - 1) * pageSize;
     return data.slice(start, start + pageSize);
   };
 
+  // --- PDF EXPORT ---
   const downloadFullReportPDF = () => {
     if (!reportData) return;
     const doc = new jsPDF();
@@ -111,46 +117,44 @@ export default function Reports() {
 
     renderTable(
       'Transactions',
-      ['Date', 'Type', 'Amount (UGX)', 'Member', 'Recorded By', 'Created At'],
+      ['Date', 'Type', 'Amount (UGX)', 'Member', 'Recorded By'],
       reportData.transactions?.map((t: any) => [
-        new Date(t.transaction_date || t.date).toLocaleDateString(),
-        t.transaction_type || t.type,
-        formatCurrency(t.amount),
-        t.member_name || '-',
+        new Date(t.transaction_date).toLocaleDateString(),
+        t.transaction_type || '-',
+        formatCurrency(t.amount || 0),
+        t.full_name || '-',      // directly from members table
         t.recorded_by || '-',
-        new Date(t.created_at).toLocaleDateString(),
       ])
     );
 
     renderTable(
       'Loans',
-      ['Date', 'Amount Requested (UGX)', 'Amount Approved (UGX)', 'Status', 'Member', 'Recorded By', 'Created At'],
+      ['Date', 'Amount Requested (UGX)', 'Amount Approved (UGX)', 'Status', 'Member', 'Recorded By'],
       reportData.loans?.map((l: any) => [
-        new Date(l.requested_date || l.date).toLocaleDateString(),
-        formatCurrency(l.amount_requested),
+        new Date(l.requested_date).toLocaleDateString(),
+        formatCurrency(l.amount_requested || 0),
         formatCurrency(l.amount_approved || 0),
-        l.status,
-        l.member_name || '-',
+        l.status || '-',
+        l.full_name || '-',      // directly from members table
         l.recorded_by || '-',
-        new Date(l.created_at).toLocaleDateString(),
       ])
     );
 
     renderTable(
       'Profits',
-      ['Source', 'Profit Amount (UGX)', 'Member', 'Recorded By', 'Created At'],
+      ['Source', 'Profit Amount (UGX)', 'Member', 'Recorded By'],
       reportData.profits?.map((p: any) => [
-        p.source,
-        formatCurrency(p.profit_amount),
-        p.member_name || '-',
+        p.source || '-',
+        formatCurrency(p.profit_amount || 0),
+        p.full_name || '-',      // directly from members table
         p.recorded_by || '-',
-        new Date(p.created_at).toLocaleDateString(),
       ])
     );
 
     doc.save(`${reportType}-detailed-report.pdf`);
   };
 
+  // --- TABLE COMPONENT ---
   const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
     const filtered = filterData(data, filter, fields);
     const paginated = paginate(filtered, page);
@@ -200,6 +204,7 @@ export default function Reports() {
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Reports & Analytics</h2>
       <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
+        {/* Report Filters */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
@@ -214,7 +219,7 @@ export default function Reports() {
           {reportType === 'member' && (
             <select value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)}>
               <option value="">Select Member</option>
-              {members.map(m => <option key={m.id} value={m.id}>{m.profiles.full_name}</option>)}
+              {members.map(m => <option key={m.id} value={m.id}>{m.full_name} ({m.member_number})</option>)}
             </select>
           )}
         </div>
@@ -227,19 +232,21 @@ export default function Reports() {
 
       {reportData && (
         <div>
+          {/* Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {Object.keys(reportData).filter(k => typeof reportData[k] !== 'object').map(key => (
               <StatCard key={key} label={key.replace(/_/g, ' ')} value={reportData[key]} icon={TrendingUp} color="bg-[#008080]" />
             ))}
           </div>
 
+          {/* Tables with Pagination */}
           {reportData.transactions?.length > 0 && (
             <TableWithPagination
               title="Transactions"
               data={reportData.transactions}
               filter={transactionFilter}
               setFilter={setTransactionFilter}
-              fields={['transaction_type', 'member_name', 'recorded_by']}
+              fields={['transaction_type', 'full_name', 'recorded_by']}
               page={pageTransactions}
               setPage={setPageTransactions}
             />
@@ -250,7 +257,7 @@ export default function Reports() {
               data={reportData.loans}
               filter={loanFilter}
               setFilter={setLoanFilter}
-              fields={['status', 'member_name', 'recorded_by']}
+              fields={['status', 'full_name', 'recorded_by']}
               page={pageLoans}
               setPage={setPageLoans}
             />
@@ -261,7 +268,7 @@ export default function Reports() {
               data={reportData.profits}
               filter={profitFilter}
               setFilter={setProfitFilter}
-              fields={['source', 'member_name', 'recorded_by']}
+              fields={['source', 'full_name', 'recorded_by']}
               page={pageProfits}
               setPage={setPageProfits}
             />
