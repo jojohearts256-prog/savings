@@ -12,135 +12,81 @@ export default function Reports() {
   const [members, setMembers] = useState<any[]>([]);
   const [reportData, setReportData] = useState<any>(null);
 
+  // Load all members for selection
   useEffect(() => { loadMembers(); }, []);
+
+  // Whenever filters change, fetch report
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
+  // --- Load members ---
   const loadMembers = async () => {
-    const { data } = await supabase.from('members').select('*, profiles(*)');
-    setMembers(data || []);
+    const { data, error } = await supabase.from('members').select('id, member_number, profiles!inner(id, full_name)');
+    if (error) console.error('Load Members Error:', error);
+    else setMembers(data || []);
   };
 
+  // --- Generate report ---
   const generateReport = async () => {
-    if (reportType === 'monthly') await generateMonthlyReport();
-    else if (reportType === 'yearly') await generateYearlyReport();
-    else if (reportType === 'member' && selectedMemberId) await generateMemberReport();
+    if (reportType === 'monthly') await fetchMonthlyReport();
+    else if (reportType === 'yearly') await fetchYearlyReport();
+    else if (reportType === 'member' && selectedMemberId) await fetchMemberReport();
   };
 
-  // --- Report Generators ---
-  const generateMonthlyReport = async () => {
-    const startDate = new Date(selectedMonth + '-01');
-    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
-    const [transactionsRes, loansRes, membersRes] = await Promise.all([
-      supabase.from('transactions').select('*').gte('transaction_date', startDate.toISOString()).lte('transaction_date', endDate.toISOString()),
-      supabase.from('loans').select('*').gte('requested_date', startDate.toISOString()).lte('requested_date', endDate.toISOString()),
-      supabase.from('members').select('*, profiles(*)'),
-    ]);
-    const transactions = transactionsRes.data || [];
-    const loans = loansRes.data || [];
-    const members = membersRes.data || [];
-    const deposits = transactions.filter(t => t.transaction_type === 'deposit');
-    const withdrawals = transactions.filter(t => t.transaction_type === 'withdrawal');
-    const contributions = transactions.filter(t => t.transaction_type === 'contribution');
-
-    setReportData({
-      period: startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-      totalDeposits: deposits.reduce((sum, t) => sum + Number(t.amount), 0),
-      totalWithdrawals: withdrawals.reduce((sum, t) => sum + Number(t.amount), 0),
-      totalContributions: contributions.reduce((sum, t) => sum + Number(t.amount), 0),
-      transactionCount: transactions.length,
-      loansRequested: loans.length,
-      loansApproved: loans.filter(l => l.status === 'approved' || l.status === 'disbursed').length,
-      totalLoanAmount: loans.filter(l => l.status !== 'rejected').reduce((sum, l) => sum + Number(l.amount_approved || l.amount_requested), 0),
-      currentBalance: members.reduce((sum, m) => sum + Number(m.account_balance), 0),
-      members,
-      transactions,
-      loans,
-    });
+  // --- Fetch Monthly Report ---
+  const fetchMonthlyReport = async () => {
+    const monthStart = selectedMonth + '-01';
+    const { data, error } = await supabase.rpc('monthly_report', { report_month: monthStart });
+    if (error) console.error('Monthly Report Error:', error);
+    else setReportData(data?.[0] || null);
   };
 
-  const generateYearlyReport = async () => {
-    const startDate = new Date(`${selectedYear}-01-01`);
-    const endDate = new Date(`${selectedYear}-12-31`);
-    const [transactionsRes, loansRes, membersRes] = await Promise.all([
-      supabase.from('transactions').select('*').gte('transaction_date', startDate.toISOString()).lte('transaction_date', endDate.toISOString()),
-      supabase.from('loans').select('*').gte('requested_date', startDate.toISOString()).lte('requested_date', endDate.toISOString()),
-      supabase.from('members').select('*, profiles(*)'),
-    ]);
-    const transactions = transactionsRes.data || [];
-    const loans = loansRes.data || [];
-    const members = membersRes.data || [];
-
-    setReportData({
-      period: selectedYear,
-      totalDeposits: transactions.filter(t => t.transaction_type === 'deposit').reduce((sum, t) => sum + Number(t.amount), 0),
-      totalWithdrawals: transactions.filter(t => t.transaction_type === 'withdrawal').reduce((sum, t) => sum + Number(t.amount), 0),
-      totalContributions: transactions.filter(t => t.transaction_type === 'contribution').reduce((sum, t) => sum + Number(t.amount), 0),
-      transactionCount: transactions.length,
-      loansRequested: loans.length,
-      loansApproved: loans.filter(l => l.status === 'approved' || l.status === 'disbursed').length,
-      loansCompleted: loans.filter(l => l.status === 'completed').length,
-      totalLoanAmount: loans.filter(l => l.status !== 'rejected').reduce((sum, l) => sum + Number(l.amount_approved || l.amount_requested), 0),
-      currentBalance: members.reduce((sum, m) => sum + Number(m.account_balance), 0),
-      totalContributionsAllTime: members.reduce((sum, m) => sum + Number(m.total_contributions), 0),
-      members,
-      transactions,
-      loans,
-    });
+  // --- Fetch Yearly Report ---
+  const fetchYearlyReport = async () => {
+    const { data, error } = await supabase.rpc('yearly_report', { report_year: parseInt(selectedYear) });
+    if (error) console.error('Yearly Report Error:', error);
+    else setReportData(data?.[0] || null);
   };
 
-  const generateMemberReport = async () => {
-    const [memberRes, transactionsRes, loansRes] = await Promise.all([
-      supabase.from('members').select('*, profiles(*)').eq('id', selectedMemberId).maybeSingle(),
-      supabase.from('transactions').select('*').eq('member_id', selectedMemberId).order('transaction_date', { ascending: false }),
-      supabase.from('loans').select('*').eq('member_id', selectedMemberId).order('requested_date', { ascending: false }),
-    ]);
-    const member = memberRes.data;
-    const transactions = transactionsRes.data || [];
-    const loans = loansRes.data || [];
-
-    if (member) {
-      setReportData({
-        member,
-        transactions,
-        loans,
-        totalDeposits: transactions.filter(t => t.transaction_type === 'deposit').reduce((sum, t) => sum + Number(t.amount), 0),
-        totalWithdrawals: transactions.filter(t => t.transaction_type === 'withdrawal').reduce((sum, t) => sum + Number(t.amount), 0),
-        totalContributions: Number(member.total_contributions),
-        activeLoans: loans.filter(l => l.status === 'disbursed').length,
-        completedLoans: loans.filter(l => l.status === 'completed').length,
-      });
-    }
+  // --- Fetch Member Report ---
+  const fetchMemberReport = async () => {
+    const { data, error } = await supabase.rpc('member_report', { member_id_input: selectedMemberId });
+    if (error) console.error('Member Report Error:', error);
+    else setReportData(data?.[0] || null);
   };
 
-  // --- PDF Download for individual metrics ---
+  // --- PDF Download for Metrics ---
   const downloadMetricPDF = (label: string, value: any) => {
     if (!reportData) return;
-
     const doc = new jsPDF();
     doc.setFontSize(18);
     doc.text(`${label} Report`, 14, 22);
-
-    const printableValue = typeof value === 'number' ? value.toLocaleString() : value;
-
     doc.autoTable({
       startY: 30,
       head: [['Metric', 'Value']],
-      body: [[label, printableValue]],
+      body: [[label, value]],
     });
-
     doc.save(`${label.replace(/\s+/g, '-')}-report.pdf`);
   };
 
-  // --- CSV Download for individual metrics ---
-  const downloadMetricCSV = (label: string, value: any) => {
-    const csvContent = `Metric,Value\n${label},${value}`;
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${label.replace(/\s+/g, '-')}-report.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  // --- PDF Download Full Report ---
+  const downloadFullReportPDF = () => {
+    if (!reportData) return;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(`${reportType === 'member' ? reportData.full_name : reportData.period} Detailed Report`, 14, 22);
+
+    let yOffset = 30;
+
+    // --- Summary Table ---
+    const summaryRows = Object.keys(reportData).filter(k => typeof reportData[k] !== 'object').map(k => [k.replace(/_/g,' '), reportData[k]]);
+    doc.autoTable({
+      startY: yOffset,
+      head: [['Metric', 'Value']],
+      body: summaryRows,
+    });
+    yOffset = (doc as any).lastAutoTable.finalY + 10;
+
+    doc.save(`${reportType}-detailed-report.pdf`);
   };
 
   // --- StatCard Component ---
@@ -153,22 +99,13 @@ export default function Reports() {
         <span className="text-sm font-medium text-gray-600">{label}</span>
       </div>
       <p className="text-2xl font-bold text-gray-800">{value}</p>
-      <div className="absolute top-3 right-3 flex gap-1">
-        <button
-          onClick={() => downloadMetricPDF(label, value)}
-          className="p-1 rounded-full bg-gray-200 hover:bg-gray-300"
-          title={`Download ${label} PDF`}
-        >
-          <Download className="w-4 h-4 text-gray-700" />
-        </button>
-        <button
-          onClick={() => downloadMetricCSV(label, value)}
-          className="p-1 rounded-full bg-gray-200 hover:bg-gray-300"
-          title={`Download ${label} CSV`}
-        >
-          <FileText className="w-4 h-4 text-gray-700" />
-        </button>
-      </div>
+      <button
+        onClick={() => downloadMetricPDF(label, value)}
+        className="absolute top-3 right-3 p-1 rounded-full bg-gray-200 hover:bg-gray-300"
+        title={`Download ${label} PDF`}
+      >
+        <Download className="w-4 h-4 text-gray-700" />
+      </button>
     </div>
   );
 
@@ -220,7 +157,7 @@ export default function Reports() {
 
         {/* Full Download Button */}
         {reportData && (
-          <button onClick={() => { downloadFullReportPDF(); downloadFullReportCSV(); }} className="px-4 py-2 rounded-xl bg-[#008080] text-white hover:bg-teal-700">
+          <button onClick={downloadFullReportPDF} className="px-4 py-2 rounded-xl bg-[#008080] text-white hover:bg-teal-700">
             <Download className="inline w-4 h-4 mr-2" /> Download Detailed Report
           </button>
         )}
@@ -229,54 +166,22 @@ export default function Reports() {
       {/* Reports */}
       {reportData && (
         <div>
-          {(reportType === 'monthly' || reportType === 'yearly') && (
-            <div>
-              <h3 className="text-xl font-bold text-gray-800 mb-4">{reportData.period} Report</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="Total Deposits" value={reportData.totalDeposits} icon={TrendingUp} color="bg-green-500" />
-                <StatCard label="Total Withdrawals" value={reportData.totalWithdrawals} icon={TrendingUp} color="bg-red-500" />
-                <StatCard label="Total Contributions" value={reportData.totalContributions} icon={TrendingUp} color="bg-blue-500" />
-                <StatCard label="Current Balance" value={reportData.currentBalance} icon={TrendingUp} color="bg-[#008080]" />
-                <StatCard label="Transactions" value={reportData.transactionCount} icon={FileText} color="bg-[#ADD8E6]" />
-                <StatCard label="Loans Requested" value={reportData.loansRequested} icon={FileText} color="bg-yellow-500" />
-                <StatCard label="Loans Approved" value={reportData.loansApproved} icon={FileText} color="bg-green-500" />
-                <StatCard label="Total Loan Amount" value={reportData.totalLoanAmount} icon={TrendingUp} color="bg-[#008080]" />
-              </div>
-            </div>
-          )}
-
-          {reportType === 'member' && reportData.member && (
-            <div>
-              <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Member Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Name</p>
-                    <p className="font-semibold text-gray-800">{reportData.member.profiles.full_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Member Number</p>
-                    <p className="font-semibold text-gray-800">{reportData.member.member_number}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Current Balance</p>
-                    <p className="font-semibold text-[#008080] text-xl">${Number(reportData.member.account_balance).toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Total Contributions</p>
-                    <p className="font-semibold text-[#008080] text-xl">${Number(reportData.member.total_contributions).toLocaleString()}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <StatCard label="Total Deposits" value={reportData.totalDeposits} icon={TrendingUp} color="bg-green-500" />
-                <StatCard label="Total Withdrawals" value={reportData.totalWithdrawals} icon={TrendingUp} color="bg-red-500" />
-                <StatCard label="Active Loans" value={reportData.activeLoans} icon={FileText} color="bg-yellow-500" />
-                <StatCard label="Completed Loans" value={reportData.completedLoans} icon={FileText} color="bg-green-500" />
-              </div>
-            </div>
-          )}
+          <h3 className="text-xl font-bold text-gray-800 mb-4">
+            {reportType === 'member' ? reportData.full_name : reportData.period} Report
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Object.keys(reportData)
+              .filter(k => typeof reportData[k] !== 'object')
+              .map((key) => (
+                <StatCard
+                  key={key}
+                  label={key.replace(/_/g, ' ')}
+                  value={typeof reportData[key] === 'number' ? `$${reportData[key].toLocaleString()}` : reportData[key]}
+                  icon={TrendingUp}
+                  color="bg-[#008080]"
+                />
+              ))}
+          </div>
         </div>
       )}
     </div>
