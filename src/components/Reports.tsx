@@ -16,6 +16,7 @@ export default function Reports() {
   const [loanFilter, setLoanFilter] = useState('');
   const [profitFilter, setProfitFilter] = useState('');
 
+  // Pagination state
   const [pageTransactions, setPageTransactions] = useState(1);
   const [pageLoans, setPageLoans] = useState(1);
   const [pageProfits, setPageProfits] = useState(1);
@@ -24,10 +25,12 @@ export default function Reports() {
   useEffect(() => { loadMembers(); }, []);
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
+  // --- Load members directly from members table ---
   const loadMembers = async () => {
     const { data, error } = await supabase
       .from('members')
       .select('id, full_name, member_number');
+
     if (error) console.error('Load Members Error:', error);
     else setMembers(data || []);
   };
@@ -72,6 +75,7 @@ export default function Reports() {
   const formatCurrency = (amount: number) =>
     Number(amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' });
 
+  // --- FILTER FUNCTION ---
   const filterData = (data: any[], filter: string, fields: string[]) => {
     if (!data) return [];
     if (!filter) return data;
@@ -81,12 +85,14 @@ export default function Reports() {
     );
   };
 
+  // --- PAGINATION FUNCTION ---
   const paginate = (data: any[], page: number) => {
     if (!data) return [];
     const start = (page - 1) * pageSize;
     return data.slice(start, start + pageSize);
   };
 
+  // --- PDF EXPORT ---
   const downloadFullReportPDF = () => {
     if (!reportData) return;
     const doc = new jsPDF();
@@ -147,6 +153,7 @@ export default function Reports() {
     doc.save(`${reportType}-detailed-report.pdf`);
   };
 
+  // --- TABLE COMPONENT ---
   const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
     const filtered = filterData(data, filter, fields);
     const paginated = paginate(filtered, page);
@@ -257,7 +264,7 @@ export default function Reports() {
               data={reportData.profits}
               filter={profitFilter}
               setFilter={setProfitFilter}
-              fields={['full_name', 'recorded_by']}
+              fields={['full_name', 'recorded_by', 'profit_amount']}
               page={pageProfits}
               setPage={setPageProfits}
             />
