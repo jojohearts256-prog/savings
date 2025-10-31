@@ -12,27 +12,21 @@ export default function Reports() {
   const [members, setMembers] = useState<any[]>([]);
   const [reportData, setReportData] = useState<any>(null);
 
-  // Load all members for selection
   useEffect(() => { loadMembers(); }, []);
-
-  // Whenever filters change, fetch report
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
-  // --- Load members ---
   const loadMembers = async () => {
     const { data, error } = await supabase.from('members').select('id, member_number, profiles!inner(id, full_name)');
     if (error) console.error('Load Members Error:', error);
     else setMembers(data || []);
   };
 
-  // --- Generate report ---
   const generateReport = async () => {
     if (reportType === 'monthly') await fetchMonthlyReport();
     else if (reportType === 'yearly') await fetchYearlyReport();
     else if (reportType === 'member' && selectedMemberId) await fetchMemberReport();
   };
 
-  // --- Fetch Monthly Report ---
   const fetchMonthlyReport = async () => {
     const monthStart = selectedMonth + '-01';
     const { data, error } = await supabase.rpc('monthly_report', { report_month: monthStart });
@@ -40,35 +34,18 @@ export default function Reports() {
     else setReportData(data?.[0] || null);
   };
 
-  // --- Fetch Yearly Report ---
   const fetchYearlyReport = async () => {
     const { data, error } = await supabase.rpc('yearly_report', { report_year: parseInt(selectedYear) });
     if (error) console.error('Yearly Report Error:', error);
     else setReportData(data?.[0] || null);
   };
 
-  // --- Fetch Member Report ---
   const fetchMemberReport = async () => {
     const { data, error } = await supabase.rpc('member_report', { member_id_input: selectedMemberId });
     if (error) console.error('Member Report Error:', error);
     else setReportData(data?.[0] || null);
   };
 
-  // --- PDF Download for Metrics ---
-  const downloadMetricPDF = (label: string, value: any) => {
-    if (!reportData) return;
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text(`${label} Report`, 14, 22);
-    doc.autoTable({
-      startY: 30,
-      head: [['Metric', 'Value']],
-      body: [[label, value]],
-    });
-    doc.save(`${label.replace(/\s+/g, '-')}-report.pdf`);
-  };
-
-  // --- PDF Download Full Report ---
   const downloadFullReportPDF = () => {
     if (!reportData) return;
     const doc = new jsPDF();
@@ -86,10 +63,42 @@ export default function Reports() {
     });
     yOffset = (doc as any).lastAutoTable.finalY + 10;
 
+    // --- Transactions Table ---
+    if (reportData.transactions?.length > 0) {
+      doc.setFontSize(14);
+      doc.text('Transactions', 14, yOffset);
+      yOffset += 6;
+      doc.autoTable({
+        startY: yOffset,
+        head: [['Date', 'Type', 'Amount']],
+        body: reportData.transactions.map((t: any) => [
+          new Date(t.transaction_date).toLocaleDateString(),
+          t.transaction_type,
+          `$${Number(t.amount).toLocaleString()}`
+        ]),
+      });
+      yOffset = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // --- Loans Table ---
+    if (reportData.loans?.length > 0) {
+      doc.setFontSize(14);
+      doc.text('Loans', 14, yOffset);
+      yOffset += 6;
+      doc.autoTable({
+        startY: yOffset,
+        head: [['Date', 'Amount', 'Status']],
+        body: reportData.loans.map((l: any) => [
+          new Date(l.requested_date).toLocaleDateString(),
+          `$${Number(l.amount_approved || l.amount_requested).toLocaleString()}`,
+          l.status
+        ]),
+      });
+    }
+
     doc.save(`${reportType}-detailed-report.pdf`);
   };
 
-  // --- StatCard Component ---
   const StatCard = ({ label, value, icon: Icon, color }: any) => (
     <div className="bg-white rounded-xl p-4 card-shadow relative">
       <div className="flex items-center gap-3 mb-2">
@@ -99,13 +108,6 @@ export default function Reports() {
         <span className="text-sm font-medium text-gray-600">{label}</span>
       </div>
       <p className="text-2xl font-bold text-gray-800">{value}</p>
-      <button
-        onClick={() => downloadMetricPDF(label, value)}
-        className="absolute top-3 right-3 p-1 rounded-full bg-gray-200 hover:bg-gray-300"
-        title={`Download ${label} PDF`}
-      >
-        <Download className="w-4 h-4 text-gray-700" />
-      </button>
     </div>
   );
 
@@ -113,7 +115,6 @@ export default function Reports() {
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Reports & Analytics</h2>
 
-      {/* Filters */}
       <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div>
@@ -155,7 +156,6 @@ export default function Reports() {
           )}
         </div>
 
-        {/* Full Download Button */}
         {reportData && (
           <button onClick={downloadFullReportPDF} className="px-4 py-2 rounded-xl bg-[#008080] text-white hover:bg-teal-700">
             <Download className="inline w-4 h-4 mr-2" /> Download Detailed Report
@@ -163,13 +163,14 @@ export default function Reports() {
         )}
       </div>
 
-      {/* Reports */}
       {reportData && (
         <div>
           <h3 className="text-xl font-bold text-gray-800 mb-4">
             {reportType === 'member' ? reportData.full_name : reportData.period} Report
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+          {/* Metric Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {Object.keys(reportData)
               .filter(k => typeof reportData[k] !== 'object')
               .map((key) => (
@@ -182,6 +183,56 @@ export default function Reports() {
                 />
               ))}
           </div>
+
+          {/* Transactions Table */}
+          {reportData.transactions?.length > 0 && (
+            <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
+              <h4 className="text-lg font-bold mb-2">Transactions</h4>
+              <table className="min-w-full border-collapse border border-gray-300">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-300 px-2 py-1">Date</th>
+                    <th className="border border-gray-300 px-2 py-1">Type</th>
+                    <th className="border border-gray-300 px-2 py-1">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.transactions.map((t: any, i: number) => (
+                    <tr key={i}>
+                      <td className="border border-gray-300 px-2 py-1">{new Date(t.transaction_date).toLocaleDateString()}</td>
+                      <td className="border border-gray-300 px-2 py-1">{t.transaction_type}</td>
+                      <td className="border border-gray-300 px-2 py-1">${Number(t.amount).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Loans Table */}
+          {reportData.loans?.length > 0 && (
+            <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
+              <h4 className="text-lg font-bold mb-2">Loans</h4>
+              <table className="min-w-full border-collapse border border-gray-300">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-300 px-2 py-1">Date</th>
+                    <th className="border border-gray-300 px-2 py-1">Amount</th>
+                    <th className="border border-gray-300 px-2 py-1">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.loans.map((l: any, i: number) => (
+                    <tr key={i}>
+                      <td className="border border-gray-300 px-2 py-1">{new Date(l.requested_date).toLocaleDateString()}</td>
+                      <td className="border border-gray-300 px-2 py-1">${Number(l.amount_approved || l.amount_requested).toLocaleString()}</td>
+                      <td className="border border-gray-300 px-2 py-1">{l.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
