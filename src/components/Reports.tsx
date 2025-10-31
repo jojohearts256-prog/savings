@@ -27,7 +27,7 @@ export default function Reports() {
   const loadMembers = async () => {
     const { data, error } = await supabase
       .from('members')
-      .select('id, profiles!inner(full_name)');
+      .select('id, profiles(full_name)'); // <- correct syntax
     if (error) console.error('Load Members Error:', error);
     else setMembers(data || []);
   };
@@ -113,8 +113,8 @@ export default function Reports() {
       'Transactions',
       ['Date', 'Type', 'Amount (UGX)', 'Member', 'Recorded By', 'Created At'],
       reportData.transactions?.map((t: any) => [
-        new Date(t.transaction_date).toLocaleDateString(),
-        t.transaction_type,
+        new Date(t.transaction_date || t.date).toLocaleDateString(),
+        t.transaction_type || t.type,
         formatCurrency(t.amount),
         t.member_name || '-',
         t.recorded_by || '-',
@@ -126,7 +126,7 @@ export default function Reports() {
       'Loans',
       ['Date', 'Amount Requested (UGX)', 'Amount Approved (UGX)', 'Status', 'Member', 'Recorded By', 'Created At'],
       reportData.loans?.map((l: any) => [
-        new Date(l.requested_date).toLocaleDateString(),
+        new Date(l.requested_date || l.date).toLocaleDateString(),
         formatCurrency(l.amount_requested),
         formatCurrency(l.amount_approved || 0),
         l.status,
@@ -176,9 +176,9 @@ export default function Reports() {
           <tbody>
             {paginated.map((row: any, i: number) => (
               <tr key={i}>
-                {Object.entries(row).map(([key, val], idx) => (
+                {Object.values(row).map((val: any, idx) => (
                   <td key={idx} className="border border-gray-300 px-2 py-1">
-                    {key.includes('date') || key.includes('created_at') ? new Date(val).toLocaleDateString() : val}
+                    {val instanceof Date ? val.toLocaleDateString() : val}
                   </td>
                 ))}
               </tr>
