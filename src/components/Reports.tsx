@@ -16,7 +16,6 @@ export default function Reports() {
   const [loanFilter, setLoanFilter] = useState('');
   const [profitFilter, setProfitFilter] = useState('');
 
-  // Pagination state
   const [pageTransactions, setPageTransactions] = useState(1);
   const [pageLoans, setPageLoans] = useState(1);
   const [pageProfits, setPageProfits] = useState(1);
@@ -25,7 +24,7 @@ export default function Reports() {
   useEffect(() => { loadMembers(); }, []);
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
-  // --- Load members directly from members table ---
+  // --- Load members ---
   const loadMembers = async () => {
     const { data, error } = await supabase
       .from('members')
@@ -75,7 +74,6 @@ export default function Reports() {
   const formatCurrency = (amount: number) =>
     Number(amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' });
 
-  // --- FILTER FUNCTION ---
   const filterData = (data: any[], filter: string, fields: string[]) => {
     if (!data) return [];
     if (!filter) return data;
@@ -85,14 +83,12 @@ export default function Reports() {
     );
   };
 
-  // --- PAGINATION FUNCTION ---
   const paginate = (data: any[], page: number) => {
     if (!data) return [];
     const start = (page - 1) * pageSize;
     return data.slice(start, start + pageSize);
   };
 
-  // --- PDF EXPORT ---
   const downloadFullReportPDF = () => {
     if (!reportData) return;
     const doc = new jsPDF();
@@ -154,7 +150,6 @@ export default function Reports() {
     doc.save(`${reportType}-detailed-report.pdf`);
   };
 
-  // --- TABLE COMPONENT ---
   const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
     const filtered = filterData(data, filter, fields);
     const paginated = paginate(filtered, page);
@@ -204,7 +199,6 @@ export default function Reports() {
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Reports & Analytics</h2>
       <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
-        {/* Report Filters */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
@@ -232,14 +226,12 @@ export default function Reports() {
 
       {reportData && (
         <div>
-          {/* Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {Object.keys(reportData).filter(k => typeof reportData[k] !== 'object').map(key => (
               <StatCard key={key} label={key.replace(/_/g, ' ')} value={reportData[key]} icon={TrendingUp} color="bg-[#008080]" />
             ))}
           </div>
 
-          {/* Tables with Pagination */}
           {reportData.transactions?.length > 0 && (
             <TableWithPagination
               title="Transactions"
