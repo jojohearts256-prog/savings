@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { FileText, Download, TrendingUp } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -86,6 +85,22 @@ export default function Reports() {
     return data.slice(start, start + pageSize);
   };
 
+  // Function to generate PDF from table
+  const downloadPDF = (title: string, data: any[]) => {
+    if (!data || data.length === 0) return;
+    const doc = new jsPDF();
+    const columns = Object.keys(data[0]).map(key => ({ header: key.replace(/_/g, ' '), dataKey: key }));
+    doc.text(title, 14, 15);
+    (doc as any).autoTable({
+      startY: 20,
+      columns,
+      body: data,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [0, 191, 255], textColor: [0, 0, 0], fontStyle: 'normal' },
+    });
+    doc.save(`${title}.pdf`);
+  };
+
   const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
     const filtered = filterData(data, filter, fields);
     const paginated = paginate(filtered, page);
@@ -93,16 +108,24 @@ export default function Reports() {
 
     return (
       <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
-        <h4 className="text-lg font-bold mb-2 text-[#00BFFF]">{title}</h4> {/* Heading in Deep Sky Blue */}
+        <div className="flex justify-between items-center mb-2">
+          <h4 className="text-lg font-bold text-[#00BFFF]">{title}</h4>
+          <button
+            className="px-3 py-1 bg-[#00BFFF] text-black rounded-xl hover:bg-[#00d4ff]"
+            onClick={() => downloadPDF(title, filtered)}
+          >
+            Download PDF
+          </button>
+        </div>
         <input
           placeholder={`Search ${title}...`}
           value={filter}
           onChange={e => { setFilter(e.target.value); setPage(1); }}
           className="mb-2 w-full px-4 py-2 border rounded-xl"
-          style={{ borderColor: '#00BFFF' }} // Search border in Deep Sky Blue
+          style={{ borderColor: '#00BFFF', color: '#333', '::placeholder': { color: '#555' } }}
         />
         <table className="min-w-full border-collapse border border-gray-300">
-          <thead className="bg-[#00BFFF] text-black font-normal"> {/* Table header background in Deep Sky Blue, text black and thin */}
+          <thead className="bg-[#00BFFF] text-black font-normal">
             <tr>
               {Object.keys(paginated[0] || {}).map(key => (
                 <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g, ' ')}</th>
@@ -174,7 +197,7 @@ export default function Reports() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
-            <select value={reportType} onChange={e => setReportType(e.target.value as any)} className="w-full px-4 py-2 border border-[#00BFFF] rounded-xl">
+            <select value={reportType} onChange={e => setReportType(e.target.value as any)} className="w-full px-4 py-2 border border-gray-300 rounded-xl">
               <option value="monthly">Monthly Report</option>
               <option value="yearly">Yearly Report</option>
               <option value="member">Member Statement</option>
@@ -184,14 +207,14 @@ export default function Reports() {
           {reportType === 'monthly' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
-              <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border rounded-xl" style={{ borderColor: '#00BFFF' }} />
+              <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border border-[#00BFFF] rounded-xl" />
             </div>
           )}
 
           {reportType === 'yearly' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
-              <input type="number" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="w-full px-4 py-2 border rounded-xl" style={{ borderColor: '#00BFFF' }} />
+              <input type="number" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="w-full px-4 py-2 border border-[#00BFFF] rounded-xl" />
             </div>
           )}
 
@@ -203,8 +226,8 @@ export default function Reports() {
                 placeholder="Type member name..."
                 value={memberSearch}
                 onChange={e => handleMemberSearch(e.target.value)}
-                className="w-full px-4 py-2 border rounded-xl"
-                style={{ borderColor: '#00BFFF' }}
+                className="w-full px-4 py-2 border border-[#00BFFF] rounded-xl"
+                style={{ color: '#333', '::placeholder': { color: '#555' } }}
               />
 
               {members.length > 0 && memberSearch.trim() !== '' && (
