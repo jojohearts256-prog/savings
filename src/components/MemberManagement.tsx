@@ -225,7 +225,7 @@ export default function MemberManagement() {
     );
   };
 
-  // ---------------- Edit Member Modal ----------------
+  // ---------------- ✅ FIXED Edit Member Modal ----------------
   const EditMemberModal = ({ member, onClose }: any) => {
     const [formData, setFormData] = useState({
       full_name: member.full_name || '',
@@ -246,31 +246,29 @@ export default function MemberManagement() {
       setSuccess(false);
 
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({
-              user_id: member.profile_id,
-              full_name: formData.full_name,
-              email: formData.email,
-              phone: formData.phone,
-              id_number: formData.id_number,
-              role: 'member',
-              member_data: {
-                address: formData.address,
-                date_of_birth: formData.date_of_birth,
-              },
-            }),
-          }
-        );
+        // ✅ Update the profiles table
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            full_name: formData.full_name,
+            email: formData.email,
+            phone: formData.phone,
+          })
+          .eq('id', member.profile_id);
 
-        const result = await response.json();
-        if (!result.success) throw new Error(result.error || 'Update failed');
+        if (profileError) throw profileError;
+
+        // ✅ Update the members table
+        const { error: memberError } = await supabase
+          .from('members')
+          .update({
+            id_number: formData.id_number,
+            address: formData.address,
+            date_of_birth: formData.date_of_birth,
+          })
+          .eq('id', member.id);
+
+        if (memberError) throw memberError;
 
         await loadMembers();
         setSuccess(true);
