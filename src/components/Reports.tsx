@@ -26,7 +26,6 @@ export default function Reports() {
     generateReport();
   }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
-  // ✅ Generate report based on selected type
   const generateReport = async () => {
     if (reportType === 'monthly') await fetchMonthlyReport();
     else if (reportType === 'yearly') await fetchYearlyReport();
@@ -63,11 +62,11 @@ export default function Reports() {
     else setReportData(data?.[0] || null);
   };
 
-  // ✅ Search member autocomplete
+  // ✅ Member search autocomplete (instant, clears old report)
   const handleMemberSearch = async (value: string) => {
     setMemberSearch(value);
     setSelectedMemberId('');
-    setReportData(null); // clear old report
+    setReportData(null);
 
     if (!value.trim()) {
       setMembers([]);
@@ -83,7 +82,7 @@ export default function Reports() {
     if (!error) setMembers(data || []);
   };
 
-  // ✅ Utility functions for filtering and pagination
+  // ✅ Utility functions
   const filterData = (data: any[], filter: string, fields: string[]) => {
     if (!data) return [];
     if (!filter) return data;
@@ -106,7 +105,7 @@ export default function Reports() {
 
     return (
       <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
-        <h4 className="text-lg font-bold mb-2">{title}</h4>
+        <h4 className="text-lg font-bold mb-2 text-[#FF7F50]">{title}</h4>
         <input
           placeholder={`Search ${title}...`}
           value={filter}
@@ -169,7 +168,7 @@ export default function Reports() {
 
   const renderMonthSection = (month: string, data: any) => (
     <div key={month} className="mb-10">
-      <h2 className="text-2xl font-bold text-[#008080] mb-2">{month.toUpperCase()}</h2>
+      <h2 className="text-2xl font-bold mb-2 text-[#1E90FF]">{month.toUpperCase()}</h2>
       <hr className="border-t-2 border-gray-300 mb-4" />
 
       {data.transactions.length > 0 && <TableWithPagination title="Transactions" data={data.transactions} filter={transactionFilter} setFilter={setTransactionFilter} fields={['transaction_type', 'full_name', 'recorded_by']} page={pageTransactions} setPage={setPageTransactions} />}
