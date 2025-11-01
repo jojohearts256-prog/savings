@@ -121,7 +121,7 @@ export default function Reports() {
     );
   };
 
-  // Group all data under one month for yearly/member reports
+  // ✅ Only group for yearly/member
   const groupAllByMonth = (data: any) => {
     const monthsMap: Record<string, any> = {};
     const addItems = (items: any[], type: 'transactions' | 'loans' | 'profits', dateField: string) => {
@@ -230,11 +230,7 @@ export default function Reports() {
         <>
           {reportType === 'monthly' && renderMonthSection(
             new Date(selectedMonth + '-01').toLocaleString('default', { month: 'long', year: 'numeric' }),
-            {
-              transactions: reportData.transactions || [],
-              loans: reportData.loans || [],
-              profits: reportData.profits || [],
-            }
+            reportData
           )}
           {(reportType === 'yearly' || reportType === 'member') && renderAllMonths()}
         </>
