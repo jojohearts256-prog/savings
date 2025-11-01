@@ -111,7 +111,7 @@ export default function Reports() {
           className="mb-2 w-full px-4 py-2 border border-gray-300 rounded-xl"
         />
         <table className="min-w-full border-collapse border border-gray-300">
-          <thead className="bg-[#003366] text-white">
+          <thead className="bg-[#87CEEB] text-white">
             <tr>
               {Object.keys(paginated[0] || {}).map(key => (
                 <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g, ' ')}</th>
