@@ -22,9 +22,7 @@ export default function Reports() {
   const [pageProfits, setPageProfits] = useState(1);
   const pageSize = 5;
 
-  useEffect(() => {
-    generateReport();
-  }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
+  useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
   const generateReport = async () => {
     if (reportType === 'monthly') await fetchMonthlyReport();
@@ -41,12 +39,7 @@ export default function Reports() {
       setReportData(
         Array.isArray(data)
           ? data[0]
-          : {
-              ...data,
-              loans: data.loans || [],
-              profits: data.profits || [],
-              transactions: data.transactions || [],
-            }
+          : { ...data, loans: data.loans || [], profits: data.profits || [], transactions: data.transactions || [] }
       );
   };
 
@@ -67,10 +60,7 @@ export default function Reports() {
     setSelectedMemberId('');
     setReportData(null);
 
-    if (!value.trim()) {
-      setMembers([]);
-      return;
-    }
+    if (!value.trim()) { setMembers([]); return; }
 
     const { data, error } = await supabase
       .from('members')
@@ -111,7 +101,7 @@ export default function Reports() {
           className="mb-2 w-full px-4 py-2 border border-gray-300 rounded-xl"
         />
         <table className="min-w-full border-collapse border border-gray-300">
-          <thead className="bg-[#5AA0D1] text-black"> {/* Darker sky blue header with black text */}
+          <thead className="bg-[#3B82F6] text-black"> {/* Professional blue header with black text */}
             <tr>
               {Object.keys(paginated[0] || {}).map(key => (
                 <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g, ' ')}</th>
@@ -145,7 +135,6 @@ export default function Reports() {
 
   const groupAllByMonth = (data: any) => {
     const monthsMap: Record<string, any> = {};
-
     const addItems = (items: any[], type: 'transactions' | 'loans' | 'profits', dateField: string) => {
       if (!items) return;
       items.forEach((item: any) => {
@@ -155,19 +144,16 @@ export default function Reports() {
         monthsMap[month][type].push(item);
       });
     };
-
     addItems(data.transactions || [], 'transactions', 'transaction_date');
     addItems(data.loans || [], 'loans', 'requested_date');
     addItems(data.profits || [], 'profits', 'created_at');
-
     return monthsMap;
   };
 
   const renderMonthSection = (month: string, data: any) => (
     <div key={month} className="mb-10">
-      <h2 className="text-2xl font-bold mb-2 text-[#1E3A8A]">{month.toUpperCase()}</h2> {/* Dark blue month title */}
+      <h2 className="text-2xl font-bold mb-2 text-[#1E3A8A]">{month.toUpperCase()}</h2>
       <hr className="border-t-2 border-gray-300 mb-4" />
-
       {data.transactions.length > 0 && <TableWithPagination title="Transactions" data={data.transactions} filter={transactionFilter} setFilter={setTransactionFilter} fields={['transaction_type', 'full_name', 'recorded_by']} page={pageTransactions} setPage={setPageTransactions} />}
       {data.loans.length > 0 && <TableWithPagination title="Loans" data={data.loans} filter={loanFilter} setFilter={setLoanFilter} fields={['status', 'full_name', 'approved_by']} page={pageLoans} setPage={setPageLoans} />}
       {data.profits.length > 0 && <TableWithPagination title="Profits" data={data.profits} filter={profitFilter} setFilter={setProfitFilter} fields={['full_name', 'recorded_by']} page={pageProfits} setPage={setPageProfits} />}
@@ -225,11 +211,7 @@ export default function Reports() {
                     <li
                       key={m.id}
                       className="px-4 py-2 hover:bg-gray-200 cursor-pointer"
-                      onClick={() => {
-                        setSelectedMemberId(m.id);
-                        setMemberSearch(m.full_name);
-                        setMembers([]);
-                      }}
+                      onClick={() => { setSelectedMemberId(m.id); setMemberSearch(m.full_name); setMembers([]); }}
                     >
                       {m.full_name} ({m.member_number})
                     </li>
