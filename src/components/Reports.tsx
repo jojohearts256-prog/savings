@@ -93,7 +93,7 @@ export default function Reports() {
 
     return (
       <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
-        <h4 className="text-lg font-bold mb-2 text-[#1E3A8A]">{title}</h4> {/* Dark blue title */}
+        <h4 className="text-lg font-bold mb-2 text-[#00BFFF]">{title}</h4> {/* Heading in Deep Sky Blue */}
         <input
           placeholder={`Search ${title}...`}
           value={filter}
@@ -101,7 +101,7 @@ export default function Reports() {
           className="mb-2 w-full px-4 py-2 border border-gray-300 rounded-xl"
         />
         <table className="min-w-full border-collapse border border-gray-300">
-          <thead className="bg-[#3B82F6] text-black"> {/* Professional blue header with black text */}
+          <thead className="bg-[#00BFFF] text-white"> {/* Table header background in Deep Sky Blue */}
             <tr>
               {Object.keys(paginated[0] || {}).map(key => (
                 <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g, ' ')}</th>
@@ -152,7 +152,7 @@ export default function Reports() {
 
   const renderMonthSection = (month: string, data: any) => (
     <div key={month} className="mb-10">
-      <h2 className="text-2xl font-bold mb-2 text-[#1E3A8A]">{month.toUpperCase()}</h2>
+      <h2 className="text-2xl font-bold mb-2 text-[#00BFFF]">{month.toUpperCase()}</h2>
       <hr className="border-t-2 border-gray-300 mb-4" />
       {data.transactions.length > 0 && <TableWithPagination title="Transactions" data={data.transactions} filter={transactionFilter} setFilter={setTransactionFilter} fields={['transaction_type', 'full_name', 'recorded_by']} page={pageTransactions} setPage={setPageTransactions} />}
       {data.loans.length > 0 && <TableWithPagination title="Loans" data={data.loans} filter={loanFilter} setFilter={setLoanFilter} fields={['status', 'full_name', 'approved_by']} page={pageLoans} setPage={setPageLoans} />}
