@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { FileText, Download, TrendingUp } from 'lucide-react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 export default function Reports() {
   const [reportType, setReportType] = useState<'monthly' | 'yearly' | 'member'>('monthly');
@@ -10,7 +7,7 @@ export default function Reports() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [members, setMembers] = useState<any[]>([]);
-  const [reportData, setReportData] = useState<any>(null);
+  const [reportData, setReportData] = useState<any>({ transactions: [], loans: [], profits: [] });
 
   const [transactionFilter, setTransactionFilter] = useState('');
   const [loanFilter, setLoanFilter] = useState('');
@@ -26,52 +23,52 @@ export default function Reports() {
 
   const loadMembers = async () => {
     const { data, error } = await supabase.from('members').select('id, full_name, member_number');
-    if (error) console.error('Load Members Error:', error);
-    else setMembers(data || []);
+    if (!error) setMembers(data || []);
   };
 
   const generateReport = async () => {
     if (reportType === 'monthly') await fetchMonthlyReport();
     else if (reportType === 'yearly') await fetchYearlyReport();
     else if (reportType === 'member' && selectedMemberId) await fetchMemberReport();
+    else setReportData({ transactions: [], loans: [], profits: [] });
   };
 
   const fetchMonthlyReport = async () => {
     const monthStart = selectedMonth + '-01';
-    const { data, error } = await supabase.rpc('monthly_report', { report_month: monthStart });
-    if (error) console.error('Monthly Report Error:', error);
-    else setReportData({
-      transactions: data?.[0]?.transactions || [],
-      loans: data?.[0]?.loans || [],
-      profits: data?.[0]?.profits || [],
+    const { data } = await supabase.rpc('monthly_report', { report_month: monthStart });
+    const result = data?.[0] || {};
+    setReportData({
+      transactions: result.transactions || [],
+      loans: result.loans || [],
+      profits: result.profits || [],
     });
   };
 
   const fetchYearlyReport = async () => {
-    const { data, error } = await supabase.rpc('yearly_report', { report_year: parseInt(selectedYear) });
-    if (error) console.error('Yearly Report Error:', error);
-    else setReportData(data?.[0] || null);
+    const { data } = await supabase.rpc('yearly_report', { report_year: parseInt(selectedYear) });
+    setReportData(data?.[0] || { transactions: [], loans: [], profits: [] });
   };
 
   const fetchMemberReport = async () => {
-    const { data, error } = await supabase.rpc('member_report', { member_id_input: selectedMemberId });
-    if (error) console.error('Member Report Error:', error);
-    else setReportData(data?.[0] || null);
+    const { data } = await supabase.rpc('member_report', { member_id_input: selectedMemberId });
+    const result = data?.[0] || {};
+    setReportData({
+      transactions: result.transactions || [],
+      loans: result.loans || [],
+      profits: result.profits || [],
+    });
   };
 
   const filterData = (data: any[], filter: string, fields: string[]) => {
     if (!data) return [];
     if (!filter) return data;
-    const lowerFilter = filter.toLowerCase();
-    return data.filter(item =>
-      fields.some(field => (item[field] || '').toString().toLowerCase().includes(lowerFilter))
-    );
+    const lower = filter.toLowerCase();
+    return data.filter(item => fields.some(f => (item[f] || '').toString().toLowerCase().includes(lower)));
   };
 
   const paginate = (data: any[], page: number) => {
     if (!data) return [];
-    const start = (page - 1) * pageSize;
-    return data.slice(start, start + pageSize);
+    return data.slice((page - 1) * pageSize, page * pageSize);
   };
 
   const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
@@ -90,11 +87,7 @@ export default function Reports() {
         />
         <table className="min-w-full border-collapse border border-gray-300">
           <thead>
-            <tr>
-              {Object.keys(paginated[0] || {}).map(key => (
-                <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g, ' ')}</th>
-              ))}
-            </tr>
+            <tr>{Object.keys(paginated[0] || {}).map(key => <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g,' ')}</th>)}</tr>
           </thead>
           <tbody>
             {paginated.map((row: any, i: number) => (
@@ -112,30 +105,28 @@ export default function Reports() {
         </table>
         {totalPages > 1 && (
           <div className="flex justify-end mt-2 gap-2">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</button>
-            <span>{page} / {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>
+            <button onClick={() => setPage(p => Math.max(1,p-1))} disabled={page===1}>Prev</button>
+            <span>{page}/{totalPages}</span>
+            <button onClick={() => setPage(p => Math.min(totalPages,totalPages))} disabled={page===totalPages}>Next</button>
           </div>
         )}
       </div>
     );
   };
 
-  // ✅ Only group for yearly/member
   const groupAllByMonth = (data: any) => {
     const monthsMap: Record<string, any> = {};
-    const addItems = (items: any[], type: 'transactions' | 'loans' | 'profits', dateField: string) => {
+    const addItems = (items: any[], type: 'transactions'|'loans'|'profits', dateField: string) => {
       if (!items) return;
-      items.forEach((item: any) => {
-        const dateVal = item[dateField] || new Date().toISOString();
-        const month = new Date(dateVal).toLocaleString('default', { month: 'long', year: 'numeric' });
-        if (!monthsMap[month]) monthsMap[month] = { transactions: [], loans: [], profits: [] };
+      items.forEach(item => {
+        const month = new Date(item[dateField]||new Date()).toLocaleString('default', {month:'long', year:'numeric'});
+        if (!monthsMap[month]) monthsMap[month]={ transactions: [], loans: [], profits: [] };
         monthsMap[month][type].push(item);
       });
     };
-    addItems(data.transactions || [], 'transactions', 'transaction_date');
-    addItems(data.loans || [], 'loans', 'requested_date');
-    addItems(data.profits || [], 'profits', 'created_at');
+    addItems(data.transactions, 'transactions', 'transaction_date');
+    addItems(data.loans, 'loans', 'requested_date');
+    addItems(data.profits, 'profits', 'created_at');
     return monthsMap;
   };
 
@@ -143,46 +134,15 @@ export default function Reports() {
     <div key={month} className="mb-10">
       <h2 className="text-2xl font-bold text-[#008080] mb-2">{month.toUpperCase()}</h2>
       <hr className="border-t-2 border-gray-300 mb-4" />
-
-      {data.transactions.length > 0 && (
-        <TableWithPagination
-          title="Transactions"
-          data={data.transactions}
-          filter={transactionFilter}
-          setFilter={setTransactionFilter}
-          fields={['transaction_type', 'full_name', 'recorded_by']}
-          page={pageTransactions}
-          setPage={setPageTransactions}
-        />
-      )}
-      {data.loans.length > 0 && (
-        <TableWithPagination
-          title="Loans"
-          data={data.loans}
-          filter={loanFilter}
-          setFilter={setLoanFilter}
-          fields={['status', 'full_name', 'approved_by']}
-          page={pageLoans}
-          setPage={setPageLoans}
-        />
-      )}
-      {data.profits.length > 0 && (
-        <TableWithPagination
-          title="Profits"
-          data={data.profits}
-          filter={profitFilter}
-          setFilter={setProfitFilter}
-          fields={['full_name', 'recorded_by']}
-          page={pageProfits}
-          setPage={setPageProfits}
-        />
-      )}
+      {data.transactions?.length>0 && <TableWithPagination title="Transactions" data={data.transactions} filter={transactionFilter} setFilter={setTransactionFilter} fields={['transaction_type','full_name','recorded_by']} page={pageTransactions} setPage={setPageTransactions}/>}
+      {data.loans?.length>0 && <TableWithPagination title="Loans" data={data.loans} filter={loanFilter} setFilter={setLoanFilter} fields={['status','full_name','approved_by']} page={pageLoans} setPage={setPageLoans}/>}
+      {data.profits?.length>0 && <TableWithPagination title="Profits" data={data.profits} filter={profitFilter} setFilter={setProfitFilter} fields={['full_name','recorded_by']} page={pageProfits} setPage={setPageProfits}/>}
     </div>
   );
 
   const renderAllMonths = () => {
     const months = groupAllByMonth(reportData);
-    return Object.keys(months).map(month => renderMonthSection(month, months[month]));
+    return Object.keys(months).map(month=>renderMonthSection(month, months[month]));
   };
 
   return (
@@ -193,33 +153,33 @@ export default function Reports() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
-            <select value={reportType} onChange={e => setReportType(e.target.value as any)} className="w-full px-4 py-2 border border-gray-300 rounded-xl">
+            <select value={reportType} onChange={e=>setReportType(e.target.value as any)} className="w-full px-4 py-2 border border-gray-300 rounded-xl">
               <option value="monthly">Monthly Report</option>
               <option value="yearly">Yearly Report</option>
               <option value="member">Member Statement</option>
             </select>
           </div>
 
-          {reportType === 'monthly' && (
+          {reportType==='monthly' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
-              <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl" />
+              <input type="month" value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl"/>
             </div>
           )}
 
-          {reportType === 'yearly' && (
+          {reportType==='yearly' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
-              <input type="number" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl" />
+              <input type="number" value={selectedYear} onChange={e=>setSelectedYear(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl"/>
             </div>
           )}
 
-          {reportType === 'member' && (
+          {reportType==='member' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Select Member</label>
-              <select value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl">
+              <select value={selectedMemberId} onChange={e=>setSelectedMemberId(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl">
                 <option value="">Select Member</option>
-                {members.map(m => <option key={m.id} value={m.id}>{m.full_name} ({m.member_number})</option>)}
+                {members.map(m=><option key={m.id} value={m.id}>{m.full_name} ({m.member_number})</option>)}
               </select>
             </div>
           )}
@@ -228,11 +188,8 @@ export default function Reports() {
 
       {reportData && (
         <>
-          {reportType === 'monthly' && renderMonthSection(
-            new Date(selectedMonth + '-01').toLocaleString('default', { month: 'long', year: 'numeric' }),
-            reportData
-          )}
-          {(reportType === 'yearly' || reportType === 'member') && renderAllMonths()}
+          {reportType==='monthly' && renderMonthSection(new Date(selectedMonth+'-01').toLocaleString('default',{month:'long', year:'numeric'}), reportData)}
+          {(reportType==='yearly' || reportType==='member') && renderAllMonths()}
         </>
       )}
     </div>
