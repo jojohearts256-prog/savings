@@ -22,19 +22,16 @@ export default function Reports() {
   const [pageProfits, setPageProfits] = useState(1);
   const pageSize = 5;
 
-  useEffect(() => { loadMembers(); }, []);
-  useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
+  useEffect(() => {
+    generateReport();
+  }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
-  const loadMembers = async () => {
-    const { data, error } = await supabase.from('members').select('id, full_name, member_number');
-    if (error) console.error('Load Members Error:', error);
-    else setMembers(data || []);
-  };
-
+  // ✅ Generate report based on selected type
   const generateReport = async () => {
     if (reportType === 'monthly') await fetchMonthlyReport();
     else if (reportType === 'yearly') await fetchYearlyReport();
     else if (reportType === 'member' && selectedMemberId) await fetchMemberReport();
+    else setReportData(null);
   };
 
   const fetchMonthlyReport = async () => {
@@ -66,6 +63,27 @@ export default function Reports() {
     else setReportData(data?.[0] || null);
   };
 
+  // ✅ Search member autocomplete
+  const handleMemberSearch = async (value: string) => {
+    setMemberSearch(value);
+    setSelectedMemberId('');
+    setReportData(null); // clear old report
+
+    if (!value.trim()) {
+      setMembers([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('members')
+      .select('id, full_name, member_number')
+      .ilike('full_name', `%${value}%`)
+      .limit(10);
+
+    if (!error) setMembers(data || []);
+  };
+
+  // ✅ Utility functions for filtering and pagination
   const filterData = (data: any[], filter: string, fields: string[]) => {
     if (!data) return [];
     if (!filter) return data;
@@ -128,6 +146,7 @@ export default function Reports() {
     );
   };
 
+  // ✅ Group data by month
   const groupAllByMonth = (data: any) => {
     const monthsMap: Record<string, any> = {};
 
@@ -162,26 +181,6 @@ export default function Reports() {
   const renderAllMonths = () => {
     const months = groupAllByMonth(reportData);
     return Object.keys(months).map(month => renderMonthSection(month, months[month]));
-  };
-
-  // --- Member search input logic ---
-  const handleMemberSearch = async (value: string) => {
-    setMemberSearch(value);
-    setSelectedMemberId('');
-    setReportData(null); // clear old report immediately
-
-    if (!value) {
-      setMembers([]);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('members')
-      .select('id, full_name, member_number')
-      .ilike('full_name', `%${value}%`)
-      .limit(10); // always return suggestions as user types
-
-    if (!error) setMembers(data || []);
   };
 
   return (
@@ -224,7 +223,7 @@ export default function Reports() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl"
               />
 
-              {members.length > 0 && (
+              {members.length > 0 && memberSearch.trim() !== '' && (
                 <ul className="absolute z-50 bg-white border border-gray-300 w-full mt-1 max-h-48 overflow-y-auto rounded-xl shadow-lg">
                   {members.map((m) => (
                     <li
