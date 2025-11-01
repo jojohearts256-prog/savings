@@ -11,6 +11,7 @@ export default function Reports() {
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [members, setMembers] = useState<any[]>([]);
   const [reportData, setReportData] = useState<any>(null);
+  const [memberSearch, setMemberSearch] = useState('');
 
   const [transactionFilter, setTransactionFilter] = useState('');
   const [loanFilter, setLoanFilter] = useState('');
@@ -127,7 +128,6 @@ export default function Reports() {
     );
   };
 
-  // ✅ Group all data under one month
   const groupAllByMonth = (data: any) => {
     const monthsMap: Record<string, any> = {};
 
@@ -194,12 +194,49 @@ export default function Reports() {
           )}
 
           {reportType === 'member' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Select Member</label>
-              <select value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl">
-                <option value="">Select Member</option>
-                {members.map(m => <option key={m.id} value={m.id}>{m.full_name} ({m.member_number})</option>)}
-              </select>
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Search Member</label>
+              <input
+                type="text"
+                placeholder="Type member name..."
+                value={memberSearch}
+                onChange={async (e) => {
+                  const value = e.target.value;
+                  setMemberSearch(value);
+                  setSelectedMemberId(''); // reset selection
+
+                  if (value.length > 1) {
+                    const { data, error } = await supabase
+                      .from('members')
+                      .select('id, full_name, member_number')
+                      .ilike('full_name', `%${value}%`)
+                      .limit(5);
+
+                    if (!error) setMembers(data || []);
+                  } else {
+                    setMembers([]);
+                  }
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl"
+              />
+
+              {members.length > 0 && memberSearch.length > 1 && (
+                <ul className="absolute z-50 bg-white border border-gray-300 w-full mt-1 max-h-48 overflow-y-auto rounded-xl shadow-lg">
+                  {members.map((m) => (
+                    <li
+                      key={m.id}
+                      className="px-4 py-2 hover:bg-gray-200 cursor-pointer"
+                      onClick={() => {
+                        setSelectedMemberId(m.id);
+                        setMemberSearch(m.full_name);
+                        setMembers([]); // hide suggestions
+                      }}
+                    >
+                      {m.full_name} ({m.member_number})
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </div>
