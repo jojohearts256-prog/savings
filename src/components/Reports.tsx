@@ -40,12 +40,22 @@ export default function Reports() {
     else if (reportType === 'member' && selectedMemberId) await fetchMemberReport();
   };
 
-  // --- FIXED: Monthly report converts YYYY-MM to proper date ---
+  // --- ✅ FIXED Monthly Report ---
   const fetchMonthlyReport = async () => {
-    const monthStart = selectedMonth + '-01'; // e.g., "2025-10-01"
+    const monthStart = selectedMonth + '-01'; // e.g., "2025-11-01"
     const { data, error } = await supabase.rpc('monthly_report', { report_month: monthStart });
     if (error) console.error('Monthly Report Error:', error);
-    else setReportData(data?.[0] || null);
+    else
+      setReportData(
+        Array.isArray(data)
+          ? data[0]
+          : {
+              ...data,
+              loans: data.loans || [],
+              profits: data.profits || [],
+              transactions: data.transactions || [],
+            }
+      );
   };
 
   const fetchYearlyReport = async () => {
