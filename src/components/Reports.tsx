@@ -16,7 +16,6 @@ export default function Reports() {
   const [loanFilter, setLoanFilter] = useState('');
   const [profitFilter, setProfitFilter] = useState('');
 
-  // Pagination state
   const [pageTransactions, setPageTransactions] = useState(1);
   const [pageLoans, setPageLoans] = useState(1);
   const [pageProfits, setPageProfits] = useState(1);
@@ -25,11 +24,8 @@ export default function Reports() {
   useEffect(() => { loadMembers(); }, []);
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
-  // --- Load members ---
   const loadMembers = async () => {
-    const { data, error } = await supabase
-      .from('members')
-      .select('id, full_name, member_number');
+    const { data, error } = await supabase.from('members').select('id, full_name, member_number');
     if (error) console.error('Load Members Error:', error);
     else setMembers(data || []);
   };
@@ -40,9 +36,9 @@ export default function Reports() {
     else if (reportType === 'member' && selectedMemberId) await fetchMemberReport();
   };
 
-  // --- ✅ FIXED Monthly Report ---
+  // ✅ Fixed Monthly Report (Displays properly like Yearly)
   const fetchMonthlyReport = async () => {
-    const monthStart = selectedMonth + '-01'; // e.g., "2025-11-01"
+    const monthStart = selectedMonth + '-01';
     const { data, error } = await supabase.rpc('monthly_report', { report_month: monthStart });
     if (error) console.error('Monthly Report Error:', error);
     else
@@ -98,6 +94,18 @@ export default function Reports() {
     if (!data) return [];
     const start = (page - 1) * pageSize;
     return data.slice(start, start + pageSize);
+  };
+
+  // ✅ Group Data by Month for Yearly Report
+  const groupByMonth = (items: any[]) => {
+    if (!items) return {};
+    return items.reduce((acc: any, item: any) => {
+      const dateField = item.transaction_date || item.requested_date || item.created_at;
+      const month = new Date(dateField).toLocaleString('default', { month: 'long', year: 'numeric' });
+      if (!acc[month]) acc[month] = [];
+      acc[month].push(item);
+      return acc;
+    }, {});
   };
 
   const downloadFullReportPDF = () => {
@@ -242,7 +250,62 @@ export default function Reports() {
             ))}
           </div>
 
-          {reportData.transactions?.length > 0 && (
+          {/* ✅ Yearly report organized by months */}
+          {reportType === 'yearly' && reportData.transactions?.length > 0 && (
+            Object.entries(groupByMonth(reportData.transactions)).map(([month, data]) => (
+              <div key={month} className="mb-10">
+                <h3 className="text-xl font-bold text-[#008080] mb-3">{month}</h3>
+                <TableWithPagination
+                  title="Transactions"
+                  data={data}
+                  filter={transactionFilter}
+                  setFilter={setTransactionFilter}
+                  fields={['transaction_type', 'full_name', 'recorded_by']}
+                  page={pageTransactions}
+                  setPage={setPageTransactions}
+                />
+              </div>
+            ))
+          )}
+
+          {/* Same for loans */}
+          {reportType === 'yearly' && reportData.loans?.length > 0 && (
+            Object.entries(groupByMonth(reportData.loans)).map(([month, data]) => (
+              <div key={month} className="mb-10">
+                <h3 className="text-xl font-bold text-[#008080] mb-3">{month}</h3>
+                <TableWithPagination
+                  title="Loans"
+                  data={data}
+                  filter={loanFilter}
+                  setFilter={setLoanFilter}
+                  fields={['status', 'full_name', 'approved_by']}
+                  page={pageLoans}
+                  setPage={setPageLoans}
+                />
+              </div>
+            ))
+          )}
+
+          {/* Same for profits */}
+          {reportType === 'yearly' && reportData.profits?.length > 0 && (
+            Object.entries(groupByMonth(reportData.profits)).map(([month, data]) => (
+              <div key={month} className="mb-10">
+                <h3 className="text-xl font-bold text-[#008080] mb-3">{month}</h3>
+                <TableWithPagination
+                  title="Profits"
+                  data={data}
+                  filter={profitFilter}
+                  setFilter={setProfitFilter}
+                  fields={['full_name', 'recorded_by']}
+                  page={pageProfits}
+                  setPage={setPageProfits}
+                />
+              </div>
+            ))
+          )}
+
+          {/* ✅ Keep Monthly & Member views normal */}
+          {reportType !== 'yearly' && reportData.transactions?.length > 0 && (
             <TableWithPagination
               title="Transactions"
               data={reportData.transactions}
@@ -253,7 +316,7 @@ export default function Reports() {
               setPage={setPageTransactions}
             />
           )}
-          {reportData.loans?.length > 0 && (
+          {reportType !== 'yearly' && reportData.loans?.length > 0 && (
             <TableWithPagination
               title="Loans"
               data={reportData.loans}
@@ -264,7 +327,7 @@ export default function Reports() {
               setPage={setPageLoans}
             />
           )}
-          {reportData.profits?.length > 0 && (
+          {reportType !== 'yearly' && reportData.profits?.length > 0 && (
             <TableWithPagination
               title="Profits"
               data={reportData.profits}
