@@ -62,7 +62,6 @@ export default function Reports() {
     else setReportData(data?.[0] || null);
   };
 
-  // ✅ Member search autocomplete (instant, clears old report)
   const handleMemberSearch = async (value: string) => {
     setMemberSearch(value);
     setSelectedMemberId('');
@@ -82,7 +81,6 @@ export default function Reports() {
     if (!error) setMembers(data || []);
   };
 
-  // ✅ Utility functions
   const filterData = (data: any[], filter: string, fields: string[]) => {
     if (!data) return [];
     if (!filter) return data;
@@ -105,7 +103,7 @@ export default function Reports() {
 
     return (
       <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
-        <h4 className="text-lg font-bold mb-2 text-[#FF7F50]">{title}</h4>
+        <h4 className="text-lg font-bold mb-2 text-[#003366]">{title}</h4>
         <input
           placeholder={`Search ${title}...`}
           value={filter}
@@ -113,7 +111,7 @@ export default function Reports() {
           className="mb-2 w-full px-4 py-2 border border-gray-300 rounded-xl"
         />
         <table className="min-w-full border-collapse border border-gray-300">
-          <thead>
+          <thead className="bg-[#003366] text-white">
             <tr>
               {Object.keys(paginated[0] || {}).map(key => (
                 <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g, ' ')}</th>
@@ -122,7 +120,7 @@ export default function Reports() {
           </thead>
           <tbody>
             {paginated.map((row: any, i: number) => (
-              <tr key={i}>
+              <tr key={i} className={i % 2 === 0 ? 'bg-gray-50' : ''}>
                 {Object.entries(row).map(([key, val], idx) => (
                   <td key={idx} className="border border-gray-300 px-2 py-1">
                     {(key === 'transaction_date' || key === 'requested_date' || key === 'created_at') && val
@@ -145,7 +143,6 @@ export default function Reports() {
     );
   };
 
-  // ✅ Group data by month
   const groupAllByMonth = (data: any) => {
     const monthsMap: Record<string, any> = {};
 
@@ -168,7 +165,7 @@ export default function Reports() {
 
   const renderMonthSection = (month: string, data: any) => (
     <div key={month} className="mb-10">
-      <h2 className="text-2xl font-bold mb-2 text-[#1E90FF]">{month.toUpperCase()}</h2>
+      <h2 className="text-2xl font-bold mb-2 text-[#001F3F]">{month.toUpperCase()}</h2>
       <hr className="border-t-2 border-gray-300 mb-4" />
 
       {data.transactions.length > 0 && <TableWithPagination title="Transactions" data={data.transactions} filter={transactionFilter} setFilter={setTransactionFilter} fields={['transaction_type', 'full_name', 'recorded_by']} page={pageTransactions} setPage={setPageTransactions} />}
