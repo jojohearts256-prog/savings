@@ -164,6 +164,26 @@ export default function Reports() {
     return Object.keys(months).map(month => renderMonthSection(month, months[month]));
   };
 
+  // --- Member search input logic ---
+  const handleMemberSearch = async (value: string) => {
+    setMemberSearch(value);
+    setSelectedMemberId('');
+    setReportData(null); // clear old report immediately
+
+    if (!value) {
+      setMembers([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('members')
+      .select('id, full_name, member_number')
+      .ilike('full_name', `%${value}%`)
+      .limit(10); // always return suggestions as user types
+
+    if (!error) setMembers(data || []);
+  };
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Reports & Analytics</h2>
@@ -200,27 +220,11 @@ export default function Reports() {
                 type="text"
                 placeholder="Type member name..."
                 value={memberSearch}
-                onChange={async (e) => {
-                  const value = e.target.value;
-                  setMemberSearch(value);
-                  setSelectedMemberId(''); // reset selection
-
-                  if (value.length > 1) {
-                    const { data, error } = await supabase
-                      .from('members')
-                      .select('id, full_name, member_number')
-                      .ilike('full_name', `%${value}%`)
-                      .limit(5);
-
-                    if (!error) setMembers(data || []);
-                  } else {
-                    setMembers([]);
-                  }
-                }}
+                onChange={e => handleMemberSearch(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl"
               />
 
-              {members.length > 0 && memberSearch.length > 1 && (
+              {members.length > 0 && (
                 <ul className="absolute z-50 bg-white border border-gray-300 w-full mt-1 max-h-48 overflow-y-auto rounded-xl shadow-lg">
                   {members.map((m) => (
                     <li
@@ -229,7 +233,7 @@ export default function Reports() {
                       onClick={() => {
                         setSelectedMemberId(m.id);
                         setMemberSearch(m.full_name);
-                        setMembers([]); // hide suggestions
+                        setMembers([]);
                       }}
                     >
                       {m.full_name} ({m.member_number})
