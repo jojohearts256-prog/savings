@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { FileText, Download, TrendingUp } from 'lucide-react';
+import { Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 export default function Reports() {
   const [reportType, setReportType] = useState<'monthly' | 'yearly' | 'member'>('monthly');
@@ -19,9 +21,6 @@ export default function Reports() {
   const [pageLoans, setPageLoans] = useState(1);
   const [pageProfits, setPageProfits] = useState(1);
   const pageSize = 5;
-
-  // ---------------------- PRINT REFS ----------------------
-  const printRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
@@ -87,92 +86,63 @@ export default function Reports() {
     return data.slice(start, start + pageSize);
   };
 
-  // ---------------- PRINT / DOWNLOAD FUNCTION ----------------
-  const handlePrint = (key: string) => {
-    const content = printRefs.current[key];
-    if (!content) return;
+  // ----------------- DOWNLOAD ALL TABLES AS SINGLE PDF -----------------
+  const downloadFullPDF = () => {
+    if (!reportData) return alert("No report data available!");
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text(`${reportType.toUpperCase()} REPORT`, 14, 15);
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Report</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            table { border-collapse: collapse; width: 100%; }
-            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-            th { background-color: #70C1F2; color: #000; }
-            tr:nth-child(even) { background-color: #f2f2f2; }
-          </style>
-        </head>
-        <body>
-          ${content.innerHTML}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-  };
+    let yOffset = 20;
 
-  const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
-    const filtered = filterData(data, filter, fields);
-    const paginated = paginate(filtered, page);
-    const totalPages = Math.ceil(filtered.length / pageSize);
-    const key = title.replace(/\s+/g, '-');
+    const months = groupAllByMonth(reportData);
 
-    return (
-      <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
-        <div className="flex justify-between items-center mb-2">
-          <h4 className="text-lg font-bold text-[#70C1F2]">{title}</h4>
-          <button
-            className="px-3 py-1 bg-[#70C1F2] text-black rounded-xl hover:bg-[#5bb0e0] flex items-center gap-1"
-            onClick={() => handlePrint(key)}
-          >
-            <Download className="w-4 h-4" /> Print / Download
-          </button>
-        </div>
-        <input
-          placeholder={`Search ${title}...`}
-          value={filter}
-          onChange={e => { setFilter(e.target.value); setPage(1); }}
-          className="mb-2 w-full px-4 py-2 border border-[#70C1F2] rounded-xl placeholder-gray-500"
-        />
-        <div ref={el => (printRefs.current[key] = el)}>
-          <table className="min-w-full border-collapse border border-gray-300">
-            <thead className="bg-[#70C1F2] text-black font-normal">
-              <tr>
-                {Object.keys(paginated[0] || {}).map(key => (
-                  <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g, ' ')}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map((row: any, i: number) => (
-                <tr key={i} className={i % 2 === 0 ? 'bg-gray-50' : ''}>
-                  {Object.entries(row).map(([key, val], idx) => (
-                    <td key={idx} className="border border-gray-300 px-2 py-1">
-                      {(key === 'transaction_date' || key === 'requested_date' || key === 'created_at') && val
-                        ? new Date(val).toLocaleDateString()
-                        : val ?? '-'}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {totalPages > 1 && (
-          <div className="flex justify-end mt-2 gap-2">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</button>
-            <span>{page} / {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>
-          </div>
-        )}
-      </div>
-    );
+    Object.keys(months).forEach((month, monthIdx) => {
+      const data = months[month];
+
+      // Month header
+      doc.setFontSize(14);
+      doc.text(month.toUpperCase(), 14, yOffset);
+      yOffset += 6;
+
+      // Function to add a table (transactions, loans, profits)
+      const addTable = (title: string, tableData: any[], fields: string[]) => {
+        if (!tableData || tableData.length === 0) return;
+
+        const columns = fields.map(f => ({ header: f.replace(/_/g, ' '), dataKey: f }));
+
+        (doc as any).autoTable({
+          startY: yOffset,
+          head: [columns.map(c => c.header)],
+          body: tableData.map(row => fields.map(f => {
+            const val = row[f];
+            if ((f === 'transaction_date' || f === 'requested_date' || f === 'created_at') && val)
+              return new Date(val).toLocaleDateString();
+            return val ?? '-';
+          })),
+          theme: 'grid',
+          headStyles: { fillColor: [112, 193, 242], textColor: 0 },
+          styles: { fontSize: 10 },
+          margin: { left: 14, right: 14 },
+          didDrawPage: (dataArg: any) => {
+            yOffset = dataArg.cursor.y + 10;
+          }
+        });
+
+        yOffset = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 10 : yOffset + 10;
+      };
+
+      addTable('Transactions', data.transactions, ['transaction_type', 'full_name', 'recorded_by']);
+      addTable('Loans', data.loans, ['status', 'full_name', 'approved_by']);
+      addTable('Profits', data.profits, ['full_name', 'recorded_by']);
+
+      if (monthIdx < Object.keys(months).length - 1) {
+        yOffset += 5;
+      }
+    });
+
+    doc.save(`${reportType}_report.pdf`);
   };
 
   const groupAllByMonth = (data: any) => {
@@ -202,6 +172,55 @@ export default function Reports() {
     </div>
   );
 
+  const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
+    const filtered = filterData(data, filter, fields);
+    const paginated = paginate(filtered, page);
+    const totalPages = Math.ceil(filtered.length / pageSize);
+
+    return (
+      <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
+        <div className="flex justify-between items-center mb-2">
+          <h4 className="text-lg font-bold text-[#70C1F2]">{title}</h4>
+        </div>
+        <input
+          placeholder={`Search ${title}...`}
+          value={filter}
+          onChange={e => { setFilter(e.target.value); setPage(1); }}
+          className="mb-2 w-full px-4 py-2 border border-[#70C1F2] rounded-xl placeholder-gray-500"
+        />
+        <table className="min-w-full border-collapse border border-gray-300">
+          <thead className="bg-[#70C1F2] text-black font-normal">
+            <tr>
+              {Object.keys(paginated[0] || {}).map(key => (
+                <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g, ' ')}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {paginated.map((row: any, i: number) => (
+              <tr key={i} className={i % 2 === 0 ? 'bg-gray-50' : ''}>
+                {Object.entries(row).map(([key, val], idx) => (
+                  <td key={idx} className="border border-gray-300 px-2 py-1">
+                    {(key === 'transaction_date' || key === 'requested_date' || key === 'created_at') && val
+                      ? new Date(val).toLocaleDateString()
+                      : val ?? '-'}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {totalPages > 1 && (
+          <div className="flex justify-end mt-2 gap-2">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</button>
+            <span>{page} / {totalPages}</span>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderAllMonths = () => {
     const months = groupAllByMonth(reportData);
     return Object.keys(months).map(month => renderMonthSection(month, months[month]));
@@ -211,7 +230,7 @@ export default function Reports() {
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Reports & Analytics</h2>
 
-      <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
+      <div className="bg-white rounded-2xl card-shadow p-6 mb-6 flex justify-between items-center">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
@@ -263,6 +282,15 @@ export default function Reports() {
             </div>
           )}
         </div>
+
+        {reportData && (
+          <button
+            className="px-4 py-2 bg-[#70C1F2] text-black rounded-xl hover:bg-[#5bb0e0] flex items-center gap-1 h-12"
+            onClick={downloadFullPDF}
+          >
+            <Download className="w-5 h-5" /> Download Full Report
+          </button>
+        )}
       </div>
 
       {reportData && renderAllMonths()}
