@@ -98,8 +98,10 @@ export default function Reports() {
   const groupByMonth = (items: any[]) => {
     if (!items) return {};
     return items.reduce((acc: any, item: any) => {
-      const dateField = item.transaction_date || item.requested_date || item.created_at;
-      const month = new Date(dateField).toLocaleString('default', { month: 'long', year: 'numeric' });
+      const dateField = item.transaction_date || item.requested_date;
+      const month = dateField
+        ? new Date(dateField).toLocaleString('default', { month: 'long', year: 'numeric' })
+        : 'No Date';
       if (!acc[month]) acc[month] = [];
       acc[month].push(item);
       return acc;
@@ -118,7 +120,7 @@ export default function Reports() {
           placeholder={`Search ${title}...`}
           value={filter}
           onChange={e => { setFilter(e.target.value); setPage(1); }}
-          className="mb-2 w-full px-2 py-1 border border-gray-300 rounded-lg"
+          className="mb-2 w-full px-4 py-2 border border-gray-300 rounded-xl"
         />
         <table className="min-w-full border-collapse border border-gray-300">
           <thead>
@@ -131,9 +133,11 @@ export default function Reports() {
           <tbody>
             {paginated.map((row: any, i: number) => (
               <tr key={i}>
-                {Object.values(row).map((val: any, idx) => (
+                {Object.entries(row).map(([key, val], idx) => (
                   <td key={idx} className="border border-gray-300 px-2 py-1">
-                    {val instanceof Date ? val.toLocaleDateString() : val}
+                    {(key === 'transaction_date' || key === 'requested_date') && val
+                      ? new Date(val).toLocaleDateString()
+                      : val ?? '-'}
                   </td>
                 ))}
               </tr>
@@ -151,51 +155,16 @@ export default function Reports() {
     );
   };
 
-  // ✅ Combined monthly section renderer (transactions + loans + profits under one month)
   const renderMonthSection = (month: string, data: any) => (
     <div key={month} className="mb-10">
       <h2 className="text-2xl font-bold text-[#008080] mb-2">{month.toUpperCase()}</h2>
       <hr className="border-t-2 border-gray-300 mb-4" />
-
-      {data.transactions?.length > 0 && (
-        <TableWithPagination
-          title="Transactions"
-          data={data.transactions}
-          filter={transactionFilter}
-          setFilter={setTransactionFilter}
-          fields={['transaction_type', 'full_name', 'recorded_by']}
-          page={pageTransactions}
-          setPage={setPageTransactions}
-        />
-      )}
-
-      {data.loans?.length > 0 && (
-        <TableWithPagination
-          title="Loans"
-          data={data.loans}
-          filter={loanFilter}
-          setFilter={setLoanFilter}
-          fields={['status', 'full_name', 'approved_by']}
-          page={pageLoans}
-          setPage={setPageLoans}
-        />
-      )}
-
-      {data.profits?.length > 0 && (
-        <TableWithPagination
-          title="Profits"
-          data={data.profits}
-          filter={profitFilter}
-          setFilter={setProfitFilter}
-          fields={['full_name', 'recorded_by']}
-          page={pageProfits}
-          setPage={setPageProfits}
-        />
-      )}
+      {data.transactions?.length > 0 && <TableWithPagination title="Transactions" data={data.transactions} filter={transactionFilter} setFilter={setTransactionFilter} fields={['transaction_type', 'full_name', 'recorded_by']} page={pageTransactions} setPage={setPageTransactions} />}
+      {data.loans?.length > 0 && <TableWithPagination title="Loans" data={data.loans} filter={loanFilter} setFilter={setLoanFilter} fields={['status', 'full_name', 'approved_by']} page={pageLoans} setPage={setPageLoans} />}
+      {data.profits?.length > 0 && <TableWithPagination title="Profits" data={data.profits} filter={profitFilter} setFilter={setProfitFilter} fields={['full_name', 'recorded_by']} page={pageProfits} setPage={setPageProfits} />}
     </div>
   );
 
-  // ✅ For yearly/member reports → combine all data under each month
   const renderYearlyOrMemberGrouped = () => {
     const months = [
       ...new Set([
@@ -220,7 +189,7 @@ export default function Reports() {
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Reports & Analytics</h2>
 
       <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
             <select value={reportType} onChange={e => setReportType(e.target.value as any)} className="w-full px-4 py-2 border border-gray-300 rounded-xl">
@@ -229,26 +198,40 @@ export default function Reports() {
               <option value="member">Member Statement</option>
             </select>
           </div>
-          {reportType === 'monthly' && <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />}
-          {reportType === 'yearly' && <input type="number" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} />}
+
+          {reportType === 'monthly' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
+              <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl" />
+            </div>
+          )}
+
+          {reportType === 'yearly' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
+              <input type="number" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl" />
+            </div>
+          )}
+
           {reportType === 'member' && (
-            <select value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)}>
-              <option value="">Select Member</option>
-              {members.map(m => <option key={m.id} value={m.id}>{m.full_name} ({m.member_number})</option>)}
-            </select>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Select Member</label>
+              <select value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl">
+                <option value="">Select Member</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.full_name} ({m.member_number})</option>)}
+              </select>
+            </div>
           )}
         </div>
       </div>
 
       {reportData && (
         <div>
-          {/* ✅ Monthly Report (just one header) */}
           {reportType === 'monthly' && renderMonthSection(
             new Date(selectedMonth + '-01').toLocaleString('default', { month: 'long', year: 'numeric' }),
             reportData
           )}
 
-          {/* ✅ Yearly & Member Reports (grouped months) */}
           {(reportType === 'yearly' || reportType === 'member') && renderYearlyOrMemberGrouped()}
         </div>
       )}
