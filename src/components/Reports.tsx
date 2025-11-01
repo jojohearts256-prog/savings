@@ -5,8 +5,7 @@ export default function Reports() {
   const [reportType, setReportType] = useState<'monthly' | 'yearly' | 'member'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [selectedMemberId, setSelectedMemberId] = useState('');
-  const [members, setMembers] = useState<any[]>([]);
+  const [memberSearch, setMemberSearch] = useState('');
   const [reportData, setReportData] = useState<any>({ transactions: [], loans: [], profits: [] });
 
   const [transactionFilter, setTransactionFilter] = useState('');
@@ -18,18 +17,12 @@ export default function Reports() {
   const [pageProfits, setPageProfits] = useState(1);
   const pageSize = 5;
 
-  useEffect(() => { loadMembers(); }, []);
-  useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
-
-  const loadMembers = async () => {
-    const { data, error } = await supabase.from('members').select('id, full_name, member_number');
-    if (!error) setMembers(data || []);
-  };
+  useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, memberSearch]);
 
   const generateReport = async () => {
     if (reportType === 'monthly') await fetchMonthlyReport();
     else if (reportType === 'yearly') await fetchYearlyReport();
-    else if (reportType === 'member' && selectedMemberId) await fetchMemberReport();
+    else if (reportType === 'member' && memberSearch) await fetchMemberReport();
     else setReportData({ transactions: [], loans: [], profits: [] });
   };
 
@@ -50,8 +43,20 @@ export default function Reports() {
   };
 
   const fetchMemberReport = async () => {
-    const { data } = await supabase.rpc('member_report', { member_id_input: selectedMemberId });
-    const result = data?.[0] || {};
+    // Search member by name first
+    const { data: members, error: memberErr } = await supabase
+      .from('members')
+      .select('id')
+      .ilike('full_name', `%${memberSearch}%`)
+      .limit(1); // Take first matching member
+    if (memberErr || !members || members.length === 0) {
+      setReportData({ transactions: [], loans: [], profits: [] });
+      return;
+    }
+
+    const memberId = members[0].id;
+    const { data: report } = await supabase.rpc('member_report', { member_id_input: memberId });
+    const result = report?.[0] || {};
     setReportData({
       transactions: result.transactions || [],
       loans: result.loans || [],
@@ -176,11 +181,8 @@ export default function Reports() {
 
           {reportType==='member' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Select Member</label>
-              <select value={selectedMemberId} onChange={e=>setSelectedMemberId(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl">
-                <option value="">Select Member</option>
-                {members.map(m=><option key={m.id} value={m.id}>{m.full_name} ({m.member_number})</option>)}
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Search Member</label>
+              <input type="text" placeholder="Enter member name..." value={memberSearch} onChange={e=>setMemberSearch(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl"/>
             </div>
           )}
         </div>
