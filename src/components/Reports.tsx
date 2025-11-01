@@ -103,7 +103,7 @@ export default function Reports() {
 
     return (
       <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
-        <h4 className="text-lg font-bold mb-2 text-[#003366]">{title}</h4>
+        <h4 className="text-lg font-bold mb-2 text-[#1E3A8A]">{title}</h4> {/* Dark blue title */}
         <input
           placeholder={`Search ${title}...`}
           value={filter}
@@ -111,7 +111,7 @@ export default function Reports() {
           className="mb-2 w-full px-4 py-2 border border-gray-300 rounded-xl"
         />
         <table className="min-w-full border-collapse border border-gray-300">
-          <thead className="bg-[#87CEEB] text-white">
+          <thead className="bg-[#5AA0D1] text-black"> {/* Darker sky blue header with black text */}
             <tr>
               {Object.keys(paginated[0] || {}).map(key => (
                 <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g, ' ')}</th>
@@ -165,7 +165,7 @@ export default function Reports() {
 
   const renderMonthSection = (month: string, data: any) => (
     <div key={month} className="mb-10">
-      <h2 className="text-2xl font-bold mb-2 text-[#001F3F]">{month.toUpperCase()}</h2>
+      <h2 className="text-2xl font-bold mb-2 text-[#1E3A8A]">{month.toUpperCase()}</h2> {/* Dark blue month title */}
       <hr className="border-t-2 border-gray-300 mb-4" />
 
       {data.transactions.length > 0 && <TableWithPagination title="Transactions" data={data.transactions} filter={transactionFilter} setFilter={setTransactionFilter} fields={['transaction_type', 'full_name', 'recorded_by']} page={pageTransactions} setPage={setPageTransactions} />}
