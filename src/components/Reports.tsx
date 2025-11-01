@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { FileText, Download, TrendingUp } from 'lucide-react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 export default function Reports() {
   const [reportType, setReportType] = useState<'monthly' | 'yearly' | 'member'>('monthly');
@@ -21,6 +19,9 @@ export default function Reports() {
   const [pageLoans, setPageLoans] = useState(1);
   const [pageProfits, setPageProfits] = useState(1);
   const pageSize = 5;
+
+  // ---------------------- PRINT REFS ----------------------
+  const printRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   useEffect(() => { generateReport(); }, [reportType, selectedMonth, selectedYear, selectedMemberId]);
 
@@ -86,74 +87,83 @@ export default function Reports() {
     return data.slice(start, start + pageSize);
   };
 
-  // ===== PDF Download Function =====
-  const downloadPDF = (title: string, data: any[]) => {
-    if (!data || data.length === 0) {
-      alert("No data to download!");
-      return;
-    }
+  // ---------------- PRINT / DOWNLOAD FUNCTION ----------------
+  const handlePrint = (key: string) => {
+    const content = printRefs.current[key];
+    if (!content) return;
 
-    const doc = new jsPDF();
-    doc.setFontSize(14);
-    doc.text(title, 14, 15);
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
 
-    const columns = Object.keys(data[0]).map(key => ({ header: key.replace(/_/g, ' '), dataKey: key }));
-
-    (doc as any).autoTable({
-      startY: 20,
-      columns,
-      body: data,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [79, 195, 247], textColor: [0, 0, 0], fontStyle: 'normal' }, // Soft Blue #4FC3F7
-    });
-
-    doc.save(`${title}.pdf`);
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+            th { background-color: #70C1F2; color: #000; }
+            tr:nth-child(even) { background-color: #f2f2f2; }
+          </style>
+        </head>
+        <body>
+          ${content.innerHTML}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
   const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
     const filtered = filterData(data, filter, fields);
     const paginated = paginate(filtered, page);
     const totalPages = Math.ceil(filtered.length / pageSize);
+    const key = title.replace(/\s+/g, '-');
 
     return (
       <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
         <div className="flex justify-between items-center mb-2">
-          <h4 className="text-lg font-bold text-[#4FC3F7]">{title}</h4>
+          <h4 className="text-lg font-bold text-[#70C1F2]">{title}</h4>
           <button
-            className="px-3 py-1 bg-[#4FC3F7] text-black rounded-xl hover:bg-[#40b0e5]"
-            onClick={() => downloadPDF(title, filtered)}
+            className="px-3 py-1 bg-[#70C1F2] text-black rounded-xl hover:bg-[#5bb0e0] flex items-center gap-1"
+            onClick={() => handlePrint(key)}
           >
-            Download PDF
+            <Download className="w-4 h-4" /> Print / Download
           </button>
         </div>
         <input
           placeholder={`Search ${title}...`}
           value={filter}
           onChange={e => { setFilter(e.target.value); setPage(1); }}
-          className="mb-2 w-full px-4 py-2 border border-[#4FC3F7] rounded-xl placeholder-gray-500"
+          className="mb-2 w-full px-4 py-2 border border-[#70C1F2] rounded-xl placeholder-gray-500"
         />
-        <table className="min-w-full border-collapse border border-gray-300">
-          <thead className="bg-[#4FC3F7] text-black font-normal">
-            <tr>
-              {Object.keys(paginated[0] || {}).map(key => (
-                <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g, ' ')}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.map((row: any, i: number) => (
-              <tr key={i} className={i % 2 === 0 ? 'bg-gray-50' : ''}>
-                {Object.entries(row).map(([key, val], idx) => (
-                  <td key={idx} className="border border-gray-300 px-2 py-1">
-                    {(key === 'transaction_date' || key === 'requested_date' || key === 'created_at') && val
-                      ? new Date(val).toLocaleDateString()
-                      : val ?? '-'}
-                  </td>
+        <div ref={el => (printRefs.current[key] = el)}>
+          <table className="min-w-full border-collapse border border-gray-300">
+            <thead className="bg-[#70C1F2] text-black font-normal">
+              <tr>
+                {Object.keys(paginated[0] || {}).map(key => (
+                  <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g, ' ')}</th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {paginated.map((row: any, i: number) => (
+                <tr key={i} className={i % 2 === 0 ? 'bg-gray-50' : ''}>
+                  {Object.entries(row).map(([key, val], idx) => (
+                    <td key={idx} className="border border-gray-300 px-2 py-1">
+                      {(key === 'transaction_date' || key === 'requested_date' || key === 'created_at') && val
+                        ? new Date(val).toLocaleDateString()
+                        : val ?? '-'}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {totalPages > 1 && (
           <div className="flex justify-end mt-2 gap-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</button>
@@ -184,7 +194,7 @@ export default function Reports() {
 
   const renderMonthSection = (month: string, data: any) => (
     <div key={month} className="mb-10">
-      <h2 className="text-2xl font-bold mb-2 text-[#4FC3F7]">{month.toUpperCase()}</h2>
+      <h2 className="text-2xl font-bold mb-2 text-[#70C1F2]">{month.toUpperCase()}</h2>
       <hr className="border-t-2 border-gray-300 mb-4" />
       {data.transactions.length > 0 && <TableWithPagination title="Transactions" data={data.transactions} filter={transactionFilter} setFilter={setTransactionFilter} fields={['transaction_type', 'full_name', 'recorded_by']} page={pageTransactions} setPage={setPageTransactions} />}
       {data.loans.length > 0 && <TableWithPagination title="Loans" data={data.loans} filter={loanFilter} setFilter={setLoanFilter} fields={['status', 'full_name', 'approved_by']} page={pageLoans} setPage={setPageLoans} />}
@@ -205,7 +215,7 @@ export default function Reports() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
-            <select value={reportType} onChange={e => setReportType(e.target.value as any)} className="w-full px-4 py-2 border border-[#4FC3F7] rounded-xl">
+            <select value={reportType} onChange={e => setReportType(e.target.value as any)} className="w-full px-4 py-2 border border-[#70C1F2] rounded-xl">
               <option value="monthly">Monthly Report</option>
               <option value="yearly">Yearly Report</option>
               <option value="member">Member Statement</option>
@@ -215,14 +225,14 @@ export default function Reports() {
           {reportType === 'monthly' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
-              <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border border-[#4FC3F7] rounded-xl" />
+              <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border border-[#70C1F2] rounded-xl" />
             </div>
           )}
 
           {reportType === 'yearly' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
-              <input type="number" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="w-full px-4 py-2 border border-[#4FC3F7] rounded-xl" />
+              <input type="number" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="w-full px-4 py-2 border border-[#70C1F2] rounded-xl" />
             </div>
           )}
 
@@ -234,11 +244,11 @@ export default function Reports() {
                 placeholder="Type member name..."
                 value={memberSearch}
                 onChange={e => handleMemberSearch(e.target.value)}
-                className="w-full px-4 py-2 border border-[#4FC3F7] rounded-xl placeholder-gray-500"
+                className="w-full px-4 py-2 border border-[#70C1F2] rounded-xl placeholder-gray-500"
               />
 
               {members.length > 0 && memberSearch.trim() !== '' && (
-                <ul className="absolute z-50 bg-white border border-[#4FC3F7] w-full mt-1 max-h-48 overflow-y-auto rounded-xl shadow-lg">
+                <ul className="absolute z-50 bg-white border border-[#70C1F2] w-full mt-1 max-h-48 overflow-y-auto rounded-xl shadow-lg">
                   {members.map((m) => (
                     <li
                       key={m.id}
