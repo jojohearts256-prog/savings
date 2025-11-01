@@ -36,7 +36,6 @@ export default function Reports() {
     else if (reportType === 'member' && selectedMemberId) await fetchMemberReport();
   };
 
-  // ✅ Fixed Monthly Report (Displays properly like Yearly)
   const fetchMonthlyReport = async () => {
     const monthStart = selectedMonth + '-01';
     const { data, error } = await supabase.rpc('monthly_report', { report_month: monthStart });
@@ -96,7 +95,6 @@ export default function Reports() {
     return data.slice(start, start + pageSize);
   };
 
-  // ✅ Group Data by Month for Yearly Report
   const groupByMonth = (items: any[]) => {
     if (!items) return {};
     return items.reduce((acc: any, item: any) => {
@@ -106,66 +104,6 @@ export default function Reports() {
       acc[month].push(item);
       return acc;
     }, {});
-  };
-
-  const downloadFullReportPDF = () => {
-    if (!reportData) return;
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text(`${reportType === 'member' ? reportData.full_name : reportData.period || reportData.year} Report`, 14, 22);
-
-    let yOffset = 30;
-    const summaryRows = Object.keys(reportData)
-      .filter(k => typeof reportData[k] !== 'object')
-      .map(k => [k.replace(/_/g, ' '), formatCurrency(reportData[k])]);
-    doc.autoTable({ startY: yOffset, head: [['Metric', 'Value']], body: summaryRows });
-    yOffset = (doc as any).lastAutoTable.finalY + 10;
-
-    const renderTable = (title: string, head: string[], rows: any[]) => {
-      if (!rows || rows.length === 0) return;
-      doc.setFontSize(14);
-      doc.text(title, 14, yOffset);
-      yOffset += 6;
-      doc.autoTable({ startY: yOffset, head: [head], body: rows });
-      yOffset = (doc as any).lastAutoTable.finalY + 10;
-    };
-
-    renderTable(
-      'Transactions',
-      ['Date', 'Type', 'Amount (UGX)', 'Member', 'Recorded By'],
-      reportData.transactions?.map((t: any) => [
-        new Date(t.transaction_date).toLocaleDateString(),
-        t.transaction_type || '-',
-        formatCurrency(t.amount || 0),
-        t.full_name || '-',
-        t.recorded_by || '-',
-      ])
-    );
-
-    renderTable(
-      'Loans',
-      ['Date', 'Amount Requested (UGX)', 'Amount Approved (UGX)', 'Status', 'Member', 'Approved By'],
-      reportData.loans?.map((l: any) => [
-        new Date(l.requested_date).toLocaleDateString(),
-        formatCurrency(l.amount_requested || 0),
-        formatCurrency(l.amount_approved || 0),
-        l.status || '-',
-        l.full_name || '-',
-        l.approved_by || '-',
-      ])
-    );
-
-    renderTable(
-      'Profits',
-      ['Profit Amount (UGX)', 'Member', 'Recorded By'],
-      reportData.profits?.map((p: any) => [
-        formatCurrency(p.profit_amount || 0),
-        p.full_name || '-',
-        p.recorded_by || '-',
-      ])
-    );
-
-    doc.save(`${reportType}-detailed-report.pdf`);
   };
 
   const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
@@ -213,9 +151,74 @@ export default function Reports() {
     );
   };
 
+  // ✅ Combined monthly section renderer (transactions + loans + profits under one month)
+  const renderMonthSection = (month: string, data: any) => (
+    <div key={month} className="mb-10">
+      <h2 className="text-2xl font-bold text-[#008080] mb-2">{month.toUpperCase()}</h2>
+      <hr className="border-t-2 border-gray-300 mb-4" />
+
+      {data.transactions?.length > 0 && (
+        <TableWithPagination
+          title="Transactions"
+          data={data.transactions}
+          filter={transactionFilter}
+          setFilter={setTransactionFilter}
+          fields={['transaction_type', 'full_name', 'recorded_by']}
+          page={pageTransactions}
+          setPage={setPageTransactions}
+        />
+      )}
+
+      {data.loans?.length > 0 && (
+        <TableWithPagination
+          title="Loans"
+          data={data.loans}
+          filter={loanFilter}
+          setFilter={setLoanFilter}
+          fields={['status', 'full_name', 'approved_by']}
+          page={pageLoans}
+          setPage={setPageLoans}
+        />
+      )}
+
+      {data.profits?.length > 0 && (
+        <TableWithPagination
+          title="Profits"
+          data={data.profits}
+          filter={profitFilter}
+          setFilter={setProfitFilter}
+          fields={['full_name', 'recorded_by']}
+          page={pageProfits}
+          setPage={setPageProfits}
+        />
+      )}
+    </div>
+  );
+
+  // ✅ For yearly/member reports → combine all data under each month
+  const renderYearlyOrMemberGrouped = () => {
+    const months = [
+      ...new Set([
+        ...Object.keys(groupByMonth(reportData.transactions)),
+        ...Object.keys(groupByMonth(reportData.loans)),
+        ...Object.keys(groupByMonth(reportData.profits))
+      ])
+    ];
+
+    return months.map(month => {
+      const monthData = {
+        transactions: groupByMonth(reportData.transactions)[month] || [],
+        loans: groupByMonth(reportData.loans)[month] || [],
+        profits: groupByMonth(reportData.profits)[month] || []
+      };
+      return renderMonthSection(month, monthData);
+    });
+  };
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Reports & Analytics</h2>
+
       <div className="bg-white rounded-2xl card-shadow p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div>
@@ -235,109 +238,18 @@ export default function Reports() {
             </select>
           )}
         </div>
-        {reportData && (
-          <button onClick={downloadFullReportPDF} className="px-4 py-2 rounded-xl bg-[#008080] text-white hover:bg-teal-700">
-            <Download className="inline w-4 h-4 mr-2" /> Download PDF
-          </button>
-        )}
       </div>
 
       {reportData && (
         <div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {Object.keys(reportData).filter(k => typeof reportData[k] !== 'object').map(key => (
-              <StatCard key={key} label={key.replace(/_/g, ' ')} value={reportData[key]} icon={TrendingUp} color="bg-[#008080]" />
-            ))}
-          </div>
-
-          {/* ✅ Yearly report organized by months */}
-          {reportType === 'yearly' && reportData.transactions?.length > 0 && (
-            Object.entries(groupByMonth(reportData.transactions)).map(([month, data]) => (
-              <div key={month} className="mb-10">
-                <h3 className="text-xl font-bold text-[#008080] mb-3">{month}</h3>
-                <TableWithPagination
-                  title="Transactions"
-                  data={data}
-                  filter={transactionFilter}
-                  setFilter={setTransactionFilter}
-                  fields={['transaction_type', 'full_name', 'recorded_by']}
-                  page={pageTransactions}
-                  setPage={setPageTransactions}
-                />
-              </div>
-            ))
+          {/* ✅ Monthly Report (just one header) */}
+          {reportType === 'monthly' && renderMonthSection(
+            new Date(selectedMonth + '-01').toLocaleString('default', { month: 'long', year: 'numeric' }),
+            reportData
           )}
 
-          {/* Same for loans */}
-          {reportType === 'yearly' && reportData.loans?.length > 0 && (
-            Object.entries(groupByMonth(reportData.loans)).map(([month, data]) => (
-              <div key={month} className="mb-10">
-                <h3 className="text-xl font-bold text-[#008080] mb-3">{month}</h3>
-                <TableWithPagination
-                  title="Loans"
-                  data={data}
-                  filter={loanFilter}
-                  setFilter={setLoanFilter}
-                  fields={['status', 'full_name', 'approved_by']}
-                  page={pageLoans}
-                  setPage={setPageLoans}
-                />
-              </div>
-            ))
-          )}
-
-          {/* Same for profits */}
-          {reportType === 'yearly' && reportData.profits?.length > 0 && (
-            Object.entries(groupByMonth(reportData.profits)).map(([month, data]) => (
-              <div key={month} className="mb-10">
-                <h3 className="text-xl font-bold text-[#008080] mb-3">{month}</h3>
-                <TableWithPagination
-                  title="Profits"
-                  data={data}
-                  filter={profitFilter}
-                  setFilter={setProfitFilter}
-                  fields={['full_name', 'recorded_by']}
-                  page={pageProfits}
-                  setPage={setPageProfits}
-                />
-              </div>
-            ))
-          )}
-
-          {/* ✅ Keep Monthly & Member views normal */}
-          {reportType !== 'yearly' && reportData.transactions?.length > 0 && (
-            <TableWithPagination
-              title="Transactions"
-              data={reportData.transactions}
-              filter={transactionFilter}
-              setFilter={setTransactionFilter}
-              fields={['transaction_type', 'full_name', 'recorded_by']}
-              page={pageTransactions}
-              setPage={setPageTransactions}
-            />
-          )}
-          {reportType !== 'yearly' && reportData.loans?.length > 0 && (
-            <TableWithPagination
-              title="Loans"
-              data={reportData.loans}
-              filter={loanFilter}
-              setFilter={setLoanFilter}
-              fields={['status', 'full_name', 'approved_by']}
-              page={pageLoans}
-              setPage={setPageLoans}
-            />
-          )}
-          {reportType !== 'yearly' && reportData.profits?.length > 0 && (
-            <TableWithPagination
-              title="Profits"
-              data={reportData.profits}
-              filter={profitFilter}
-              setFilter={setProfitFilter}
-              fields={['full_name', 'recorded_by']}
-              page={pageProfits}
-              setPage={setPageProfits}
-            />
-          )}
+          {/* ✅ Yearly & Member Reports (grouped months) */}
+          {(reportType === 'yearly' || reportType === 'member') && renderYearlyOrMemberGrouped()}
         </div>
       )}
     </div>
