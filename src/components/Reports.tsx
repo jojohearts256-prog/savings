@@ -104,7 +104,7 @@ export default function Reports() {
       columns,
       body: data,
       styles: { fontSize: 10 },
-      headStyles: { fillColor: [0, 191, 255], textColor: [0, 0, 0], fontStyle: 'normal' },
+      headStyles: { fillColor: [79, 195, 247], textColor: [0, 0, 0], fontStyle: 'normal' }, // Soft Blue #4FC3F7
     });
 
     doc.save(`${title}.pdf`);
@@ -118,9 +118,9 @@ export default function Reports() {
     return (
       <div className="overflow-x-auto mb-6 bg-white rounded-xl card-shadow p-4">
         <div className="flex justify-between items-center mb-2">
-          <h4 className="text-lg font-bold text-[#00BFFF]">{title}</h4>
+          <h4 className="text-lg font-bold text-[#4FC3F7]">{title}</h4>
           <button
-            className="px-3 py-1 bg-[#00BFFF] text-black rounded-xl hover:bg-[#00d4ff]"
+            className="px-3 py-1 bg-[#4FC3F7] text-black rounded-xl hover:bg-[#40b0e5]"
             onClick={() => downloadPDF(title, filtered)}
           >
             Download PDF
@@ -130,10 +130,10 @@ export default function Reports() {
           placeholder={`Search ${title}...`}
           value={filter}
           onChange={e => { setFilter(e.target.value); setPage(1); }}
-          className="mb-2 w-full px-4 py-2 border border-[#00BFFF] rounded-xl placeholder-gray-500"
+          className="mb-2 w-full px-4 py-2 border border-[#4FC3F7] rounded-xl placeholder-gray-500"
         />
         <table className="min-w-full border-collapse border border-gray-300">
-          <thead className="bg-[#00BFFF] text-black font-normal">
+          <thead className="bg-[#4FC3F7] text-black font-normal">
             <tr>
               {Object.keys(paginated[0] || {}).map(key => (
                 <th key={key} className="border border-gray-300 px-2 py-1">{key.replace(/_/g, ' ')}</th>
@@ -184,7 +184,7 @@ export default function Reports() {
 
   const renderMonthSection = (month: string, data: any) => (
     <div key={month} className="mb-10">
-      <h2 className="text-2xl font-bold mb-2 text-[#00BFFF]">{month.toUpperCase()}</h2>
+      <h2 className="text-2xl font-bold mb-2 text-[#4FC3F7]">{month.toUpperCase()}</h2>
       <hr className="border-t-2 border-gray-300 mb-4" />
       {data.transactions.length > 0 && <TableWithPagination title="Transactions" data={data.transactions} filter={transactionFilter} setFilter={setTransactionFilter} fields={['transaction_type', 'full_name', 'recorded_by']} page={pageTransactions} setPage={setPageTransactions} />}
       {data.loans.length > 0 && <TableWithPagination title="Loans" data={data.loans} filter={loanFilter} setFilter={setLoanFilter} fields={['status', 'full_name', 'approved_by']} page={pageLoans} setPage={setPageLoans} />}
@@ -205,7 +205,7 @@ export default function Reports() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
-            <select value={reportType} onChange={e => setReportType(e.target.value as any)} className="w-full px-4 py-2 border border-[#00BFFF] rounded-xl">
+            <select value={reportType} onChange={e => setReportType(e.target.value as any)} className="w-full px-4 py-2 border border-[#4FC3F7] rounded-xl">
               <option value="monthly">Monthly Report</option>
               <option value="yearly">Yearly Report</option>
               <option value="member">Member Statement</option>
@@ -215,14 +215,14 @@ export default function Reports() {
           {reportType === 'monthly' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
-              <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border border-[#00BFFF] rounded-xl" />
+              <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border border-[#4FC3F7] rounded-xl" />
             </div>
           )}
 
           {reportType === 'yearly' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
-              <input type="number" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="w-full px-4 py-2 border border-[#00BFFF] rounded-xl" />
+              <input type="number" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="w-full px-4 py-2 border border-[#4FC3F7] rounded-xl" />
             </div>
           )}
 
@@ -234,11 +234,11 @@ export default function Reports() {
                 placeholder="Type member name..."
                 value={memberSearch}
                 onChange={e => handleMemberSearch(e.target.value)}
-                className="w-full px-4 py-2 border border-[#00BFFF] rounded-xl placeholder-gray-500"
+                className="w-full px-4 py-2 border border-[#4FC3F7] rounded-xl placeholder-gray-500"
               />
 
               {members.length > 0 && memberSearch.trim() !== '' && (
-                <ul className="absolute z-50 bg-white border border-[#00BFFF] w-full mt-1 max-h-48 overflow-y-auto rounded-xl shadow-lg">
+                <ul className="absolute z-50 bg-white border border-[#4FC3F7] w-full mt-1 max-h-48 overflow-y-auto rounded-xl shadow-lg">
                   {members.map((m) => (
                     <li
                       key={m.id}
