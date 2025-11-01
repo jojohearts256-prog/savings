@@ -65,18 +65,6 @@ export default function Reports() {
     else setReportData(data?.[0] || null);
   };
 
-  const StatCard = ({ label, value, icon: Icon, color }: any) => (
-    <div className="bg-white rounded-xl p-4 card-shadow relative">
-      <div className="flex items-center gap-3 mb-2">
-        <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center`}>
-          <Icon className="w-5 h-5 text-white" />
-        </div>
-        <span className="text-sm font-medium text-gray-600">{label}</span>
-      </div>
-      <p className="text-2xl font-bold text-gray-800">{value}</p>
-    </div>
-  );
-
   const formatCurrency = (amount: number) =>
     Number(amount).toLocaleString('en-UGX', { style: 'currency', currency: 'UGX' });
 
@@ -93,19 +81,6 @@ export default function Reports() {
     if (!data) return [];
     const start = (page - 1) * pageSize;
     return data.slice(start, start + pageSize);
-  };
-
-  const groupByMonth = (items: any[]) => {
-    if (!items) return {};
-    return items.reduce((acc: any, item: any) => {
-      const dateField = item.transaction_date || item.requested_date;
-      const month = dateField
-        ? new Date(dateField).toLocaleString('default', { month: 'long', year: 'numeric' })
-        : 'No Date';
-      if (!acc[month]) acc[month] = [];
-      acc[month].push(item);
-      return acc;
-    }, {});
   };
 
   const TableWithPagination = ({ title, data, filter, setFilter, fields, page, setPage }: any) => {
@@ -135,7 +110,7 @@ export default function Reports() {
               <tr key={i}>
                 {Object.entries(row).map(([key, val], idx) => (
                   <td key={idx} className="border border-gray-300 px-2 py-1">
-                    {(key === 'transaction_date' || key === 'requested_date') && val
+                    {(key === 'transaction_date' || key === 'requested_date' || key === 'created_at') && val
                       ? new Date(val).toLocaleDateString()
                       : val ?? '-'}
                   </td>
@@ -165,23 +140,30 @@ export default function Reports() {
     </div>
   );
 
-  const renderYearlyOrMemberGrouped = () => {
-    const months = [
-      ...new Set([
-        ...Object.keys(groupByMonth(reportData.transactions)),
-        ...Object.keys(groupByMonth(reportData.loans)),
-        ...Object.keys(groupByMonth(reportData.profits))
-      ])
-    ];
+  const groupAllByMonth = (reportData: any) => {
+    const monthsMap: Record<string, any> = {};
 
-    return months.map(month => {
-      const monthData = {
-        transactions: groupByMonth(reportData.transactions)[month] || [],
-        loans: groupByMonth(reportData.loans)[month] || [],
-        profits: groupByMonth(reportData.profits)[month] || []
-      };
-      return renderMonthSection(month, monthData);
-    });
+    const addItems = (items: any[], type: 'transactions' | 'loans' | 'profits', dateField: string) => {
+      if (!items) return;
+      items.forEach((item: any) => {
+        const dateVal = item[dateField];
+        if (!dateVal) return; // skip items without date
+        const month = new Date(dateVal).toLocaleString('default', { month: 'long', year: 'numeric' });
+        if (!monthsMap[month]) monthsMap[month] = { transactions: [], loans: [], profits: [] };
+        monthsMap[month][type].push(item);
+      });
+    };
+
+    addItems(reportData.transactions || [], 'transactions', 'transaction_date');
+    addItems(reportData.loans || [], 'loans', 'requested_date');
+    addItems(reportData.profits || [], 'profits', 'created_at');
+
+    return monthsMap;
+  };
+
+  const renderYearlyOrMemberGrouped = () => {
+    const groupedMonths = groupAllByMonth(reportData);
+    return Object.keys(groupedMonths).map(month => renderMonthSection(month, groupedMonths[month]));
   };
 
   return (
