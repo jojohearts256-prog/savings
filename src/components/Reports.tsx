@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { FileText, Download, TrendingUp } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -85,12 +86,19 @@ export default function Reports() {
     return data.slice(start, start + pageSize);
   };
 
-  // Function to generate PDF from table
+  // ===== PDF Download Function =====
   const downloadPDF = (title: string, data: any[]) => {
-    if (!data || data.length === 0) return;
+    if (!data || data.length === 0) {
+      alert("No data to download!");
+      return;
+    }
+
     const doc = new jsPDF();
-    const columns = Object.keys(data[0]).map(key => ({ header: key.replace(/_/g, ' '), dataKey: key }));
+    doc.setFontSize(14);
     doc.text(title, 14, 15);
+
+    const columns = Object.keys(data[0]).map(key => ({ header: key.replace(/_/g, ' '), dataKey: key }));
+
     (doc as any).autoTable({
       startY: 20,
       columns,
@@ -98,6 +106,7 @@ export default function Reports() {
       styles: { fontSize: 10 },
       headStyles: { fillColor: [0, 191, 255], textColor: [0, 0, 0], fontStyle: 'normal' },
     });
+
     doc.save(`${title}.pdf`);
   };
 
@@ -121,8 +130,7 @@ export default function Reports() {
           placeholder={`Search ${title}...`}
           value={filter}
           onChange={e => { setFilter(e.target.value); setPage(1); }}
-          className="mb-2 w-full px-4 py-2 border rounded-xl"
-          style={{ borderColor: '#00BFFF', color: '#333', '::placeholder': { color: '#555' } }}
+          className="mb-2 w-full px-4 py-2 border border-[#00BFFF] rounded-xl placeholder-gray-500"
         />
         <table className="min-w-full border-collapse border border-gray-300">
           <thead className="bg-[#00BFFF] text-black font-normal">
@@ -197,7 +205,7 @@ export default function Reports() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
-            <select value={reportType} onChange={e => setReportType(e.target.value as any)} className="w-full px-4 py-2 border border-gray-300 rounded-xl">
+            <select value={reportType} onChange={e => setReportType(e.target.value as any)} className="w-full px-4 py-2 border border-[#00BFFF] rounded-xl">
               <option value="monthly">Monthly Report</option>
               <option value="yearly">Yearly Report</option>
               <option value="member">Member Statement</option>
@@ -226,8 +234,7 @@ export default function Reports() {
                 placeholder="Type member name..."
                 value={memberSearch}
                 onChange={e => handleMemberSearch(e.target.value)}
-                className="w-full px-4 py-2 border border-[#00BFFF] rounded-xl"
-                style={{ color: '#333', '::placeholder': { color: '#555' } }}
+                className="w-full px-4 py-2 border border-[#00BFFF] rounded-xl placeholder-gray-500"
               />
 
               {members.length > 0 && memberSearch.trim() !== '' && (
