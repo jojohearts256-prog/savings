@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -15,7 +15,7 @@ import MemberManagement from './MemberManagement';
 import TransactionManagement from './TransactionManagement';
 import LoanManagement from './LoanManagement';
 import Reports from './Reports';
-import ProfitManagement from './ProfitManagement'; // ✅ Fixed import
+import ProfitManagement from './ProfitManagement';
 import Particles from 'react-tsparticles';
 import { loadFull } from 'tsparticles';
 import CountUp from 'react-countup';
@@ -30,6 +30,11 @@ export default function AdminDashboard() {
     totalLoans: 0,
     pendingLoans: 0,
   });
+
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const notificationRef = useRef(null);
 
   const particlesInit = useCallback(async (engine) => {
     await loadFull(engine);
@@ -75,6 +80,39 @@ export default function AdminDashboard() {
     }
   }
 
+  async function loadNotifications() {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .in('type', [
+          'loan_request', 
+          'loan_reminder_admin', 
+          'loan_overdue_admin'
+        ])
+        .order('sent_at', { ascending: false });
+
+      if (error) throw error;
+      setNotifications(data || []);
+    } catch (err) {
+      console.error('Failed to load notifications:', err);
+    }
+  }
+
+  async function markAsRead(id) {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', id);
+
+      if (error) throw error;
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+    }
+  }
+
   async function handleSignOut() {
     try {
       await signOut();
@@ -83,8 +121,24 @@ export default function AdminDashboard() {
     }
   }
 
+  // Close notifications when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [notificationRef]);
+
   useEffect(() => {
     loadStats();
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000); // refresh every 30s
+    return () => clearInterval(interval);
   }, []);
 
   const tabs = [
@@ -93,7 +147,7 @@ export default function AdminDashboard() {
     { id: 'transactions', label: 'Transactions', icon: DollarSign },
     { id: 'loans', label: 'Loans', icon: CreditCard },
     { id: 'reports', label: 'Reports', icon: FileText },
-    { id: 'profits', label: 'Profits', icon: Banknote }, // ✅ Profits tab
+    { id: 'profits', label: 'Profits', icon: Banknote },
   ];
 
   return (
@@ -132,6 +186,44 @@ export default function AdminDashboard() {
             </div>
 
             <div className="flex items-center gap-4 relative z-20">
+              <div ref={notificationRef} className="relative">
+                <button
+                  onClick={() => setShowNotifications((prev) => !prev)}
+                  className="p-2 bg-white/20 hover:bg-blue-500/30 rounded-xl transition-all duration-300 hover:scale-110 shadow-md hover:shadow-lg"
+                >
+                  <Bell className="w-5 h-5 text-white" />
+                  {notifications.filter((n) => !n.read).length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
+                      {notifications.filter((n) => !n.read).length}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white shadow-lg rounded-xl z-50 p-3">
+                    {notifications.length === 0 ? (
+                      <p className="text-gray-500 text-sm">No new notifications</p>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          className={`p-3 rounded-lg mb-2 cursor-pointer transition-colors ${
+                            n.read ? 'bg-gray-100' : 'bg-blue-50'
+                          }`}
+                          onClick={() => markAsRead(n.id)}
+                        >
+                          <p className="font-semibold text-gray-800">{n.title}</p>
+                          <p className="text-sm text-gray-600">{n.message}</p>
+                          <p className="text-xs text-gray-400">
+                            {new Date(n.sent_at).toLocaleString()}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="text-right">
                 <p className="text-sm font-medium text-white">{profile?.full_name}</p>
                 <p className="text-xs text-white/80 capitalize">{profile?.role}</p>
@@ -187,7 +279,7 @@ export default function AdminDashboard() {
         {activeTab === 'transactions' && <TransactionManagement />}
         {activeTab === 'loans' && <LoanManagement />}
         {activeTab === 'reports' && <Reports />}
-        {activeTab === 'profits' && <ProfitManagement />} {/* ✅ Profits page working now */}
+        {activeTab === 'profits' && <ProfitManagement />}
       </div>
 
       <style>{`
