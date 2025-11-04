@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase, Member, Transaction, Loan, Notification } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DollarSign, TrendingUp, CreditCard, Bell, LogOut, FileText } from 'lucide-react';
+import { debounce } from 'lodash';
 
 export default function MemberDashboard() {
   const { profile, signOut } = useAuth();
@@ -63,7 +64,7 @@ export default function MemberDashboard() {
     }
   };
 
-  // --- Loan Modal with Guarantors ---
+  // --- Enhanced Loan Modal ---
   const LoanRequestModal = () => {
     const [formData, setFormData] = useState({
       amount: '',
@@ -80,29 +81,15 @@ export default function MemberDashboard() {
     const [searchResults, setSearchResults] = useState<Member[]>([]);
     const [searchLoading, setSearchLoading] = useState(false);
 
-    // --- Simple debounce implementation ---
-    const debounce = (func: Function, wait: number) => {
-      let timeout: ReturnType<typeof setTimeout>;
-      return (...args: any[]) => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func(...args), wait);
-      };
-    };
-
     // Compute remaining amount dynamically
     const remainingAmount = useMemo(() => {
-      return Math.max(
-        Number(formData.amount || 0) -
-          guarantors.reduce((sum, g) => sum + Number(g.amount || 0), 0),
-        0
-      );
+      return Math.max(Number(formData.amount || 0) - guarantors.reduce((sum, g) => sum + Number(g.amount || 0), 0), 0);
     }, [formData.amount, guarantors]);
 
-    // --- Debounced search for members ---
-    const performSearch = async (query: string, index: number) => {
+    // Debounced search
+    const debouncedSearch = debounce(async (query: string, index: number) => {
       if (!query) return setSearchResults([]);
       setSearchLoading(true);
-
       const { data } = await supabase
         .from('members')
         .select('*')
@@ -110,12 +97,11 @@ export default function MemberDashboard() {
         .neq('profile_id', profile?.id)
         .limit(5);
 
+      // Exclude already selected guarantors
       const filtered = data?.filter((m) => !guarantors.some((g) => g.member_id === m.id)) || [];
       setSearchResults(filtered);
       setSearchLoading(false);
-    };
-
-    const debouncedSearch = useMemo(() => debounce(performSearch, 300), [guarantors, profile?.id]);
+    }, 300);
 
     const handleSearch = (index: number, query: string) => {
       setGuarantors((prev) => {
@@ -135,6 +121,7 @@ export default function MemberDashboard() {
         return updated;
       });
       setSearchResults([]);
+      // Add another guarantor input automatically if needed
       if (remainingAmount > 0 && guarantors.length < 2) addGuarantor();
     };
 
@@ -168,7 +155,8 @@ export default function MemberDashboard() {
         const requestedAmount = Number(formData.amount);
         const totalGuarantee = guarantors.reduce((sum, g) => sum + Number(g.amount || 0), 0);
 
-        if (totalGuarantee < requestedAmount) throw new Error('Guarantors do not cover requested amount');
+        if (totalGuarantee < requestedAmount)
+          throw new Error('Guarantors do not cover requested amount');
 
         const loanNumber = 'LN' + Date.now() + Math.floor(Math.random() * 1000);
 
@@ -186,6 +174,7 @@ export default function MemberDashboard() {
 
         if (loanError) throw loanError;
 
+        // Batch insert guarantors
         const validGuarantors = guarantors.filter((g) => Number(g.amount) > 0);
         if (validGuarantors.length > 0) {
           const { error: gError } = await supabase.from('loan_guarantors').insert(
@@ -342,16 +331,68 @@ export default function MemberDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navbar */}
-      {/* ... rest of your original code unchanged ... */}
+      <nav className="bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] p-4 flex justify-between items-center text-white">
+        <h1 className="font-bold text-xl">Member Dashboard</h1>
+        <div className="flex items-center gap-4">
+          <button onClick={() => setShowNotifications(!showNotifications)} className="relative">
+            <Bell />
+            {unreadCount > 0 && (
+              <span className="absolute top-0 right-0 bg-red-500 text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+          <button onClick={signOut}>
+            <LogOut />
+          </button>
+        </div>
+      </nav>
 
-      {/* Request Loan Button */}
-      <div className="text-center mt-4">
-        <button
-          onClick={() => setShowLoanModal(true)}
-          className="px-6 py-3 bg-[#007B8A] text-white rounded-xl font-medium hover:bg-[#005f6b] transition-colors"
-        >
-          Request a Loan
-        </button>
+      {/* Main */}
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">Hello, {member?.full_name}</h2>
+          <button
+            onClick={() => setShowLoanModal(true)}
+            className="bg-[#007B8A] text-white px-4 py-2 rounded-xl font-medium"
+          >
+            Request Loan
+          </button>
+        </div>
+
+        {/* Transactions & Loans */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white p-4 rounded-xl shadow">
+            <h3 className="font-semibold text-lg mb-2">Recent Transactions</h3>
+            {transactions.length === 0 ? (
+              <p className="text-gray-500 text-sm">No transactions yet.</p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {transactions.map((t) => (
+                  <li key={t.id} className="flex justify-between border-b pb-1">
+                    <span>{t.description}</span>
+                    <span>{t.amount.toLocaleString()} UGX</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="bg-white p-4 rounded-xl shadow">
+            <h3 className="font-semibold text-lg mb-2">Your Loans</h3>
+            {loans.length === 0 ? (
+              <p className="text-gray-500 text-sm">No loans requested yet.</p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {loans.map((l) => (
+                  <li key={l.id} className="flex justify-between border-b pb-1">
+                    <span>{l.loan_number}</span>
+                    <span>{l.amount_requested.toLocaleString()} UGX</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
 
       {showLoanModal && <LoanRequestModal />}
