@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase, Member, Transaction, Loan, Notification } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DollarSign, TrendingUp, CreditCard, Bell, LogOut, FileText } from 'lucide-react';
@@ -13,8 +13,19 @@ export default function MemberDashboard() {
   const [showLoanModal, setShowLoanModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  const notifRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (profile) loadMemberData();
+
+    // Click outside to close notifications
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [profile]);
 
   const loadMemberData = async () => {
@@ -26,7 +37,6 @@ export default function MemberDashboard() {
         .select('*')
         .eq('profile_id', profile.id)
         .maybeSingle();
-
       if (!memberData) return;
 
       const fetchedMember = {
@@ -64,29 +74,21 @@ export default function MemberDashboard() {
     }
   };
 
-  // --- Enhanced Loan Modal ---
+  // --- Loan Modal ---
   const LoanRequestModal = () => {
-    const [formData, setFormData] = useState({
-      amount: '',
-      repayment_period: '12',
-      reason: '',
-    });
-
-    const [guarantors, setGuarantors] = useState<
-      { member_id: number; name: string; amount: string; search: string }[]
-    >([{ member_id: 0, name: '', amount: '', search: '' }]);
-
+    const [formData, setFormData] = useState({ amount: '', repayment_period: '12', reason: '' });
+    const [guarantors, setGuarantors] = useState<{ member_id: number; name: string; amount: string; search: string }[]>([
+      { member_id: 0, name: '', amount: '', search: '' },
+    ]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [searchResults, setSearchResults] = useState<Member[]>([]);
     const [searchLoading, setSearchLoading] = useState(false);
 
-    const remainingAmount = useMemo(() => {
-      return Math.max(
-        Number(formData.amount || 0) - guarantors.reduce((sum, g) => sum + Number(g.amount || 0), 0),
-        0
-      );
-    }, [formData.amount, guarantors]);
+    const remainingAmount = useMemo(
+      () => Math.max(Number(formData.amount || 0) - guarantors.reduce((sum, g) => sum + Number(g.amount || 0), 0), 0),
+      [formData.amount, guarantors]
+    );
 
     const debouncedSearch = debounce(async (query: string, index: number) => {
       if (!query) return setSearchResults([]);
@@ -97,7 +99,6 @@ export default function MemberDashboard() {
         .ilike('full_name', `%${query}%`)
         .neq('profile_id', profile?.id)
         .limit(5);
-
       const filtered = data?.filter((m) => !guarantors.some((g) => g.member_id === m.id)) || [];
       setSearchResults(filtered);
       setSearchLoading(false);
@@ -139,9 +140,7 @@ export default function MemberDashboard() {
       }
     };
 
-    const removeGuarantor = (index: number) => {
-      setGuarantors((prev) => prev.filter((_, i) => i !== index));
-    };
+    const removeGuarantor = (index: number) => setGuarantors((prev) => prev.filter((_, i) => i !== index));
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -150,12 +149,9 @@ export default function MemberDashboard() {
 
       try {
         if (!member) throw new Error('Member not found');
-
         const requestedAmount = Number(formData.amount);
         const totalGuarantee = guarantors.reduce((sum, g) => sum + Number(g.amount || 0), 0);
-
-        if (totalGuarantee < requestedAmount)
-          throw new Error('Guarantors do not cover requested amount');
+        if (totalGuarantee < requestedAmount) throw new Error('Guarantors do not cover requested amount');
 
         const loanNumber = 'LN' + Date.now() + Math.floor(Math.random() * 1000);
 
@@ -176,11 +172,7 @@ export default function MemberDashboard() {
         const validGuarantors = guarantors.filter((g) => Number(g.amount) > 0);
         if (validGuarantors.length > 0) {
           const { error: gError } = await supabase.from('loan_guarantors').insert(
-            validGuarantors.map((g) => ({
-              loan_id: loanData.id,
-              guarantor_id: g.member_id,
-              amount: Number(g.amount),
-            }))
+            validGuarantors.map((g) => ({ loan_id: loanData.id, guarantor_id: g.member_id, amount: Number(g.amount) }))
           );
           if (gError) throw gError;
         }
@@ -198,12 +190,10 @@ export default function MemberDashboard() {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl p-6 max-w-md w-full overflow-y-auto max-h-[90vh]">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Request Loan</h2>
-          <p className="text-sm text-gray-600 mb-2">
-            Your account balance: {member?.account_balance.toLocaleString()} UGX
-          </p>
+          <p className="text-sm text-gray-600 mb-2">Your account balance: {member?.account_balance.toLocaleString()} UGX</p>
           {error && <div className="mb-4 p-3 bg-red-50 text-red-800 rounded-xl">{error}</div>}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Form Fields */}
+            {/* Loan Amount */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Loan Amount (UGX)</label>
               <input
@@ -215,6 +205,7 @@ export default function MemberDashboard() {
               />
             </div>
 
+            {/* Repayment */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Repayment Period (Months)</label>
               <select
@@ -223,13 +214,12 @@ export default function MemberDashboard() {
                 className="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-[#007B8A]"
               >
                 {['3', '6', '12', '18', '24'].map((m) => (
-                  <option key={m} value={m}>
-                    {m} Months
-                  </option>
+                  <option key={m} value={m}>{m} Months</option>
                 ))}
               </select>
             </div>
 
+            {/* Reason */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
               <textarea
@@ -241,6 +231,7 @@ export default function MemberDashboard() {
               />
             </div>
 
+            {/* Guarantors */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="font-medium text-gray-700">
@@ -255,7 +246,6 @@ export default function MemberDashboard() {
                   + Add Guarantor
                 </button>
               </div>
-
               <div className="space-y-2">
                 {guarantors.map((g, idx) => (
                   <div key={idx} className="flex gap-2 items-center">
@@ -306,6 +296,7 @@ export default function MemberDashboard() {
               </div>
             </div>
 
+            {/* Submit */}
             <div className="flex gap-3 mt-4">
               <button
                 type="submit"
@@ -335,7 +326,7 @@ export default function MemberDashboard() {
       {/* Navbar */}
       <nav className="bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] p-4 flex justify-between items-center text-white">
         <h1 className="font-bold text-xl">Member Dashboard</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 relative">
           <button onClick={() => setShowNotifications(!showNotifications)} className="relative">
             <Bell />
             {unreadCount > 0 && (
@@ -344,6 +335,31 @@ export default function MemberDashboard() {
               </span>
             )}
           </button>
+
+          {/* Notifications Dropdown */}
+          {showNotifications && (
+            <div
+              ref={notifRef}
+              className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white shadow-lg rounded-xl z-50 border"
+            >
+              {notifications.length === 0 ? (
+                <p className="p-4 text-gray-500 text-sm">No notifications</p>
+              ) : (
+                notifications.map((n) => (
+                  <div
+                    key={n.id}
+                    className={`p-3 border-b hover:bg-gray-100 cursor-pointer ${
+                      !n.read ? 'bg-gray-50 font-medium' : ''
+                    }`}
+                  >
+                    <p>{n.message}</p>
+                    <p className="text-xs text-gray-400">{new Date(n.sent_at).toLocaleString()}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
           <button onClick={signOut}>
             <LogOut />
           </button>
@@ -351,7 +367,7 @@ export default function MemberDashboard() {
       </nav>
 
       {/* Main */}
-      <div className="p-6">
+      <div className="p-6 space-y-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">Hello, {member?.full_name}</h2>
           <button
@@ -362,74 +378,42 @@ export default function MemberDashboard() {
           </button>
         </div>
 
-        {/* Transactions & Loans */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Transactions */}
-          <div className="bg-white p-4 rounded-xl shadow">
-            <h3 className="font-semibold text-lg mb-2">Recent Transactions</h3>
-            {transactions.length === 0 ? (
-              <p className="text-gray-500 text-sm">No transactions yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {transactions.map((t) => (
-                  <li
-                    key={t.id}
-                    className="flex justify-between items-center bg-gray-50 p-3 rounded-xl shadow-sm border"
-                  >
-                    <div>
-                      <p className="font-medium">{t.description}</p>
-                      <p className="text-xs text-gray-400">
-                        {new Date(t.transaction_date).toLocaleString()}
-                      </p>
-                    </div>
-                    <span
-                      className={`font-semibold ${
-                        t.type === 'credit' ? 'text-green-500' : 'text-red-500'
-                      }`}
-                    >
-                      {t.amount.toLocaleString()} UGX
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+        {/* Transactions & Loans stacked as cards */}
+        <div className="space-y-4">
+          {transactions.map((t) => (
+            <div key={t.id} className="bg-white p-4 rounded-xl shadow flex justify-between items-center">
+              <div>
+                <p className="font-medium">{t.description}</p>
+                <p className="text-xs text-gray-400">{new Date(t.transaction_date).toLocaleString()}</p>
+              </div>
+              <span className={`font-semibold ${t.type === 'credit' ? 'text-green-500' : 'text-red-500'}`}>
+                {t.amount.toLocaleString()} UGX
+              </span>
+            </div>
+          ))}
 
-          {/* Loans */}
-          <div className="bg-white p-4 rounded-xl shadow">
-            <h3 className="font-semibold text-lg mb-2">Your Loans</h3>
-            {loans.length === 0 ? (
-              <p className="text-gray-500 text-sm">No loans requested yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {loans.map((l) => (
-                  <li
-                    key={l.id}
-                    className="bg-gray-50 p-3 rounded-xl shadow-sm border flex justify-between items-center"
-                  >
-                    <div>
-                      <p className="font-medium">{l.loan_number}</p>
-                      <p className="text-xs text-gray-400">
-                        Requested: {new Date(l.requested_date).toLocaleDateString()} | Period: {l.repayment_period_months} months
-                      </p>
-                      <p
-                        className={`text-xs font-medium ${
-                          l.status === 'approved'
-                            ? 'text-green-500'
-                            : l.status === 'rejected'
-                            ? 'text-red-500'
-                            : 'text-yellow-500'
-                        }`}
-                      >
-                        {l.status?.toUpperCase() || 'PENDING'}
-                      </p>
-                    </div>
-                    <span className="font-semibold">{l.amount_requested.toLocaleString()} UGX</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {loans.map((l) => (
+            <div key={l.id} className="bg-white p-4 rounded-xl shadow flex justify-between items-center">
+              <div>
+                <p className="font-medium">{l.loan_number}</p>
+                <p className="text-xs text-gray-400">
+                  Requested: {new Date(l.requested_date).toLocaleDateString()} | Period: {l.repayment_period_months} months
+                </p>
+                <p
+                  className={`text-xs font-medium ${
+                    l.status === 'approved'
+                      ? 'text-green-500'
+                      : l.status === 'rejected'
+                      ? 'text-red-500'
+                      : 'text-yellow-500'
+                  }`}
+                >
+                  {l.status?.toUpperCase() || 'PENDING'}
+                </p>
+              </div>
+              <span className="font-semibold">{l.amount_requested.toLocaleString()} UGX</span>
+            </div>
+          ))}
         </div>
       </div>
 
