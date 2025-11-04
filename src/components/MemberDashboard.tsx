@@ -81,12 +81,13 @@ export default function MemberDashboard() {
     const [searchResults, setSearchResults] = useState<Member[]>([]);
     const [searchLoading, setSearchLoading] = useState(false);
 
-    // Compute remaining amount dynamically
     const remainingAmount = useMemo(() => {
-      return Math.max(Number(formData.amount || 0) - guarantors.reduce((sum, g) => sum + Number(g.amount || 0), 0), 0);
+      return Math.max(
+        Number(formData.amount || 0) - guarantors.reduce((sum, g) => sum + Number(g.amount || 0), 0),
+        0
+      );
     }, [formData.amount, guarantors]);
 
-    // Debounced search
     const debouncedSearch = debounce(async (query: string, index: number) => {
       if (!query) return setSearchResults([]);
       setSearchLoading(true);
@@ -97,7 +98,6 @@ export default function MemberDashboard() {
         .neq('profile_id', profile?.id)
         .limit(5);
 
-      // Exclude already selected guarantors
       const filtered = data?.filter((m) => !guarantors.some((g) => g.member_id === m.id)) || [];
       setSearchResults(filtered);
       setSearchLoading(false);
@@ -121,7 +121,6 @@ export default function MemberDashboard() {
         return updated;
       });
       setSearchResults([]);
-      // Add another guarantor input automatically if needed
       if (remainingAmount > 0 && guarantors.length < 2) addGuarantor();
     };
 
@@ -174,7 +173,6 @@ export default function MemberDashboard() {
 
         if (loanError) throw loanError;
 
-        // Batch insert guarantors
         const validGuarantors = guarantors.filter((g) => Number(g.amount) > 0);
         if (validGuarantors.length > 0) {
           const { error: gError } = await supabase.from('loan_guarantors').insert(
@@ -205,6 +203,7 @@ export default function MemberDashboard() {
           </p>
           {error && <div className="mb-4 p-3 bg-red-50 text-red-800 rounded-xl">{error}</div>}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Form Fields */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Loan Amount (UGX)</label>
               <input
@@ -256,6 +255,7 @@ export default function MemberDashboard() {
                   + Add Guarantor
                 </button>
               </div>
+
               <div className="space-y-2">
                 {guarantors.map((g, idx) => (
                   <div key={idx} className="flex gap-2 items-center">
@@ -287,7 +287,9 @@ export default function MemberDashboard() {
                     )}
                   </div>
                 ))}
+
                 {searchLoading && <p className="text-xs text-gray-500 mt-1">Searching...</p>}
+
                 {searchResults.length > 0 && (
                   <div className="border bg-white rounded-xl max-h-40 overflow-y-auto mt-1">
                     {searchResults.map((m) => (
@@ -362,31 +364,67 @@ export default function MemberDashboard() {
 
         {/* Transactions & Loans */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Transactions */}
           <div className="bg-white p-4 rounded-xl shadow">
             <h3 className="font-semibold text-lg mb-2">Recent Transactions</h3>
             {transactions.length === 0 ? (
               <p className="text-gray-500 text-sm">No transactions yet.</p>
             ) : (
-              <ul className="space-y-2 text-sm">
+              <ul className="space-y-3">
                 {transactions.map((t) => (
-                  <li key={t.id} className="flex justify-between border-b pb-1">
-                    <span>{t.description}</span>
-                    <span>{t.amount.toLocaleString()} UGX</span>
+                  <li
+                    key={t.id}
+                    className="flex justify-between items-center bg-gray-50 p-3 rounded-xl shadow-sm border"
+                  >
+                    <div>
+                      <p className="font-medium">{t.description}</p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(t.transaction_date).toLocaleString()}
+                      </p>
+                    </div>
+                    <span
+                      className={`font-semibold ${
+                        t.type === 'credit' ? 'text-green-500' : 'text-red-500'
+                      }`}
+                    >
+                      {t.amount.toLocaleString()} UGX
+                    </span>
                   </li>
                 ))}
               </ul>
             )}
           </div>
+
+          {/* Loans */}
           <div className="bg-white p-4 rounded-xl shadow">
             <h3 className="font-semibold text-lg mb-2">Your Loans</h3>
             {loans.length === 0 ? (
               <p className="text-gray-500 text-sm">No loans requested yet.</p>
             ) : (
-              <ul className="space-y-2 text-sm">
+              <ul className="space-y-3">
                 {loans.map((l) => (
-                  <li key={l.id} className="flex justify-between border-b pb-1">
-                    <span>{l.loan_number}</span>
-                    <span>{l.amount_requested.toLocaleString()} UGX</span>
+                  <li
+                    key={l.id}
+                    className="bg-gray-50 p-3 rounded-xl shadow-sm border flex justify-between items-center"
+                  >
+                    <div>
+                      <p className="font-medium">{l.loan_number}</p>
+                      <p className="text-xs text-gray-400">
+                        Requested: {new Date(l.requested_date).toLocaleDateString()} | Period: {l.repayment_period_months} months
+                      </p>
+                      <p
+                        className={`text-xs font-medium ${
+                          l.status === 'approved'
+                            ? 'text-green-500'
+                            : l.status === 'rejected'
+                            ? 'text-red-500'
+                            : 'text-yellow-500'
+                        }`}
+                      >
+                        {l.status?.toUpperCase() || 'PENDING'}
+                      </p>
+                    </div>
+                    <span className="font-semibold">{l.amount_requested.toLocaleString()} UGX</span>
                   </li>
                 ))}
               </ul>
