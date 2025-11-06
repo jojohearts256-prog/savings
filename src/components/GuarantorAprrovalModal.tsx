@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import { supabase, Member, Loan, LoanGuarantee } from '../lib/supabase';
+import { supabase, Member, Loan } from '../lib/supabase';
 import { XCircle } from 'lucide-react';
 
 interface GuarantorApprovalModalProps {
-  loanGuarantee: LoanGuarantee | null; // pending loan guarantee
-  member: Member | null;
+  loan: Loan | null; // Loan object needing your approval
+  member: Member | null; // current logged-in member
   onClose: () => void;
   onSuccess: () => void;
 }
 
 export default function GuarantorApprovalModal({
-  loanGuarantee,
+  loan,
   member,
   onClose,
   onSuccess,
@@ -18,35 +18,37 @@ export default function GuarantorApprovalModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  if (!loanGuarantee || !member) return null;
+  if (!loan || !member) return null;
 
   const handleDecision = async (decision: 'approved' | 'rejected') => {
     setLoading(true);
     setError('');
 
     try {
-      // 1️⃣ Update the guarantee status
+      // Update the guarantee status for this member
       const { error: updateError } = await supabase
         .from('loan_guarantees')
         .update({ status: decision })
-        .eq('id', loanGuarantee.id);
+        .eq('loan_id', loan.id)
+        .eq('guarantor_id', member.id);
+
       if (updateError) throw updateError;
 
-      // 2️⃣ Optionally, send notification to the loan requester
+      // Send notification to the loan requester
       const message =
         decision === 'approved'
           ? `${member.full_name} approved your loan guarantee.`
           : `${member.full_name} rejected your loan guarantee.`;
 
       await supabase.from('notifications').insert({
-        member_id: loanGuarantee.loan.member_id,
+        member_id: loan.member_id,
         type: 'guarantor_response',
         title: 'Guarantor Response',
         message,
         recipient_role: 'member',
         metadata: JSON.stringify({
           guarantor_id: member.id,
-          loanId: loanGuarantee.loan_id,
+          loanId: loan.id,
           decision,
         }),
       });
@@ -79,12 +81,8 @@ export default function GuarantorApprovalModal({
         )}
 
         <p className="mb-4">
-          Loan <strong>{loanGuarantee.loan.loan_number}</strong> requested by member ID{' '}
-          <strong>{loanGuarantee.loan.member_id}</strong> needs your approval.
-        </p>
-
-        <p className="mb-4">
-          Amount you pledged: <strong>{loanGuarantee.amount_guaranteed.toLocaleString()} UGX</strong>
+          Loan <strong>{loan.loan_number}</strong> requested by member ID{' '}
+          <strong>{loan.member_id}</strong> needs your approval.
         </p>
 
         <div className="flex gap-3">
