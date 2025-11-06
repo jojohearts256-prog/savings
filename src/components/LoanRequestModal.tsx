@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { supabase, Member, Profile } from '../lib/supabase';
 import { XCircle } from 'lucide-react';
 import { debounce } from 'lodash';
@@ -108,7 +108,7 @@ export default function LoanRequestModal({ member, profile, onClose, onSuccess }
 
       const loanNumber = 'LN' + Date.now() + Math.floor(Math.random() * 1000);
 
-      // Create loan
+      // 1️⃣ Create loan
       const { data: loanData, error: loanError } = await supabase
         .from('loans')
         .insert({
@@ -122,7 +122,7 @@ export default function LoanRequestModal({ member, profile, onClose, onSuccess }
         .single();
       if (loanError) throw loanError;
 
-      // Add guarantors
+      // 2️⃣ Add guarantors
       const validGuarantors = guarantors.filter(g => Number(g.amount) > 0);
       if (validGuarantors.length > 0) {
         const { error: gError } = await supabase.from('loan_guarantees').insert(
@@ -135,7 +135,7 @@ export default function LoanRequestModal({ member, profile, onClose, onSuccess }
         );
         if (gError) throw gError;
 
-        // Send notifications
+        // 3️⃣ Send notifications to guarantors
         for (const g of validGuarantors) {
           await supabase.from('notifications').insert({
             member_id: g.member_id,
