@@ -11,7 +11,6 @@ import {
   Send,
 } from 'lucide-react';
 import LoanRequestModal from '../components/LoanRequestModal';
-import GuarantorApprovalModal from '../components/GuarantorApprovalModal'; // 👈 NEW IMPORT
 
 export default function MemberDashboard() {
   const { profile, signOut } = useAuth();
@@ -19,10 +18,12 @@ export default function MemberDashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [pendingGuarantorLoans, setPendingGuarantorLoans] = useState<Loan[]>([]);
+  const [pendingGuarantorLoans, setPendingGuarantorLoans] = useState<
+    (Loan & { borrower_name: string })[]
+  >([]);
   const [showLoanModal, setShowLoanModal] = useState(false);
-  const [showGuarantorModal, setShowGuarantorModal] = useState<Loan | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [loadingGuarantorAction, setLoadingGuarantorAction] = useState(false);
 
   useEffect(() => {
     loadMemberData();
@@ -72,7 +73,7 @@ export default function MemberDashboard() {
       setLoans(loanRes.data || []);
       setNotifications(notifRes.data || []);
 
-      // Add loan reminders and overdue notices dynamically
+      // Loan reminders and overdue
       const reminders: Notification[] = [];
       loanRes.data?.forEach((loan) => {
         if (loan.status !== 'disbursed' || !loan.disbursed_date) return;
@@ -99,29 +100,65 @@ export default function MemberDashboard() {
             id: `loan-overdue-${loan.id}`,
             member_id: fetchedMember.id,
             title: 'Loan Overdue',
-            message: `Alert: Your loan ${loan.loan_number} is overdue by ${Math.abs(diffDays)} days. Please repay immediately.`,
+            message: `Alert: Your loan ${loan.loan_number} is overdue by ${Math.abs(
+              diffDays
+            )} days. Please repay immediately.`,
             type: 'loan_overdue',
             read: false,
             sent_at: new Date(),
           });
         }
       });
-
       setNotifications((prev) => [...prev, ...reminders]);
 
       // Fetch loans where this member is a guarantor and approval is pending
       const pendingGuarantorRes = await supabase
         .from('loans')
-        .select('*')
+        .select(`
+          *,
+          member:member_id(full_name)
+        `)
         .contains('guarantors', [{ member_id: fetchedMember.id, approved: false }]);
 
-      setPendingGuarantorLoans(pendingGuarantorRes.data || []);
+      const pendingWithName = (pendingGuarantorRes.data || []).map((loan) => ({
+        ...loan,
+        borrower_name: loan.member?.full_name || 'Unknown',
+      }));
+
+      setPendingGuarantorLoans(pendingWithName);
     } catch (err) {
       console.error('Failed to load member data:', err);
     }
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Approve / Reject loan directly
+  const handleGuarantorAction = async (loanId: string, approve: boolean) => {
+    if (!member) return;
+    setLoadingGuarantorAction(true);
+
+    try {
+      // Update guarantor status in the loan's guarantors array
+      const loanData = pendingGuarantorLoans.find((l) => l.id === loanId);
+      if (!loanData) return;
+
+      const updatedGuarantors = loanData.guarantors.map((g) =>
+        g.member_id === member.id ? { ...g, approved: approve } : g
+      );
+
+      await supabase
+        .from('loans')
+        .update({ guarantors: updatedGuarantors })
+        .eq('id', loanId);
+
+      loadMemberData();
+    } catch (err) {
+      console.error('Failed to update guarantor approval:', err);
+    } finally {
+      setLoadingGuarantorAction(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -174,9 +211,7 @@ export default function MemberDashboard() {
                 {notifications.map((notif) => (
                   <div
                     key={notif.id}
-                    className={`p-3 rounded-xl ${
-                      notif.read ? 'bg-gray-50' : 'bg-blue-50'
-                    }`}
+                    className={`p-3 rounded-xl ${notif.read ? 'bg-gray-50' : 'bg-blue-50'}`}
                     onClick={async () => {
                       if (!notif.read) {
                         await supabase
@@ -241,26 +276,40 @@ export default function MemberDashboard() {
           </div>
         </div>
 
-        {/* Pending Guarantor Approvals */}
+        {/* Pending Guarantor Approvals – Beautiful Cards with Approve/Reject */}
         {pendingGuarantorLoans.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 card-shadow mb-6">
+          <div className="mb-6">
             <h3 className="text-lg font-bold text-gray-800 mb-3">Pending Guarantor Approvals</h3>
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {pendingGuarantorLoans.map((loan) => (
                 <div
                   key={loan.id}
-                  className="flex justify-between items-center p-3 bg-yellow-50 rounded-xl cursor-pointer"
-                  onClick={() => setShowGuarantorModal(loan)}
+                  className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-2xl shadow-md hover:shadow-xl transition-shadow"
                 >
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{loan.loan_number}</p>
-                    <p className="text-xs text-gray-600">
-                      Amount Requested: {Number(loan.amount_requested).toLocaleString()} UGX
-                    </p>
+                  <p className="text-sm text-gray-600">Borrower:</p>
+                  <p className="text-lg font-bold text-gray-800 mb-2">{loan.borrower_name}</p>
+                  <p className="text-sm text-gray-600">Loan Number:</p>
+                  <p className="text-md font-medium text-gray-800 mb-2">{loan.loan_number}</p>
+                  <p className="text-sm text-gray-600">Amount Requested:</p>
+                  <p className="text-md font-medium text-gray-800 mb-3">
+                    {Number(loan.amount_requested).toLocaleString()} UGX
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={loadingGuarantorAction}
+                      onClick={() => handleGuarantorAction(loan.id, true)}
+                      className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-colors"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      disabled={loadingGuarantorAction}
+                      onClick={() => handleGuarantorAction(loan.id, false)}
+                      className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors"
+                    >
+                      Reject
+                    </button>
                   </div>
-                  <button className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-sm font-medium">
-                    Approve / Reject
-                  </button>
                 </div>
               ))}
             </div>
@@ -282,7 +331,9 @@ export default function MemberDashboard() {
                   className="flex justify-between items-center p-3 bg-gray-50 rounded-xl"
                 >
                   <div>
-                    <p className="text-sm font-medium text-gray-800 capitalize">{tx.transaction_type}</p>
+                    <p className="text-sm font-medium text-gray-800 capitalize">
+                      {tx.transaction_type}
+                    </p>
                     <p className="text-xs text-gray-600">
                       {new Date(tx.transaction_date).toLocaleDateString()}
                     </p>
@@ -364,21 +415,12 @@ export default function MemberDashboard() {
         </div>
       </div>
 
-      {/* Modals */}
-      {showLoanModal && member && (
+      {/* Loan Request Modal */}
+      {showLoanModal && (
         <LoanRequestModal
           member={member}
           profile={profile}
           onClose={() => setShowLoanModal(false)}
-          onSuccess={loadMemberData}
-        />
-      )}
-
-      {showGuarantorModal && member && (
-        <GuarantorApprovalModal
-          loan={showGuarantorModal}
-          member={member}
-          onClose={() => setShowGuarantorModal(null)}
           onSuccess={loadMemberData}
         />
       )}
