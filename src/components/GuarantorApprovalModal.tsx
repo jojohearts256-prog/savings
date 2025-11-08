@@ -25,7 +25,7 @@ export default function GuarantorApprovalModal({
     setError('');
 
     try {
-      // Update the guarantee status for this member
+      // 1️⃣ Update this guarantor's decision in the loan_guarantees table
       const { error: updateError } = await supabase
         .from('loan_guarantees')
         .update({ status: decision })
@@ -34,7 +34,7 @@ export default function GuarantorApprovalModal({
 
       if (updateError) throw updateError;
 
-      // Send notification to the loan requester
+      // 2️⃣ Send notification to the loan requester
       const message =
         decision === 'approved'
           ? `${member.full_name} approved your loan guarantee.`
@@ -53,6 +53,48 @@ export default function GuarantorApprovalModal({
         }),
       });
 
+      // 3️⃣ Check if all guarantors have approved
+      const { data: guaranteesRes, error: guaranteesError } = await supabase
+        .from('loan_guarantees')
+        .select('*')
+        .eq('loan_id', loan.id);
+
+      if (guaranteesError) throw guaranteesError;
+
+      const allApproved = guaranteesRes?.every((g) => g.status === 'approved') ?? false;
+      const anyRejected = guaranteesRes?.some((g) => g.status === 'rejected') ?? false;
+
+      // 4️⃣ If all approved, move loan to pending_admin
+      if (allApproved) {
+        await supabase.from('loans').update({ status: 'pending_admin' }).eq('id', loan.id);
+
+        // Optional: Notify admin (if you have admin notifications)
+        await supabase.from('notifications').insert({
+          member_id: null, // or admin ID
+          type: 'loan_pending_admin',
+          title: 'Loan Ready for Admin Approval',
+          message: `Loan ${loan.loan_number} is approved by all guarantors and ready for admin processing.`,
+          recipient_role: 'admin',
+          metadata: JSON.stringify({ loanId: loan.id }),
+        });
+      }
+
+      // 5️⃣ If any rejected, mark loan as rejected
+      if (anyRejected) {
+        await supabase.from('loans').update({ status: 'rejected' }).eq('id', loan.id);
+
+        // Optional: Notify loan requester
+        await supabase.from('notifications').insert({
+          member_id: loan.member_id,
+          type: 'loan_rejected',
+          title: 'Loan Rejected',
+          message: `Loan ${loan.loan_number} has been rejected by one or more guarantors.`,
+          recipient_role: 'member',
+          metadata: JSON.stringify({ loanId: loan.id }),
+        });
+      }
+
+      // Refresh parent data
       onSuccess();
       onClose();
     } catch (err: any) {
