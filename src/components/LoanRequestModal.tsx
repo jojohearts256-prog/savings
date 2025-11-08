@@ -1,278 +1,283 @@
-import { supabase, Loan, Member, Profile } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import { CreditCard, CheckCircle, XCircle, Clock, TrendingUp } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { supabase, Member, Profile } from '../lib/supabase';
+import { XCircle } from 'lucide-react';
+import { debounce } from 'lodash';
 
-// Optional: import GuarantorApprovalModal if using a separate modal for guarantors
-import GuarantorApprovalModal from './GuarantorApprovalModal';
+interface LoanRequestModalProps {
+  member: Member | null;
+  profile: Profile | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}
 
-export default function LoanManagement() {
-  const { profile } = useAuth();
-  const [loans, setLoans] = useState<any[]>([]);
-  const [selectedLoan, setSelectedLoan] = useState<any>(null);
-  const [showRepaymentModal, setShowRepaymentModal] = useState(false);
-  const [showGuarantorModal, setShowGuarantorModal] = useState(false);
+interface Guarantor {
+  member_id: string | number;
+  name: string;
+  amount: string;
+  search: string;
+}
 
-  useEffect(() => {
-    loadLoans();
-  }, []);
+export default function LoanRequestModal({ member, profile, onClose, onSuccess }: LoanRequestModalProps) {
+  const [formData, setFormData] = useState({
+    amount: '',
+    repayment_period: '12',
+    reason: '',
+  });
 
-  const loadLoans = async () => {
+  const [guarantors, setGuarantors] = useState<Guarantor[]>([{ member_id: 0, name: '', amount: '', search: '' }]);
+  const [searchResults, setSearchResults] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const memberSavings = Math.floor(Number(member?.account_balance || 0));
+  const safeSavingsLimit = 1000;
+  const usableSavings = Math.max(memberSavings - safeSavingsLimit, 0);
+
+  const totalGuarantor = useMemo(
+    () => guarantors.reduce((sum, g) => sum + Math.floor(Number(g.amount || 0)), 0),
+    [guarantors]
+  );
+
+  const remainingAmount = useMemo(() => {
+    return Math.max(Math.floor(Number(formData.amount || 0)) - usableSavings - totalGuarantor, 0);
+  }, [formData.amount, usableSavings, totalGuarantor]);
+
+  const debouncedSearch = debounce(async (query: string) => {
+    if (!query) return setSearchResults([]);
     const { data } = await supabase
-      .from('loans')
-      .select(
-        `*, members!loans_member_id_fkey(*, profiles(*)), loan_guarantees(*)`
-      )
-      .order('requested_date', { ascending: false });
+      .from('members')
+      .select('*')
+      .ilike('full_name', `%${query}%`)
+      .neq('profile_id', profile?.id)
+      .limit(5);
+    const filtered = data?.filter(m => !guarantors.some(g => g.member_id === m.id)) || [];
+    setSearchResults(filtered);
+  }, 300);
 
-    setLoans(data || []);
+  const handleSearch = (index: number, query: string) => {
+    setGuarantors(prev => {
+      const updated = [...prev];
+      updated[index].search = query;
+      return updated;
+    });
+    debouncedSearch(query);
   };
 
-  // Admin approve/reject loan action
-  const handleLoanAction = async (
-    loanId: string,
-    action: 'approve' | 'reject',
-    approvedAmount?: number,
-    interestRate?: number
-  ) => {
-    try {
-      if (action === 'approve' && approvedAmount && interestRate !== undefined) {
-        const totalRepayable = approvedAmount + (approvedAmount * interestRate / 100);
+  const selectGuarantor = (index: number, m: Member) => {
+    setGuarantors(prev => {
+      const updated = [...prev];
+      updated[index].member_id = m.id;
+      updated[index].name = m.full_name;
+      updated[index].search = m.full_name;
+      return updated;
+    });
+    setSearchResults([]);
 
-        await supabase
-          .from('loans')
-          .update({
-            status: 'approved',
-            amount_approved: approvedAmount,
-            interest_rate: interestRate,
-            approved_date: new Date().toISOString(),
-            approved_by: profile?.id,
-            total_repayable: totalRepayable,
-            outstanding_balance: approvedAmount,
-          })
-          .eq('id', loanId);
-
-        const loan = loans.find(l => l.id === loanId);
-        await supabase.from('notifications').insert({
-          member_id: loan.member_id,
-          type: 'loan_approved',
-          title: 'Loan Approved',
-          message: `Your loan request of UGX ${approvedAmount.toLocaleString('en-UG')} has been approved at ${interestRate}% interest.`,
-        });
-      } else if (action === 'reject') {
-        await supabase
-          .from('loans')
-          .update({ status: 'rejected', approved_by: profile?.id })
-          .eq('id', loanId);
-
-        const loan = loans.find(l => l.id === loanId);
-        await supabase.from('notifications').insert({
-          member_id: loan.member_id,
-          type: 'loan_rejected',
-          title: 'Loan Rejected',
-          message: 'Your loan request has been reviewed and could not be approved at this time.',
-        });
-      }
-
-      loadLoans();
-    } catch (err) {
-      console.error('Error processing loan:', err);
+    if (remainingAmount > 0 && guarantors.length < 3) {
+      setGuarantors(prev => [...prev, { member_id: 0, name: '', amount: '', search: '' }]);
     }
   };
 
-  // Disburse approved loan
-  const handleDisburse = async (loanId: string) => {
-    try {
-      const loan = loans.find(l => l.id === loanId);
+  const handleAmountChange = (index: number, value: string) => {
+    if (Number(value) < 0) return;
+    setError('');
+    setGuarantors(prev => {
+      const updated = [...prev];
+      updated[index].amount = Math.floor(Number(value)).toString();
+      return updated;
+    });
+  };
 
-      await supabase
+  const removeGuarantor = (index: number) => setGuarantors(prev => prev.filter((_, i) => i !== index));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      if (!member) throw new Error('Member data not found');
+
+      const requestedAmount = Math.floor(Number(formData.amount));
+      const totalCovered = usableSavings + totalGuarantor;
+
+      if (totalCovered < requestedAmount) {
+        const moreNeeded = requestedAmount - totalCovered;
+        throw new Error(`Loan not fully covered. You need ${moreNeeded} more from guarantors.`);
+      }
+
+      const loanNumber = 'LN' + Date.now() + Math.floor(Math.random() * 1000);
+
+      // 1️⃣ Create loan
+      const { data: loanData, error: loanError } = await supabase
         .from('loans')
-        .update({ status: 'disbursed', disbursed_date: new Date().toISOString() })
-        .eq('id', loanId);
+        .insert({
+          member_id: member.id,
+          loan_number: loanNumber,
+          amount_requested: requestedAmount,
+          repayment_period_months: parseInt(formData.repayment_period),
+          reason: formData.reason,
+        })
+        .select()
+        .single();
+      if (loanError) throw loanError;
 
-      const member = loan.members;
-      const newBalance = Number(member.account_balance) + Number(loan.amount_approved);
+      // 2️⃣ Add guarantors
+      const validGuarantors = guarantors.filter(g => Number(g.amount) > 0);
+      if (validGuarantors.length > 0) {
+        const { error: gError } = await supabase.from('loan_guarantees').insert(
+          validGuarantors.map(g => ({
+            loan_id: loanData.id,
+            guarantor_id: g.member_id,
+            amount_guaranteed: Math.floor(Number(g.amount)),
+            status: 'pending',
+          }))
+        );
+        if (gError) throw gError;
 
-      await supabase
-        .from('members')
-        .update({ account_balance: newBalance })
-        .eq('id', loan.member_id);
-
-      await supabase.from('transactions').insert({
-        member_id: loan.member_id,
-        transaction_type: 'deposit',
-        amount: loan.amount_approved,
-        balance_before: member.account_balance,
-        balance_after: newBalance,
-        description: `Loan disbursement`,
-        recorded_by: profile?.id,
-      });
-
-      await supabase.from('notifications').insert({
-        member_id: loan.member_id,
-        type: 'loan_disbursed',
-        title: 'Loan Disbursed',
-        message: `Your loan of UGX ${loan.amount_approved.toLocaleString('en-UG')} has been disbursed to your account.`,
-      });
-
-      loadLoans();
-    } catch (err) {
-      console.error('Error disbursing loan:', err);
-    }
-  };
-
-  // Admin/Member repayment modal
-  const RepaymentModal = ({ loan, onClose }: any) => {
-    const [amount, setAmount] = useState('');
-    const [notes, setNotes] = useState('');
-    const [loading, setLoading] = useState(false);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setLoading(true);
-      try {
-        const repaymentAmount = parseFloat(amount.replace(/,/g, ''));
-        let principalRemaining = Number(loan.outstanding_balance);
-        let interest = principalRemaining * (loan.interest_rate / 100);
-        let newOutstanding = principalRemaining - repaymentAmount + interest;
-
-        await supabase.from('loan_repayments').insert({
-          loan_id: loan.id,
-          amount: repaymentAmount,
-          recorded_by: profile?.id,
-          notes,
-        });
-
-        await supabase
-          .from('loans')
-          .update({
-            amount_repaid: Number(loan.amount_repaid) + repaymentAmount,
-            outstanding_balance: newOutstanding <= 0 ? 0 : newOutstanding,
-            status: newOutstanding <= 0 ? 'completed' : 'disbursed',
-          })
-          .eq('id', loan.id);
-
-        await supabase.from('notifications').insert({
-          member_id: loan.member_id,
-          type: 'loan_repayment',
-          title: 'Loan Repayment Recorded',
-          message: `A repayment of UGX ${repaymentAmount.toLocaleString('en-UG')} has been recorded. Outstanding balance: UGX ${newOutstanding.toLocaleString('en-UG')}`,
-        });
-
-        onClose();
-        loadLoans();
-      } catch (err) {
-        console.error('Error recording repayment:', err);
-      } finally {
-        setLoading(false);
+        // 3️⃣ Send notifications to guarantors
+        for (const g of validGuarantors) {
+          await supabase.from('notifications').insert({
+            member_id: g.member_id,
+            type: 'loan_request',
+            title: 'Loan Approval Needed',
+            message: `${member.full_name} requested a loan of ${requestedAmount} UGX. You pledged ${Math.floor(
+              Number(g.amount)
+            )} UGX. Approve or reject your guarantee.`,
+            recipient_role: 'guarantor',
+            metadata: JSON.stringify({
+              loanId: loanData.id,
+              member_name: member.full_name,
+              requested_amount: requestedAmount,
+              pledged_amount: Math.floor(Number(g.amount)),
+            }),
+            sent_at: new Date(),
+            read: false,
+          });
+        }
       }
-    };
 
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Record Repayment</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="bg-blue-50 rounded-xl p-4 mb-4">
-              <p className="text-sm text-gray-600 mb-1">Outstanding Balance</p>
-              <p className="text-2xl font-bold text-[#008080]">UGX {Number(loan.outstanding_balance).toLocaleString('en-UG')}</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Repayment Amount (UGX)</label>
-              <input
-                type="text"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080] focus:border-transparent outline-none"
-                rows={2}
-              />
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50"
-              >
-                {loading ? 'Recording...' : 'Record Repayment'}
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  };
-
-  // Check if loan needs guarantor approval
-  const handleOpenGuarantorModal = (loan: any) => {
-    if (loan.loan_guarantees && loan.loan_guarantees.length > 0) {
-      setSelectedLoan(loan);
-      setShowGuarantorModal(true);
-    } else {
-      alert('No guarantors assigned to this loan.');
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending': return <Clock className="w-4 h-4" />;
-      case 'approved': return <CheckCircle className="w-4 h-4" />;
-      case 'rejected': return <XCircle className="w-4 h-4" />;
-      case 'disbursed': return <CreditCard className="w-4 h-4" />;
-      case 'completed': return <CheckCircle className="w-4 h-4" />;
-      default: return null;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'approved': return 'bg-blue-100 text-blue-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      case 'disbursed': return 'bg-green-100 text-green-800';
-      case 'completed': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit loan request');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div>
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Loan Management</h2>
-      {/* ... dashboard summary & table code remains unchanged ... */}
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl w-full max-w-md p-6 relative shadow-2xl border border-gray-100 animate-fadeIn max-h-[90vh] overflow-y-auto">
+        <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition">
+          <XCircle className="w-6 h-6" />
+        </button>
 
-      {selectedLoan && showGuarantorModal && (
-        <GuarantorApprovalModal
-          loan={selectedLoan}
-          member={profile} // current logged-in user as guarantor
-          onClose={() => { setSelectedLoan(null); setShowGuarantorModal(false); loadLoans(); }}
-          onSuccess={() => loadLoans()}
-        />
-      )}
+        <h2 className="text-xl font-bold text-gray-800 mb-4">Request Loan</h2>
 
-      {selectedLoan && showRepaymentModal && (
-        <RepaymentModal
-          loan={selectedLoan}
-          onClose={() => { setSelectedLoan(null); setShowRepaymentModal(false); loadLoans(); }}
-        />
-      )}
+        {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">{error}</div>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Loan Amount</label>
+            <input
+              type="number"
+              value={formData.amount}
+              onChange={e => setFormData({ ...formData, amount: e.target.value })}
+              className="w-full border rounded-lg p-2 mt-1 focus:ring-[#007B8A] focus:border-[#007B8A]"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Repayment Period (Months)</label>
+            <input
+              type="number"
+              value={formData.repayment_period}
+              onChange={e => setFormData({ ...formData, repayment_period: e.target.value })}
+              className="w-full border rounded-lg p-2 mt-1 focus:ring-[#007B8A] focus:border-[#007B8A]"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Reason</label>
+            <textarea
+              value={formData.reason}
+              onChange={e => setFormData({ ...formData, reason: e.target.value })}
+              className="w-full border rounded-lg p-2 mt-1 focus:ring-[#007B8A] focus:border-[#007B8A]"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Guarantors</label>
+            {guarantors.map((g, i) => {
+              const suggested = i === guarantors.length - 1 ? remainingAmount : 0;
+              return (
+                <div key={i} className="mb-3 border p-3 rounded-xl bg-gray-50">
+                  <input
+                    type="text"
+                    placeholder="Search member..."
+                    value={g.search}
+                    onChange={e => handleSearch(i, e.target.value)}
+                    className="w-full border rounded-lg p-2 mb-2"
+                  />
+                  {searchResults.length > 0 && g.search && (
+                    <ul className="border rounded-lg bg-white max-h-32 overflow-y-auto mb-2">
+                      {searchResults.map(m => (
+                        <li
+                          key={m.id}
+                          onClick={() => selectGuarantor(i, m)}
+                          className="p-2 hover:bg-gray-100 cursor-pointer"
+                        >
+                          {m.full_name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {g.name && (
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">{g.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeGuarantor(i)}
+                        className="text-xs text-red-500 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  <input
+                    type="number"
+                    placeholder={`Guarantee amount (Suggested: ${suggested})`}
+                    value={g.amount}
+                    onChange={e => handleAmountChange(i, e.target.value)}
+                    className="w-full border rounded-lg p-2"
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="text-sm text-gray-600">
+            Remaining amount to cover loan: <strong>{remainingAmount}</strong>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 py-2 bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] text-white font-medium rounded-xl disabled:opacity-50"
+            >
+              {loading ? 'Submitting...' : 'Submit Request'}
+            </button>
+            <button type="button" onClick={onClose} className="px-6 py-2 border rounded-xl hover:bg-gray-50">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
