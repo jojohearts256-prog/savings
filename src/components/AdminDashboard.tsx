@@ -33,7 +33,6 @@ export default function AdminDashboard() {
 
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
-
   const notificationRef = useRef(null);
 
   const particlesInit = useCallback(async (engine) => {
@@ -80,25 +79,6 @@ export default function AdminDashboard() {
     }
   }
 
-  async function loadNotifications() {
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .in('type', [
-          'loan_request', 
-          'loan_reminder_admin', 
-          'loan_overdue_admin'
-        ])
-        .order('sent_at', { ascending: false });
-
-      if (error) throw error;
-      setNotifications(data || []);
-    } catch (err) {
-      console.error('Failed to load notifications:', err);
-    }
-  }
-
   async function markAsRead(id) {
     try {
       const { error } = await supabase
@@ -134,11 +114,46 @@ export default function AdminDashboard() {
     };
   }, [notificationRef]);
 
+  // Load stats once
   useEffect(() => {
     loadStats();
-    loadNotifications();
-    const interval = setInterval(loadNotifications, 30000); // refresh every 30s
-    return () => clearInterval(interval);
+  }, []);
+
+  // Subscribe to notifications in real-time
+  useEffect(() => {
+    // Initial load
+    const fetchNotifications = async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .in('type', ['loan_request', 'loan_reminder_admin', 'loan_overdue_admin'])
+        .order('sent_at', { ascending: false });
+      if (error) console.error(error);
+      else setNotifications(data || []);
+    };
+
+    fetchNotifications();
+
+    // Subscribe to new notifications
+    const subscription = supabase
+      .channel('notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `type=in.(loan_request,loan_reminder_admin,loan_overdue_admin)`,
+        },
+        (payload) => {
+          setNotifications((prev) => [payload.new, ...prev]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   const tabs = [
