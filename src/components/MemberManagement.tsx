@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase, Member } from '../lib/supabase';
 import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, Loader2 } from 'lucide-react';
 
@@ -10,9 +10,6 @@ export default function MemberManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Ref to store notifications without triggering re-renders
-  const notificationsRef = useRef<any[]>([]);
-
   // ---------------- Helper: Format Name ----------------
   const formatName = (name: string | undefined) => {
     if (!name) return '-';
@@ -23,10 +20,9 @@ export default function MemberManagement() {
       .join(' ');
   };
 
-  // ---------------- Load Members ----------------
+  // Load members
   useEffect(() => {
     loadMembers();
-    subscribeNotifications(); // start notifications
   }, []);
 
   const loadMembers = async () => {
@@ -34,42 +30,11 @@ export default function MemberManagement() {
       .from('members')
       .select('*')
       .order('created_at', { ascending: false });
+
     if (error) console.error('Error loading members:', error.message);
     setMembers(data || []);
   };
 
-  // ---------------- Notifications Handling ----------------
-  const subscribeNotifications = () => {
-    const subscription = supabase
-      .channel('public:notifications')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'notifications' },
-        (payload) => {
-          const newNotification = payload.new;
-          // Only add unique notifications
-          if (!notificationsRef.current.some((n) => n.id === newNotification.id)) {
-            notificationsRef.current.push(newNotification);
-          }
-        }
-      )
-      .subscribe();
-
-    // Periodically update members table only if needed
-    const interval = setInterval(() => {
-      if (notificationsRef.current.length > 0) {
-        loadMembers(); // reload members table safely
-        notificationsRef.current = []; // clear after processing
-      }
-    }, 2000);
-
-    return () => {
-      clearInterval(interval);
-      supabase.removeChannel(subscription);
-    };
-  };
-
-  // ---------------- Filtered Members ----------------
   const filteredMembers = members.filter(
     (m) =>
       (m.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
@@ -260,7 +225,7 @@ export default function MemberManagement() {
     );
   };
 
-  // ---------------- Edit / View / Delete Modals (remain same) ----------------
+  // ---------------- ✅ FIXED Edit Member Modal ----------------
   const EditMemberModal = ({ member, onClose }: any) => {
     const [formData, setFormData] = useState({
       full_name: member.full_name || '',
@@ -281,6 +246,7 @@ export default function MemberManagement() {
       setSuccess(false);
 
       try {
+        // ✅ Update the profiles table
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
@@ -292,6 +258,7 @@ export default function MemberManagement() {
 
         if (profileError) throw profileError;
 
+        // ✅ Update the members table
         const { error: memberError } = await supabase
           .from('members')
           .update({
@@ -320,14 +287,18 @@ export default function MemberManagement() {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
         <div className="bg-white rounded-2xl p-6 max-w-2xl max-h-[90vh] overflow-y-auto">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Edit Member</h2>
+
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-800">{error}</div>
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-800">
+              {error}
+            </div>
           )}
           {success && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-800 flex items-center gap-2">
               <CheckCircle className="w-5 h-5" /> Member Updated Successfully!
             </div>
           )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -378,6 +349,7 @@ export default function MemberManagement() {
                 />
               </div>
             </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
               <textarea
@@ -387,6 +359,7 @@ export default function MemberManagement() {
                 rows={2}
               />
             </div>
+
             <div className="flex gap-3 pt-4">
               <button
                 type="submit"
@@ -410,33 +383,37 @@ export default function MemberManagement() {
     );
   };
 
-  const ViewMemberModal = ({ member, onClose }: any) => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Member Details</h2>
-        <div className="space-y-2 text-gray-700">
-          <p><strong>Member #:</strong> {member.member_number}</p>
-          <p><strong>Full Name:</strong> {formatName(member.full_name)}</p>
-          <p><strong>Email:</strong> {member.email || '-'}</p>
-          <p><strong>Phone:</strong> {member.phone || '-'}</p>
-          <p><strong>ID Number:</strong> {member.id_number || '-'}</p>
-          <p><strong>Address:</strong> {member.address || '-'}</p>
-          <p><strong>Date of Birth:</strong> {member.date_of_birth || '-'}</p>
-          <p><strong>Balance:</strong> UGX {Math.floor(Number(member.account_balance)).toLocaleString()}</p>
-          <p><strong>Status:</strong> {member.status || '-'}</p>
-        </div>
-        <div className="flex justify-end mt-4">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
-          >
-            Close
-          </button>
+  // ---------------- View Member Modal ----------------
+  const ViewMemberModal = ({ member, onClose }: any) => {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+        <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Member Details</h2>
+          <div className="space-y-2 text-gray-700">
+            <p><strong>Member #:</strong> {member.member_number}</p>
+            <p><strong>Full Name:</strong> {formatName(member.full_name)}</p>
+            <p><strong>Email:</strong> {member.email || '-'}</p>
+            <p><strong>Phone:</strong> {member.phone || '-'}</p>
+            <p><strong>ID Number:</strong> {member.id_number || '-'}</p>
+            <p><strong>Address:</strong> {member.address || '-'}</p>
+            <p><strong>Date of Birth:</strong> {member.date_of_birth || '-'}</p>
+            <p><strong>Balance:</strong> UGX {Math.floor(Number(member.account_balance)).toLocaleString()}</p>
+            <p><strong>Status:</strong> {member.status || '-'}</p>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
+  // ---------------- Delete Member ----------------
   const deleteMember = async (memberId: string) => {
     const confirmDelete = confirm('Are you sure you want to delete this member?');
     if (!confirmDelete) return;
