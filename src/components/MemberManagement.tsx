@@ -10,6 +10,7 @@ export default function MemberManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ---------------- Helper: Format Name ----------------
   const formatName = (name: string | undefined) => {
     if (!name) return '-';
     return name
@@ -19,6 +20,7 @@ export default function MemberManagement() {
       .join(' ');
   };
 
+  // Load members
   useEffect(() => {
     loadMembers();
   }, []);
@@ -135,9 +137,7 @@ export default function MemberManagement() {
                 <input
                   type="text"
                   value={formData.full_name}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, full_name: e.target.value }))
-                  }
+                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
                   required
                 />
@@ -147,9 +147,7 @@ export default function MemberManagement() {
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, email: e.target.value }))
-                  }
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
                   required
                 />
@@ -159,9 +157,7 @@ export default function MemberManagement() {
                 <input
                   type="password"
                   value={formData.password}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, password: e.target.value }))
-                  }
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
                   required
                   minLength={6}
@@ -172,9 +168,7 @@ export default function MemberManagement() {
                 <input
                   type="text"
                   value={formData.phone}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, phone: e.target.value }))
-                  }
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
                 />
               </div>
@@ -183,9 +177,7 @@ export default function MemberManagement() {
                 <input
                   type="text"
                   value={formData.id_number}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, id_number: e.target.value }))
-                  }
+                  onChange={(e) => setFormData({ ...formData, id_number: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
                 />
               </div>
@@ -194,9 +186,7 @@ export default function MemberManagement() {
                 <input
                   type="date"
                   value={formData.date_of_birth}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, date_of_birth: e.target.value }))
-                  }
+                  onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
                 />
               </div>
@@ -206,9 +196,7 @@ export default function MemberManagement() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
               <textarea
                 value={formData.address}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, address: e.target.value }))
-                }
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
                 rows={2}
               />
@@ -237,7 +225,7 @@ export default function MemberManagement() {
     );
   };
 
-  // ---------------- Edit Member Modal (unchanged) ----------------
+  // ---------------- ✅ FIXED Edit Member Modal ----------------
   const EditMemberModal = ({ member, onClose }: any) => {
     const [formData, setFormData] = useState({
       full_name: member.full_name || '',
@@ -258,6 +246,7 @@ export default function MemberManagement() {
       setSuccess(false);
 
       try {
+        // ✅ Update the profiles table
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
@@ -269,6 +258,7 @@ export default function MemberManagement() {
 
         if (profileError) throw profileError;
 
+        // ✅ Update the members table
         const { error: memberError } = await supabase
           .from('members')
           .update({
