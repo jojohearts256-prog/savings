@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { supabase, Member, Profile } from '../lib/supabase';
 import { XCircle } from 'lucide-react';
 import { debounce } from 'lodash';
@@ -135,7 +135,7 @@ export default function LoanRequestModal({ member, profile, onClose, onSuccess }
         );
         if (gError) throw gError;
 
-        // 3️⃣ Send notifications to guarantors
+        // 3️⃣ Notify guarantors
         for (const g of validGuarantors) {
           await supabase.from('notifications').insert({
             member_id: g.member_id,
@@ -155,6 +155,19 @@ export default function LoanRequestModal({ member, profile, onClose, onSuccess }
             read: false,
           });
         }
+      }
+
+      // ✅ If no guarantors, loan goes directly to admin (optional)
+      if (validGuarantors.length === 0) {
+        await supabase.from('notifications').insert({
+          member_id: null,
+          type: 'loan_ready_for_admin',
+          title: 'Loan Ready for Approval',
+          message: `Loan ${loanNumber} by member ${member.full_name} has no guarantors.`,
+          metadata: JSON.stringify({ loanId: loanData.id }),
+          sent_at: new Date(),
+          read: false,
+        });
       }
 
       onSuccess();
