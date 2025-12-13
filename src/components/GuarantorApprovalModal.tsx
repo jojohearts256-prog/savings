@@ -25,34 +25,19 @@ export default function GuarantorApprovalModal({
     setError('');
 
     try {
-      // 1️⃣ Fetch the loan record from 'loans' table to get the guarantors JSON
-      const { data: loanData, error: fetchError } = await supabase
-        .from('loans')
-        .select('id, loan_number, member_id, guarantors')
-        .eq('id', loan.id)
-        .maybeSingle();
-
-      if (fetchError) throw fetchError;
-      if (!loanData) throw new Error('Loan not found');
-
-      // 2️⃣ Update the current member's status in the guarantors JSON
-      const updatedGuarantors = (loanData.guarantors || []).map((g: any) => {
-        if (g.member_id === member.id) {
-          return { ...g, status: decision };
-        }
-        return g;
-      });
-
+      // 1️⃣ Update the guarantor row in loan_guarantees
       const { error: updateError } = await supabase
-        .from('loans')
-        .update({ guarantors: updatedGuarantors })
-        .eq('id', loan.id);
+        .from('loan_guarantees')
+        .update({ status: decision })
+        .eq('loan_id', loan.id)
+        .eq('guarantor_id', member.id)
+        .single();
 
       if (updateError) throw updateError;
 
-      // 3️⃣ Notify the loan member about this guarantor's decision
+      // 2️⃣ Notify the loan member
       await supabase.from('notifications').insert({
-        member_id: loanData.member_id,
+        member_id: loan.member_id,
         type: 'guarantor_response',
         title: 'Guarantor Response',
         message:
@@ -68,8 +53,13 @@ export default function GuarantorApprovalModal({
         read: false,
       });
 
-      // 4️⃣ Check if all guarantors have accepted
-      const allAccepted = updatedGuarantors.every((g: any) => g.status === 'accepted');
+      // 3️⃣ Check if all guarantors have accepted
+      const { data: allGuarantors } = await supabase
+        .from('loan_guarantees')
+        .select('*')
+        .eq('loan_id', loan.id);
+
+      const allAccepted = allGuarantors?.every(g => g.status === 'accepted');
 
       if (allAccepted) {
         // Notify admin
@@ -77,7 +67,7 @@ export default function GuarantorApprovalModal({
           member_id: null, // admin notifications
           type: 'loan_ready_for_admin',
           title: 'Loan Ready for Approval',
-          message: `Loan ${loan.loan_number} by member ${loanData.member_id} has all guarantor approvals.`,
+          message: `Loan ${loan.loan_number} by member ${loan.member_id} has all guarantor approvals.`,
           metadata: JSON.stringify({ loanId: loan.id }),
           sent_at: new Date(),
           read: false,
