@@ -6,16 +6,14 @@ interface GuarantorApprovalModalProps {
   loan: Loan | null;
   member: Member | null;
   onClose: () => void;
-  onApprove: () => void;
-  onReject: () => void;
+  onSuccess: () => void;
 }
 
 export default function GuarantorApprovalModal({
   loan,
   member,
   onClose,
-  onApprove,
-  onReject,
+  onSuccess,
 }: GuarantorApprovalModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -27,27 +25,40 @@ export default function GuarantorApprovalModal({
     setError('');
 
     try {
-      // 1️⃣ Update guarantor status
+      // 1️⃣ Fetch the loan record from 'loans' table to get the guarantors JSON
+      const { data: loanData, error: fetchError } = await supabase
+        .from('loans')
+        .select('id, loan_number, member_id, guarantors')
+        .eq('id', loan.id)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+      if (!loanData) throw new Error('Loan not found');
+
+      // 2️⃣ Update the current member's status in the guarantors JSON
+      const updatedGuarantors = (loanData.guarantors || []).map((g: any) => {
+        if (g.member_id === member.id) {
+          return { ...g, status: decision };
+        }
+        return g;
+      });
+
       const { error: updateError } = await supabase
-        .from('loan_guarantees')
-        .update({ status: decision })
-        .eq('loan_id', loan.id)
-        .eq('guarantor_id', member.id);
+        .from('loans')
+        .update({ guarantors: updatedGuarantors })
+        .eq('id', loan.id);
 
       if (updateError) throw updateError;
 
-      // 2️⃣ Notify loan owner (member)
-      const message =
-        decision === 'accepted'
-          ? `${member.full_name} accepted your loan guarantee.`
-          : `${member.full_name} declined your loan guarantee.`;
-
+      // 3️⃣ Notify the loan member about this guarantor's decision
       await supabase.from('notifications').insert({
-        member_id: loan.member_id,
+        member_id: loanData.member_id,
         type: 'guarantor_response',
         title: 'Guarantor Response',
-        message,
-        recipient_role: 'member',
+        message:
+          decision === 'accepted'
+            ? `${member.full_name} accepted your loan guarantee.`
+            : `${member.full_name} declined your loan guarantee.`,
         metadata: JSON.stringify({
           guarantor_id: member.id,
           loanId: loan.id,
@@ -57,32 +68,23 @@ export default function GuarantorApprovalModal({
         read: false,
       });
 
-      // 3️⃣ Check if all guarantors approved
-      const { data: allGuarantors } = await supabase
-        .from('loan_guarantees')
-        .select('*')
-        .eq('loan_id', loan.id);
-
-      const allAccepted = allGuarantors?.every((g) => g.status === 'accepted');
+      // 4️⃣ Check if all guarantors have accepted
+      const allAccepted = updatedGuarantors.every((g: any) => g.status === 'accepted');
 
       if (allAccepted) {
-        // Notify admin that loan is ready for approval
+        // Notify admin
         await supabase.from('notifications').insert({
-          member_id: null,
+          member_id: null, // admin notifications
           type: 'loan_ready_for_admin',
           title: 'Loan Ready for Approval',
-          message: `Loan ${loan.loan_number} by member ${loan.member_id} has all guarantor approvals.`,
-          recipient_role: 'admin',
+          message: `Loan ${loan.loan_number} by member ${loanData.member_id} has all guarantor approvals.`,
           metadata: JSON.stringify({ loanId: loan.id }),
           sent_at: new Date(),
           read: false,
         });
       }
 
-      // Call dashboard callbacks
-      if (decision === 'accepted') onApprove();
-      else onReject();
-
+      onSuccess();
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to submit decision');
