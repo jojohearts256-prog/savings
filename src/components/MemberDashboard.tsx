@@ -33,17 +33,17 @@ export default function MemberDashboard() {
 
     try {
       // Load member info
-      const memberRes = await supabase
+      const { data: memberRes } = await supabase
         .from('members')
         .select('*')
         .eq('profile_id', profile.id)
         .maybeSingle();
-      if (!memberRes.data) return;
+      if (!memberRes) return;
 
       const fetchedMember = {
-        ...memberRes.data,
-        account_balance: Number(memberRes.data.account_balance),
-        total_contributions: Number(memberRes.data.total_contributions),
+        ...memberRes,
+        account_balance: Number(memberRes.account_balance),
+        total_contributions: Number(memberRes.total_contributions),
       };
       setMember(fetchedMember);
 
@@ -109,16 +109,23 @@ export default function MemberDashboard() {
 
       setNotifications((prev) => [...prev, ...reminders]);
 
-      // Fetch loans where this member is a guarantor and approval is pending
-      const { data: pendingGuarantorRes } = await supabase
+      // Fetch pending guarantor loans correctly
+      const { data: pendingGuarantees } = await supabase
         .from('loan_guarantees')
-        .select('loan:loan_id (*)')
+        .select('loan_id')
         .eq('guarantor_id', fetchedMember.id)
         .eq('status', 'pending');
 
-      setPendingGuarantorLoans(
-        pendingGuarantorRes?.map((pg) => pg.loan) || []
-      );
+      const loanIds = pendingGuarantees?.map(g => g.loan_id) || [];
+      if (loanIds.length > 0) {
+        const { data: loansData } = await supabase
+          .from('loans')
+          .select('*')
+          .in('id', loanIds);
+        setPendingGuarantorLoans(loansData || []);
+      } else {
+        setPendingGuarantorLoans([]);
+      }
 
     } catch (err) {
       console.error('Failed to load member data:', err);
