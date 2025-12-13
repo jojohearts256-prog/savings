@@ -32,10 +32,9 @@ export default function GuarantorApprovalModal({
         .eq('loan_id', loan.id)
         .eq('guarantor_id', member.id)
         .single();
-
       if (updateError) throw updateError;
 
-      // 2️⃣ Notify the loan member
+      // 2️⃣ Notify loan member
       await supabase.from('notifications').insert({
         member_id: loan.member_id,
         type: 'guarantor_response',
@@ -44,22 +43,21 @@ export default function GuarantorApprovalModal({
           decision === 'accepted'
             ? `${member.full_name} accepted your loan guarantee.`
             : `${member.full_name} declined your loan guarantee.`,
-        metadata: JSON.stringify({
-          guarantor_id: member.id,
-          loanId: loan.id,
-          decision,
-        }),
+        metadata: JSON.stringify({ guarantor_id: member.id, loanId: loan.id, decision }),
         sent_at: new Date(),
         read: false,
       });
 
-      // 3️⃣ Check if all guarantors have accepted
+      // 3️⃣ Check if all guarantors accepted
       const { data: allGuarantors } = await supabase
         .from('loan_guarantees')
         .select('*')
         .eq('loan_id', loan.id);
 
-      const allAccepted = allGuarantors?.every(g => g.status === 'accepted');
+      const validGuarantors = allGuarantors?.filter(g => g.amount_guaranteed > 0);
+      const allAccepted = validGuarantors && validGuarantors.length > 0 
+        ? validGuarantors.every(g => g.status === 'accepted') 
+        : false;
 
       if (allAccepted) {
         // Notify admin
