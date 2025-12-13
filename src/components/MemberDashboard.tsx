@@ -28,34 +28,26 @@ export default function MemberDashboard() {
     loadMemberData();
   }, [profile]);
 
-  // Auto-open the first pending guarantor loan modal
-  useEffect(() => {
-    if (pendingGuarantorLoans.length > 0 && !showGuarantorModal) {
-      setShowGuarantorModal(pendingGuarantorLoans[0]);
-    }
-  }, [pendingGuarantorLoans]);
-
   const loadMemberData = async () => {
     if (!profile) return;
 
     try {
       // Load member info
-      const { data: memberData } = await supabase
+      const memberRes = await supabase
         .from('members')
         .select('*')
         .eq('profile_id', profile.id)
         .maybeSingle();
-
-      if (!memberData) return;
+      if (!memberRes.data) return;
 
       const fetchedMember = {
-        ...memberData,
-        account_balance: Number(memberData.account_balance),
-        total_contributions: Number(memberData.total_contributions),
+        ...memberRes.data,
+        account_balance: Number(memberRes.data.account_balance),
+        total_contributions: Number(memberRes.data.total_contributions),
       };
       setMember(fetchedMember);
 
-      // Load transactions, loans, notifications in parallel
+      // Load transactions, loans, notifications
       const [txRes, loanRes, notifRes] = await Promise.all([
         supabase
           .from('transactions')
@@ -87,7 +79,9 @@ export default function MemberDashboard() {
         const dueDate = new Date(loan.disbursed_date);
         dueDate.setMonth(dueDate.getMonth() + loan.repayment_period_months);
         const today = new Date();
-        const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        const diffDays = Math.ceil(
+          (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+        );
 
         if (diffDays > 0 && diffDays <= 10) {
           reminders.push({
@@ -115,12 +109,13 @@ export default function MemberDashboard() {
 
       setNotifications((prev) => [...prev, ...reminders]);
 
-      // Pending guarantor approvals
-      const { data: pendingLoans } = await supabase
+      // ✅ Pending guarantor loans (JSON array column)
+      const { data: pendingLoans, error } = await supabase
         .from('loans_with_guarantors')
         .select('*')
-        .eq('guarantor_id', fetchedMember.id)
-        .eq('status', 'pending');
+        .contains('guarantors', [{ member_id: fetchedMember.id, status: 'pending' }]);
+
+      if (error) console.error('Failed to fetch pending guarantor loans:', error);
 
       setPendingGuarantorLoans(pendingLoans || []);
     } catch (err) {
@@ -209,7 +204,6 @@ export default function MemberDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Account Balance */}
           <div className="bg-white rounded-2xl p-6 card-shadow-hover">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#00BFFF] flex items-center justify-center">
@@ -222,7 +216,6 @@ export default function MemberDashboard() {
             </h3>
           </div>
 
-          {/* Total Contributions */}
           <div className="bg-white rounded-2xl p-6 card-shadow-hover">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00BFFF] to-[#D8468C] flex items-center justify-center">
@@ -235,7 +228,6 @@ export default function MemberDashboard() {
             </h3>
           </div>
 
-          {/* Active Loans */}
           <div className="bg-white rounded-2xl p-6 card-shadow-hover">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] flex items-center justify-center">
@@ -291,9 +283,7 @@ export default function MemberDashboard() {
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-800 capitalize">{tx.transaction_type}</p>
-                    <p className="text-xs text-gray-600">
-                      {new Date(tx.transaction_date).toLocaleDateString()}
-                    </p>
+                    <p className="text-xs text-gray-600">{new Date(tx.transaction_date).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
                     <p
@@ -333,9 +323,7 @@ export default function MemberDashboard() {
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="text-sm font-medium text-gray-800">{loan.loan_number}</p>
-                        <p className="text-xs text-gray-600">
-                          {new Date(loan.requested_date).toLocaleDateString()}
-                        </p>
+                        <p className="text-xs text-gray-600">{new Date(loan.requested_date).toLocaleDateString()}</p>
                       </div>
                       <span
                         className={`status-badge text-xs ${
@@ -387,8 +375,7 @@ export default function MemberDashboard() {
           loan={showGuarantorModal}
           member={member}
           onClose={() => setShowGuarantorModal(null)}
-          onApprove={loadMemberData}
-          onReject={loadMemberData}
+          onSuccess={loadMemberData}
         />
       )}
     </div>
