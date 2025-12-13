@@ -1,15 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member, Transaction, Loan, Notification } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  DollarSign,
-  TrendingUp,
-  CreditCard,
-  Bell,
-  LogOut,
-  FileText,
-  Send,
-} from 'lucide-react';
+import { DollarSign, TrendingUp, CreditCard, Bell, LogOut, FileText, Send } from 'lucide-react';
 import LoanRequestModal from '../components/LoanRequestModal';
 import GuarantorApprovalModal from '../components/GuarantorApprovalModal';
 
@@ -32,12 +24,13 @@ export default function MemberDashboard() {
     if (!profile) return;
 
     try {
-      // Load member info
+      // 1️⃣ Load member info
       const memberRes = await supabase
         .from('members')
         .select('*')
         .eq('profile_id', profile.id)
         .maybeSingle();
+
       if (!memberRes.data) return;
 
       const fetchedMember = {
@@ -47,7 +40,7 @@ export default function MemberDashboard() {
       };
       setMember(fetchedMember);
 
-      // Load transactions, loans, notifications
+      // 2️⃣ Load transactions, loans, notifications in parallel
       const [txRes, loanRes, notifRes] = await Promise.all([
         supabase
           .from('transactions')
@@ -72,16 +65,14 @@ export default function MemberDashboard() {
       setLoans(loanRes.data || []);
       setNotifications(notifRes.data || []);
 
-      // Loan reminders
+      // 3️⃣ Loan reminders
       const reminders: Notification[] = [];
       loanRes.data?.forEach((loan) => {
         if (loan.status !== 'disbursed' || !loan.disbursed_date) return;
         const dueDate = new Date(loan.disbursed_date);
         dueDate.setMonth(dueDate.getMonth() + loan.repayment_period_months);
         const today = new Date();
-        const diffDays = Math.ceil(
-          (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
         if (diffDays > 0 && diffDays <= 10) {
           reminders.push({
@@ -94,6 +85,7 @@ export default function MemberDashboard() {
             sent_at: new Date(),
           });
         }
+
         if (diffDays < 0) {
           reminders.push({
             id: `loan-overdue-${loan.id}`,
@@ -106,18 +98,24 @@ export default function MemberDashboard() {
           });
         }
       });
-
       setNotifications((prev) => [...prev, ...reminders]);
 
-      // ✅ Pending guarantor loans (JSON array column)
+      // 4️⃣ Pending guarantor loans (JSON column fix)
       const { data: pendingLoans, error } = await supabase
         .from('loans_with_guarantors')
-        .select('*')
-        .contains('guarantors', [{ member_id: fetchedMember.id, status: 'pending' }]);
+        .select('*');
 
-      if (error) console.error('Failed to fetch pending guarantor loans:', error);
+      if (error) throw error;
 
-      setPendingGuarantorLoans(pendingLoans || []);
+      // Filter locally for loans where current member is a pending guarantor
+      const filteredPending = (pendingLoans || []).filter((loan) => {
+        if (!loan.guarantors || !Array.isArray(loan.guarantors)) return false;
+        return loan.guarantors.some(
+          (g: any) => g.member_id === fetchedMember.id && g.status === 'pending'
+        );
+      });
+
+      setPendingGuarantorLoans(filteredPending);
     } catch (err) {
       console.error('Failed to load member data:', err);
     }
@@ -283,7 +281,9 @@ export default function MemberDashboard() {
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-800 capitalize">{tx.transaction_type}</p>
-                    <p className="text-xs text-gray-600">{new Date(tx.transaction_date).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-600">
+                      {new Date(tx.transaction_date).toLocaleDateString()}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p
@@ -323,7 +323,9 @@ export default function MemberDashboard() {
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="text-sm font-medium text-gray-800">{loan.loan_number}</p>
-                        <p className="text-xs text-gray-600">{new Date(loan.requested_date).toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-600">
+                          {new Date(loan.requested_date).toLocaleDateString()}
+                        </p>
                       </div>
                       <span
                         className={`status-badge text-xs ${
