@@ -250,7 +250,7 @@ export default function MemberDashboard() {
                 <div
                   key={loan.id}
                   className="flex justify-between items-center p-3 bg-yellow-50 rounded-xl cursor-pointer"
-                  onClick={() => setShowGuarantorModal(loan)}
+                  onClick={() => setShowGuarantorModal(loan)} // 👈 Trigger modal
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-800">{loan.loan_number}</p>
