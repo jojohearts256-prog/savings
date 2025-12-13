@@ -11,7 +11,7 @@ import {
   Send,
 } from 'lucide-react';
 import LoanRequestModal from '../components/LoanRequestModal';
-import GuarantorApprovalModal from '../components/GuarantorApprovalModal'; // 👈 NEW IMPORT
+import GuarantorApprovalModal from '../components/GuarantorApprovalModal';
 
 export default function MemberDashboard() {
   const { profile, signOut } = useAuth();
@@ -110,12 +110,16 @@ export default function MemberDashboard() {
       setNotifications((prev) => [...prev, ...reminders]);
 
       // Fetch loans where this member is a guarantor and approval is pending
-      const pendingGuarantorRes = await supabase
-        .from('loans')
-        .select('*')
-        .contains('guarantors', [{ member_id: fetchedMember.id, approved: false }]);
+      const { data: pendingGuarantorRes } = await supabase
+        .from('loan_guarantees')
+        .select('loan:loan_id (*)')
+        .eq('guarantor_id', fetchedMember.id)
+        .eq('status', 'pending');
 
-      setPendingGuarantorLoans(pendingGuarantorRes.data || []);
+      setPendingGuarantorLoans(
+        pendingGuarantorRes?.map((pg) => pg.loan) || []
+      );
+
     } catch (err) {
       console.error('Failed to load member data:', err);
     }
@@ -250,7 +254,7 @@ export default function MemberDashboard() {
                 <div
                   key={loan.id}
                   className="flex justify-between items-center p-3 bg-yellow-50 rounded-xl cursor-pointer"
-                  onClick={() => setShowGuarantorModal(loan)} // 👈 Trigger modal
+                  onClick={() => setShowGuarantorModal(loan)}
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-800">{loan.loan_number}</p>
