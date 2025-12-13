@@ -24,6 +24,7 @@ export default function MemberDashboard() {
   const [showGuarantorModal, setShowGuarantorModal] = useState<Loan | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Load member data
   useEffect(() => {
     loadMemberData();
   }, [profile]);
@@ -32,7 +33,7 @@ export default function MemberDashboard() {
     if (!profile) return;
 
     try {
-      // Load member info
+      // Fetch member
       const memberRes = await supabase
         .from('members')
         .select('*')
@@ -47,8 +48,8 @@ export default function MemberDashboard() {
       };
       setMember(fetchedMember);
 
-      // Load transactions, loans, notifications in parallel
-      const [txRes, loanRes, notifRes] = await Promise.all([
+      // Load transactions, loans, notifications, pending guarantor loans
+      const [txRes, loanRes, notifRes, pendingRes] = await Promise.all([
         supabase
           .from('transactions')
           .select('*')
@@ -66,63 +67,112 @@ export default function MemberDashboard() {
           .eq('member_id', fetchedMember.id)
           .order('sent_at', { ascending: false })
           .limit(20),
+        supabase
+          .from('loans_with_guarantors')
+          .select('*')
+          .eq('guarantor_id', fetchedMember.id)
+          .eq('status', 'pending'),
       ]);
 
       setTransactions(txRes.data || []);
       setLoans(loanRes.data || []);
       setNotifications(notifRes.data || []);
-
-      // Loan reminders
-      const reminders: Notification[] = [];
-      loanRes.data?.forEach((loan) => {
-        if (loan.status !== 'disbursed' || !loan.disbursed_date) return;
-        const dueDate = new Date(loan.disbursed_date);
-        dueDate.setMonth(dueDate.getMonth() + loan.repayment_period_months);
-        const today = new Date();
-        const diffDays = Math.ceil(
-          (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        if (diffDays > 0 && diffDays <= 10) {
-          reminders.push({
-            id: `loan-reminder-${loan.id}`,
-            member_id: fetchedMember.id,
-            title: 'Loan Reminder',
-            message: `Reminder: Your loan ${loan.loan_number} has ${diffDays} days remaining.`,
-            type: 'loan_reminder',
-            read: false,
-            sent_at: new Date(),
-          });
-        }
-        if (diffDays < 0) {
-          reminders.push({
-            id: `loan-overdue-${loan.id}`,
-            member_id: fetchedMember.id,
-            title: 'Loan Overdue',
-            message: `Alert: Your loan ${loan.loan_number} is overdue by ${Math.abs(diffDays)} days.`,
-            type: 'loan_overdue',
-            read: false,
-            sent_at: new Date(),
-          });
-        }
-      });
-
-      setNotifications((prev) => [...prev, ...reminders]);
-
-      // ✅ Use your loans_with_guarantors view for pending guarantor approvals
-      const { data: pendingLoans } = await supabase
-        .from('loans_with_guarantors')
-        .select('*')
-        .eq('guarantor_id', fetchedMember.id)
-        .eq('status', 'pending');
-
-      setPendingGuarantorLoans(pendingLoans || []);
+      setPendingGuarantorLoans(pendingRes.data || []);
     } catch (err) {
       console.error('Failed to load member data:', err);
     }
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Real-time subscription for new guarantee requests
+  useEffect(() => {
+    if (!member) return;
+
+    const subscription = supabase
+      .channel('public:loan_guarantees')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'loan_guarantees' },
+        async (payload) => {
+          const guarantee = payload.new as any;
+
+          // Only show notifications for current member
+          if (guarantee.guarantor_id === member.id) {
+            // Check if notification already exists
+            const { data: existing } = await supabase
+              .from('notifications')
+              .select('*')
+              .eq('loan_id', guarantee.loan_id)
+              .eq('member_id', member.id)
+              .eq('type', 'Guarantee Request');
+
+            if (!existing || existing.length === 0) {
+              // Insert notification
+              const { data: newNotif } = await supabase
+                .from('notifications')
+                .insert({
+                  member_id: member.id,
+                  loan_id: guarantee.loan_id,
+                  title: 'Guarantee Request',
+                  message: `You have been requested to guarantee loan ${guarantee.loan_id} for amount UGX ${guarantee.amount_guaranteed}. Please accept or decline.`,
+                  type: 'Guarantee Request',
+                  read: false,
+                  sent_at: new Date(),
+                })
+                .select()
+                .single();
+
+              setNotifications((prev) => [newNotif, ...prev]);
+            }
+
+            // Open modal automatically
+            const { data: loanData } = await supabase
+              .from('loans')
+              .select('*')
+              .eq('id', guarantee.loan_id)
+              .maybeSingle();
+
+            if (loanData) setShowGuarantorModal(loanData);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(subscription);
+  }, [member]);
+
+  // Handle Approve / Reject
+  const handleGuarantorDecision = async (
+    loanId: string,
+    guarantorId: string,
+    decision: 'accepted' | 'declined'
+  ) => {
+    try {
+      // Update loan_guarantee record
+      await supabase
+        .from('loan_guarantees')
+        .update({ status: decision })
+        .eq('loan_id', loanId)
+        .eq('guarantor_id', guarantorId);
+
+      // Update notification as read
+      await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('loan_id', loanId)
+        .eq('member_id', guarantorId)
+        .eq('type', 'Guarantee Request');
+
+      // Reload data
+      await loadMemberData();
+      setShowGuarantorModal(null);
+
+      // Optionally: Admin is notified via trigger (notify_admin_when_all_guarantors_approved)
+    } catch (err) {
+      console.error('Failed to update guarantor decision:', err);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -204,35 +254,18 @@ export default function MemberDashboard() {
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-2xl p-6 card-shadow-hover">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#00BFFF] flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-            </div>
             <p className="text-sm text-gray-600 mb-1">Account Balance (UGX)</p>
             <h3 className="text-3xl font-bold text-[#007B8A]">
               {member ? member.account_balance.toLocaleString() : '0'}
             </h3>
           </div>
-
           <div className="bg-white rounded-2xl p-6 card-shadow-hover">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00BFFF] to-[#D8468C] flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
-            </div>
             <p className="text-sm text-gray-600 mb-1">Total Contributions (UGX)</p>
             <h3 className="text-3xl font-bold text-[#007B8A]">
               {member ? member.total_contributions.toLocaleString() : '0'}
             </h3>
           </div>
-
           <div className="bg-white rounded-2xl p-6 card-shadow-hover">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] flex items-center justify-center">
-                <CreditCard className="w-6 h-6 text-white" />
-              </div>
-            </div>
             <p className="text-sm text-gray-600 mb-1">Active Loans</p>
             <h3 className="text-3xl font-bold text-gray-800">
               {loans.filter((l) => l.status === 'disbursed').length}
@@ -265,102 +298,6 @@ export default function MemberDashboard() {
             </div>
           </div>
         )}
-
-        {/* Transactions and Loans */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Recent Transactions */}
-          <div className="bg-white rounded-2xl card-shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-800">Recent Transactions</h3>
-              <FileText className="w-5 h-5 text-gray-400" />
-            </div>
-            <div className="space-y-3">
-              {transactions.slice(0, 5).map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex justify-between items-center p-3 bg-gray-50 rounded-xl"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-gray-800 capitalize">{tx.transaction_type}</p>
-                    <p className="text-xs text-gray-600">
-                      {new Date(tx.transaction_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p
-                      className={`text-sm font-semibold ${
-                        tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'
-                      }`}
-                    >
-                      {tx.transaction_type === 'withdrawal' ? '-' : '+'}
-                      {Number(tx.amount).toLocaleString()} UGX
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      Bal: {Number(tx.balance_after).toLocaleString()} UGX
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* My Loans */}
-          <div className="bg-white rounded-2xl card-shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-800">My Loans</h3>
-              <button
-                onClick={() => setShowLoanModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 btn-primary text-white text-sm font-medium rounded-lg"
-              >
-                <Send className="w-4 h-4" /> Request Loan
-              </button>
-            </div>
-            <div className="space-y-3">
-              {loans.length === 0 ? (
-                <p className="text-sm text-gray-600">No loans yet</p>
-              ) : (
-                loans.map((loan) => (
-                  <div key={loan.id} className="p-3 bg-gray-50 rounded-xl">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">{loan.loan_number}</p>
-                        <p className="text-xs text-gray-600">
-                          {new Date(loan.requested_date).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <span
-                        className={`status-badge text-xs ${
-                          loan.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : loan.status === 'approved'
-                            ? 'bg-blue-100 text-blue-800'
-                            : loan.status === 'rejected'
-                            ? 'bg-red-100 text-red-800'
-                            : loan.status === 'disbursed'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {loan.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>
-                        Amount:{' '}
-                        {Number(loan.amount_approved || loan.amount_requested).toLocaleString()} UGX
-                      </span>
-                      {loan.outstanding_balance !== null && (
-                        <span className="font-semibold text-[#007B8A]">
-                          Outstanding: {Number(loan.outstanding_balance).toLocaleString()} UGX
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Modals */}
@@ -378,7 +315,12 @@ export default function MemberDashboard() {
           loan={showGuarantorModal}
           member={member}
           onClose={() => setShowGuarantorModal(null)}
-          onSuccess={loadMemberData}
+          onApprove={() =>
+            handleGuarantorDecision(showGuarantorModal.id, member.id, 'accepted')
+          }
+          onReject={() =>
+            handleGuarantorDecision(showGuarantorModal.id, member.id, 'declined')
+          }
         />
       )}
     </div>
