@@ -33,17 +33,17 @@ export default function MemberDashboard() {
 
     try {
       // Load member info
-      const { data: memberRes } = await supabase
+      const memberRes = await supabase
         .from('members')
         .select('*')
         .eq('profile_id', profile.id)
         .maybeSingle();
-      if (!memberRes) return;
+      if (!memberRes.data) return;
 
       const fetchedMember = {
-        ...memberRes,
-        account_balance: Number(memberRes.account_balance),
-        total_contributions: Number(memberRes.total_contributions),
+        ...memberRes.data,
+        account_balance: Number(memberRes.data.account_balance),
+        total_contributions: Number(memberRes.data.total_contributions),
       };
       setMember(fetchedMember);
 
@@ -109,23 +109,26 @@ export default function MemberDashboard() {
 
       setNotifications((prev) => [...prev, ...reminders]);
 
-      // Fetch pending guarantor loans correctly
+      // ✅ Fetch pending guarantor loans using loan_guarantees table
       const { data: pendingGuarantees } = await supabase
         .from('loan_guarantees')
         .select('loan_id')
         .eq('guarantor_id', fetchedMember.id)
         .eq('status', 'pending');
 
-      const loanIds = pendingGuarantees?.map(g => g.loan_id) || [];
+      const loanIds = pendingGuarantees?.map((g: any) => g.loan_id) || [];
+
+      let pendingLoans: Loan[] = [];
       if (loanIds.length > 0) {
         const { data: loansData } = await supabase
           .from('loans')
           .select('*')
           .in('id', loanIds);
-        setPendingGuarantorLoans(loansData || []);
-      } else {
-        setPendingGuarantorLoans([]);
+
+        pendingLoans = loansData || [];
       }
+
+      setPendingGuarantorLoans(pendingLoans);
 
     } catch (err) {
       console.error('Failed to load member data:', err);
@@ -185,9 +188,7 @@ export default function MemberDashboard() {
                 {notifications.map((notif) => (
                   <div
                     key={notif.id}
-                    className={`p-3 rounded-xl ${
-                      notif.read ? 'bg-gray-50' : 'bg-blue-50'
-                    }`}
+                    className={`p-3 rounded-xl ${notif.read ? 'bg-gray-50' : 'bg-blue-50'}`}
                     onClick={async () => {
                       if (!notif.read) {
                         await supabase
