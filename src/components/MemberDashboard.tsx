@@ -38,6 +38,7 @@ export default function MemberDashboard() {
         .select('*')
         .eq('profile_id', profile.id)
         .maybeSingle();
+
       if (!memberRes.data) return;
 
       const fetchedMember = {
@@ -72,16 +73,14 @@ export default function MemberDashboard() {
       setLoans(loanRes.data || []);
       setNotifications(notifRes.data || []);
 
-      // Add loan reminders and overdue notices dynamically
+      // Loan reminders & overdue notices
       const reminders: Notification[] = [];
       loanRes.data?.forEach((loan) => {
         if (loan.status !== 'disbursed' || !loan.disbursed_date) return;
         const dueDate = new Date(loan.disbursed_date);
         dueDate.setMonth(dueDate.getMonth() + loan.repayment_period_months);
         const today = new Date();
-        const diffDays = Math.ceil(
-          (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
         if (diffDays > 0 && diffDays <= 10) {
           reminders.push({
@@ -109,27 +108,13 @@ export default function MemberDashboard() {
 
       setNotifications((prev) => [...prev, ...reminders]);
 
-      // ✅ Fetch pending guarantor loans using loan_guarantees table
-      const { data: pendingGuarantees } = await supabase
-        .from('loan_guarantees')
-        .select('loan_id')
-        .eq('guarantor_id', fetchedMember.id)
-        .eq('status', 'pending');
+      // ✅ Fetch loans where this member is a guarantor and approval is pending
+      const pendingGuarantorRes = await supabase
+        .from('loans_with_guarantors')
+        .select('*')
+        .contains('guarantors', [{ member_id: fetchedMember.id, status: 'pending' }]);
 
-      const loanIds = pendingGuarantees?.map((g: any) => g.loan_id) || [];
-
-      let pendingLoans: Loan[] = [];
-      if (loanIds.length > 0) {
-        const { data: loansData } = await supabase
-          .from('loans')
-          .select('*')
-          .in('id', loanIds);
-
-        pendingLoans = loansData || [];
-      }
-
-      setPendingGuarantorLoans(pendingLoans);
-
+      setPendingGuarantorLoans(pendingGuarantorRes.data || []);
     } catch (err) {
       console.error('Failed to load member data:', err);
     }
