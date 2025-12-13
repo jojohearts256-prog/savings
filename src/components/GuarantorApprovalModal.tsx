@@ -20,12 +20,12 @@ export default function GuarantorApprovalModal({
 
   if (!loan || !member) return null;
 
-  const handleDecision = async (decision: 'approved' | 'rejected') => {
+  const handleDecision = async (decision: 'accepted' | 'declined') => {
     setLoading(true);
     setError('');
 
     try {
-      // 1️⃣ Update this member's guarantor status
+      // 1️⃣ Update guarantor status
       const { error: updateError } = await supabase
         .from('loan_guarantees')
         .update({ status: decision })
@@ -34,11 +34,11 @@ export default function GuarantorApprovalModal({
 
       if (updateError) throw updateError;
 
-      // 2️⃣ Notify the borrower (loan member)
+      // 2️⃣ Notify member
       const message =
-        decision === 'approved'
-          ? `${member.full_name} approved your loan guarantee.`
-          : `${member.full_name} rejected your loan guarantee.`;
+        decision === 'accepted'
+          ? `${member.full_name} accepted your loan guarantee.`
+          : `${member.full_name} declined your loan guarantee.`;
 
       await supabase.from('notifications').insert({
         member_id: loan.member_id,
@@ -55,18 +55,16 @@ export default function GuarantorApprovalModal({
         read: false,
       });
 
-      // 3️⃣ Check if all guarantors have approved
-      const { data: allGuarantors, error: fetchError } = await supabase
+      // 3️⃣ Check if all guarantors approved
+      const { data: allGuarantors } = await supabase
         .from('loan_guarantees')
         .select('*')
         .eq('loan_id', loan.id);
 
-      if (fetchError) throw fetchError;
+      const allAccepted = allGuarantors?.every(g => g.status === 'accepted');
 
-      const allApproved = allGuarantors?.every(g => g.status === 'approved');
-
-      if (allApproved) {
-        // Notify admin that loan is ready
+      if (allAccepted) {
+        // Notify admin
         await supabase.from('notifications').insert({
           member_id: null,
           type: 'loan_ready_for_admin',
@@ -79,7 +77,7 @@ export default function GuarantorApprovalModal({
         });
       }
 
-      onSuccess(); // Refresh dashboard data
+      onSuccess();
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to submit decision');
@@ -113,18 +111,18 @@ export default function GuarantorApprovalModal({
 
         <div className="flex gap-3">
           <button
-            onClick={() => handleDecision('approved')}
+            onClick={() => handleDecision('accepted')}
             disabled={loading}
             className="flex-1 py-2 bg-green-500 text-white font-medium rounded-xl disabled:opacity-50"
           >
-            {loading ? 'Processing...' : 'Approve'}
+            {loading ? 'Processing...' : 'Accept'}
           </button>
           <button
-            onClick={() => handleDecision('rejected')}
+            onClick={() => handleDecision('declined')}
             disabled={loading}
             className="flex-1 py-2 bg-red-500 text-white font-medium rounded-xl disabled:opacity-50"
           >
-            {loading ? 'Processing...' : 'Reject'}
+            {loading ? 'Processing...' : 'Decline'}
           </button>
         </div>
       </div>
