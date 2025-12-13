@@ -50,6 +50,7 @@ export default function LoanRequestModal({ member, profile, onClose, onSuccess }
       .ilike('full_name', `%${query}%`)
       .neq('profile_id', profile?.id)
       .limit(5);
+
     const filtered = data?.filter(m => !guarantors.some(g => g.member_id === m.id)) || [];
     setSearchResults(filtered);
   }, 300);
@@ -135,7 +136,7 @@ export default function LoanRequestModal({ member, profile, onClose, onSuccess }
         );
         if (gError) throw gError;
 
-        // 3️⃣ Notify guarantors
+        // 3️⃣ Send notifications to guarantors only
         for (const g of validGuarantors) {
           await supabase.from('notifications').insert({
             member_id: g.member_id,
@@ -157,7 +158,7 @@ export default function LoanRequestModal({ member, profile, onClose, onSuccess }
         }
       }
 
-      // ✅ If no guarantors, loan goes directly to admin (optional)
+      // ✅ If there are NO guarantors, optionally notify admin immediately
       if (validGuarantors.length === 0) {
         await supabase.from('notifications').insert({
           member_id: null,
