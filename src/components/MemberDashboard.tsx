@@ -14,7 +14,7 @@ export default function MemberDashboard() {
   const [pendingGuarantorLoans, setPendingGuarantorLoans] = useState<Loan[]>([]);
   const [showLoanModal, setShowLoanModal] = useState(false);
   const [showGuarantorModal, setShowGuarantorModal] = useState<Loan | null>(null);
-  const [showNotifications, setShowNotifications] = useState(false);
+  const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
 
   useEffect(() => {
     loadMemberData();
@@ -24,13 +24,12 @@ export default function MemberDashboard() {
     if (!profile) return;
 
     try {
-      // 1️⃣ Load member info
+      // Load member info
       const memberRes = await supabase
         .from('members')
         .select('*')
         .eq('profile_id', profile.id)
         .maybeSingle();
-
       if (!memberRes.data) return;
 
       const fetchedMember = {
@@ -40,7 +39,7 @@ export default function MemberDashboard() {
       };
       setMember(fetchedMember);
 
-      // 2️⃣ Load transactions, loans, notifications in parallel
+      // Load transactions, loans, notifications in parallel
       const [txRes, loanRes, notifRes] = await Promise.all([
         supabase
           .from('transactions')
@@ -65,7 +64,7 @@ export default function MemberDashboard() {
       setLoans(loanRes.data || []);
       setNotifications(notifRes.data || []);
 
-      // 3️⃣ Loan reminders
+      // Loan reminders
       const reminders: Notification[] = [];
       loanRes.data?.forEach((loan) => {
         if (loan.status !== 'disbursed' || !loan.disbursed_date) return;
@@ -100,14 +99,10 @@ export default function MemberDashboard() {
       });
       setNotifications((prev) => [...prev, ...reminders]);
 
-      // 4️⃣ Pending guarantor loans (JSON column fix)
-      const { data: pendingLoans, error } = await supabase
-        .from('loans_with_guarantors')
-        .select('*');
-
+      // Pending guarantor loans
+      const { data: pendingLoans, error } = await supabase.from('loans_with_guarantors').select('*');
       if (error) throw error;
 
-      // Filter locally for loans where current member is a pending guarantor
       const filteredPending = (pendingLoans || []).filter((loan) => {
         if (!loan.guarantors || !Array.isArray(loan.guarantors)) return false;
         return loan.guarantors.some(
@@ -123,8 +118,53 @@ export default function MemberDashboard() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  // --- Notification Toast Component ---
+  const NotificationToast = ({
+    notif,
+    onClose,
+  }: {
+    notif: Notification;
+    onClose: () => void;
+  }) => {
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 5000);
+      return () => clearTimeout(timer);
+    }, [onClose]);
+
+    const handleClick = async () => {
+      if (!notif.read) {
+        await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
+      }
+      onClose();
+    };
+
+    return (
+      <div
+        onClick={handleClick}
+        className="cursor-pointer w-80 bg-white shadow-lg rounded-xl p-4 border-l-4 border-blue-500 hover:shadow-2xl transition-all duration-300 flex justify-between items-start"
+      >
+        <div className="flex-1">
+          <p className="text-sm font-bold text-gray-800">{notif.title}</p>
+          <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
+          <p className="text-xs text-gray-500 mt-1">{new Date(notif.sent_at).toLocaleTimeString()}</p>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="ml-2 text-gray-400 hover:text-gray-700 font-bold"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
       {/* Navbar */}
       <nav className="bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -137,7 +177,7 @@ export default function MemberDashboard() {
             </div>
             <div className="flex items-center gap-4">
               <button
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={() => setShowNotificationsPanel(!showNotificationsPanel)}
                 className="relative p-2 text-white hover:text-[#D8468C] hover:bg-white/20 rounded-xl transition-transform duration-300 hover:scale-105"
               >
                 <Bell className="w-5 h-5" />
@@ -162,47 +202,22 @@ export default function MemberDashboard() {
         </div>
       </nav>
 
-      {/* Notifications */}
-      {showNotifications && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="bg-white rounded-2xl card-shadow p-4 max-h-96 overflow-y-auto">
-            <h3 className="font-bold text-gray-800 mb-3">Notifications</h3>
-            {notifications.length === 0 ? (
-              <p className="text-sm text-gray-600">No notifications</p>
-            ) : (
-              <div className="space-y-2">
-                {notifications.map((notif) => (
-                  <div
-                    key={notif.id}
-                    className={`p-3 rounded-xl ${notif.read ? 'bg-gray-50' : 'bg-blue-50'}`}
-                    onClick={async () => {
-                      if (!notif.read) {
-                        await supabase
-                          .from('notifications')
-                          .update({ read: true })
-                          .eq('id', notif.id);
-                        loadMemberData();
-                      }
-                    }}
-                  >
-                    <p className="text-sm font-medium text-gray-800">{notif.title}</p>
-                    <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {new Date(notif.sent_at).toLocaleString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Floating Toast Notifications */}
+      <div className="fixed top-5 right-5 flex flex-col gap-3 z-50">
+        {notifications.map((notif) => (
+          <NotificationToast
+            key={notif.id}
+            notif={notif}
+            onClose={() => setNotifications((prev) => prev.filter((n) => n.id !== notif.id))}
+          />
+        ))}
+      </div>
 
       {/* Dashboard Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-2xl p-6 card-shadow-hover">
+          <div className="bg-white rounded-2xl p-6 shadow hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#00BFFF] flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-white" />
@@ -214,7 +229,7 @@ export default function MemberDashboard() {
             </h3>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 card-shadow-hover">
+          <div className="bg-white rounded-2xl p-6 shadow hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00BFFF] to-[#D8468C] flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-white" />
@@ -226,7 +241,7 @@ export default function MemberDashboard() {
             </h3>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 card-shadow-hover">
+          <div className="bg-white rounded-2xl p-6 shadow hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] flex items-center justify-center">
                 <CreditCard className="w-6 h-6 text-white" />
@@ -241,13 +256,13 @@ export default function MemberDashboard() {
 
         {/* Pending Guarantor Approvals */}
         {pendingGuarantorLoans.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 card-shadow mb-6">
+          <div className="bg-white rounded-2xl p-6 shadow mb-6">
             <h3 className="text-lg font-bold text-gray-800 mb-3">Pending Guarantor Approvals</h3>
             <div className="space-y-3">
               {pendingGuarantorLoans.map((loan) => (
                 <div
                   key={loan.id}
-                  className="flex justify-between items-center p-3 bg-yellow-50 rounded-xl cursor-pointer"
+                  className="flex justify-between items-center p-3 bg-yellow-50 rounded-xl cursor-pointer hover:bg-yellow-100 transition-colors"
                   onClick={() => setShowGuarantorModal(loan)}
                 >
                   <div>
@@ -256,7 +271,7 @@ export default function MemberDashboard() {
                       Amount Requested: {Number(loan.amount_requested).toLocaleString()} UGX
                     </p>
                   </div>
-                  <button className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-sm font-medium">
+                  <button className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-sm font-medium hover:bg-yellow-600 transition-colors">
                     Approve / Reject
                   </button>
                 </div>
@@ -265,20 +280,17 @@ export default function MemberDashboard() {
           </div>
         )}
 
-        {/* Transactions and Loans */}
+        {/* Transactions & Loans */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Recent Transactions */}
-          <div className="bg-white rounded-2xl card-shadow p-6">
+          {/* Transactions */}
+          <div className="bg-white rounded-2xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-gray-800">Recent Transactions</h3>
               <FileText className="w-5 h-5 text-gray-400" />
             </div>
             <div className="space-y-3">
               {transactions.slice(0, 5).map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex justify-between items-center p-3 bg-gray-50 rounded-xl"
-                >
+                <div key={tx.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
                   <div>
                     <p className="text-sm font-medium text-gray-800 capitalize">{tx.transaction_type}</p>
                     <p className="text-xs text-gray-600">
@@ -303,13 +315,13 @@ export default function MemberDashboard() {
             </div>
           </div>
 
-          {/* My Loans */}
-          <div className="bg-white rounded-2xl card-shadow p-6">
+          {/* Loans */}
+          <div className="bg-white rounded-2xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-gray-800">My Loans</h3>
               <button
                 onClick={() => setShowLoanModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 btn-primary text-white text-sm font-medium rounded-lg"
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <Send className="w-4 h-4" /> Request Loan
               </button>
@@ -328,7 +340,7 @@ export default function MemberDashboard() {
                         </p>
                       </div>
                       <span
-                        className={`status-badge text-xs ${
+                        className={`text-xs font-semibold px-2 py-1 rounded-full ${
                           loan.status === 'pending'
                             ? 'bg-yellow-100 text-yellow-800'
                             : loan.status === 'approved'
@@ -345,8 +357,7 @@ export default function MemberDashboard() {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>
-                        Amount:{' '}
-                        {Number(loan.amount_approved || loan.amount_requested).toLocaleString()} UGX
+                        Amount: {Number(loan.amount_approved || loan.amount_requested).toLocaleString()} UGX
                       </span>
                       {loan.outstanding_balance !== null && (
                         <span className="font-semibold text-[#007B8A]">
