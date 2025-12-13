@@ -6,14 +6,16 @@ interface GuarantorApprovalModalProps {
   loan: Loan | null;
   member: Member | null;
   onClose: () => void;
-  onSuccess: () => void;
+  onApprove: () => void;
+  onReject: () => void;
 }
 
 export default function GuarantorApprovalModal({
   loan,
   member,
   onClose,
-  onSuccess,
+  onApprove,
+  onReject,
 }: GuarantorApprovalModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -34,7 +36,7 @@ export default function GuarantorApprovalModal({
 
       if (updateError) throw updateError;
 
-      // 2️⃣ Notify member
+      // 2️⃣ Notify loan owner (member)
       const message =
         decision === 'accepted'
           ? `${member.full_name} accepted your loan guarantee.`
@@ -61,10 +63,10 @@ export default function GuarantorApprovalModal({
         .select('*')
         .eq('loan_id', loan.id);
 
-      const allAccepted = allGuarantors?.every(g => g.status === 'accepted');
+      const allAccepted = allGuarantors?.every((g) => g.status === 'accepted');
 
       if (allAccepted) {
-        // Notify admin
+        // Notify admin that loan is ready for approval
         await supabase.from('notifications').insert({
           member_id: null,
           type: 'loan_ready_for_admin',
@@ -77,7 +79,10 @@ export default function GuarantorApprovalModal({
         });
       }
 
-      onSuccess();
+      // Call dashboard callbacks
+      if (decision === 'accepted') onApprove();
+      else onReject();
+
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to submit decision');
