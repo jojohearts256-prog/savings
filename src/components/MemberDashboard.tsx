@@ -72,7 +72,7 @@ export default function MemberDashboard() {
       setLoans(loanRes.data || []);
       setNotifications(notifRes.data || []);
 
-      // Add loan reminders and overdue notices dynamically
+      // Loan reminders
       const reminders: Notification[] = [];
       loanRes.data?.forEach((loan) => {
         if (loan.status !== 'disbursed' || !loan.disbursed_date) return;
@@ -99,7 +99,7 @@ export default function MemberDashboard() {
             id: `loan-overdue-${loan.id}`,
             member_id: fetchedMember.id,
             title: 'Loan Overdue',
-            message: `Alert: Your loan ${loan.loan_number} is overdue by ${Math.abs(diffDays)} days. Please repay immediately.`,
+            message: `Alert: Your loan ${loan.loan_number} is overdue by ${Math.abs(diffDays)} days.`,
             type: 'loan_overdue',
             read: false,
             sent_at: new Date(),
@@ -109,27 +109,14 @@ export default function MemberDashboard() {
 
       setNotifications((prev) => [...prev, ...reminders]);
 
-      // ✅ Fetch pending guarantor loans using loan_guarantees table
-      const { data: pendingGuarantees } = await supabase
-        .from('loan_guarantees')
-        .select('loan_id')
+      // ✅ Use your loans_with_guarantors view for pending guarantor approvals
+      const { data: pendingLoans } = await supabase
+        .from('loans_with_guarantors')
+        .select('*')
         .eq('guarantor_id', fetchedMember.id)
         .eq('status', 'pending');
 
-      const loanIds = pendingGuarantees?.map((g: any) => g.loan_id) || [];
-
-      let pendingLoans: Loan[] = [];
-      if (loanIds.length > 0) {
-        const { data: loansData } = await supabase
-          .from('loans')
-          .select('*')
-          .in('id', loanIds);
-
-        pendingLoans = loansData || [];
-      }
-
-      setPendingGuarantorLoans(pendingLoans);
-
+      setPendingGuarantorLoans(pendingLoans || []);
     } catch (err) {
       console.error('Failed to load member data:', err);
     }
