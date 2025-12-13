@@ -1,136 +1,396 @@
-import { useState } from 'react';
-import { supabase, Member, Loan } from '../lib/supabase';
-import { XCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase, Member, Transaction, Loan, Notification } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  DollarSign,
+  TrendingUp,
+  CreditCard,
+  Bell,
+  LogOut,
+  FileText,
+  Send,
+} from 'lucide-react';
+import LoanRequestModal from '../components/LoanRequestModal';
+import GuarantorApprovalModal from '../components/GuarantorApprovalModal';
 
-interface GuarantorApprovalModalProps {
-  loan: Loan | null;
-  member: Member | null;
-  onClose: () => void;
-  onApprove: () => void;
-  onReject: () => void;
-}
+export default function MemberDashboard() {
+  const { profile, signOut } = useAuth();
+  const [member, setMember] = useState<Member | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [pendingGuarantorLoans, setPendingGuarantorLoans] = useState<Loan[]>([]);
+  const [showLoanModal, setShowLoanModal] = useState(false);
+  const [showGuarantorModal, setShowGuarantorModal] = useState<Loan | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
 
-export default function GuarantorApprovalModal({
-  loan,
-  member,
-  onClose,
-  onApprove,
-  onReject,
-}: GuarantorApprovalModalProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  useEffect(() => {
+    loadMemberData();
+  }, [profile]);
 
-  if (!loan || !member) return null;
+  // Auto-open the first pending guarantor loan modal
+  useEffect(() => {
+    if (pendingGuarantorLoans.length > 0 && !showGuarantorModal) {
+      setShowGuarantorModal(pendingGuarantorLoans[0]);
+    }
+  }, [pendingGuarantorLoans]);
 
-  const handleDecision = async (decision: 'accepted' | 'declined') => {
-    setLoading(true);
-    setError('');
+  const loadMemberData = async () => {
+    if (!profile) return;
 
     try {
-      // 1️⃣ Update guarantor status
-      const { error: updateError } = await supabase
-        .from('loan_guarantees')
-        .update({ status: decision })
-        .eq('loan_id', loan.id)
-        .eq('guarantor_id', member.id);
+      // Load member info
+      const { data: memberData } = await supabase
+        .from('members')
+        .select('*')
+        .eq('profile_id', profile.id)
+        .maybeSingle();
 
-      if (updateError) throw updateError;
+      if (!memberData) return;
 
-      // 2️⃣ Notify loan owner (member)
-      const message =
-        decision === 'accepted'
-          ? `${member.full_name} accepted your loan guarantee.`
-          : `${member.full_name} declined your loan guarantee.`;
+      const fetchedMember = {
+        ...memberData,
+        account_balance: Number(memberData.account_balance),
+        total_contributions: Number(memberData.total_contributions),
+      };
+      setMember(fetchedMember);
 
-      await supabase.from('notifications').insert({
-        member_id: loan.member_id,
-        type: 'guarantor_response',
-        title: 'Guarantor Response',
-        message,
-        recipient_role: 'member',
-        metadata: JSON.stringify({
-          guarantor_id: member.id,
-          loanId: loan.id,
-          decision,
-        }),
-        sent_at: new Date(),
-        read: false,
+      // Load transactions, loans, notifications in parallel
+      const [txRes, loanRes, notifRes] = await Promise.all([
+        supabase
+          .from('transactions')
+          .select('*')
+          .eq('member_id', fetchedMember.id)
+          .order('transaction_date', { ascending: false })
+          .limit(10),
+        supabase
+          .from('loans')
+          .select('*')
+          .eq('member_id', fetchedMember.id)
+          .order('requested_date', { ascending: false }),
+        supabase
+          .from('notifications')
+          .select('*')
+          .eq('member_id', fetchedMember.id)
+          .order('sent_at', { ascending: false })
+          .limit(20),
+      ]);
+
+      setTransactions(txRes.data || []);
+      setLoans(loanRes.data || []);
+      setNotifications(notifRes.data || []);
+
+      // Loan reminders
+      const reminders: Notification[] = [];
+      loanRes.data?.forEach((loan) => {
+        if (loan.status !== 'disbursed' || !loan.disbursed_date) return;
+        const dueDate = new Date(loan.disbursed_date);
+        dueDate.setMonth(dueDate.getMonth() + loan.repayment_period_months);
+        const today = new Date();
+        const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays > 0 && diffDays <= 10) {
+          reminders.push({
+            id: `loan-reminder-${loan.id}`,
+            member_id: fetchedMember.id,
+            title: 'Loan Reminder',
+            message: `Reminder: Your loan ${loan.loan_number} has ${diffDays} days remaining.`,
+            type: 'loan_reminder',
+            read: false,
+            sent_at: new Date(),
+          });
+        }
+        if (diffDays < 0) {
+          reminders.push({
+            id: `loan-overdue-${loan.id}`,
+            member_id: fetchedMember.id,
+            title: 'Loan Overdue',
+            message: `Alert: Your loan ${loan.loan_number} is overdue by ${Math.abs(diffDays)} days.`,
+            type: 'loan_overdue',
+            read: false,
+            sent_at: new Date(),
+          });
+        }
       });
 
-      // 3️⃣ Check if all guarantors approved
-      const { data: allGuarantors } = await supabase
-        .from('loan_guarantees')
+      setNotifications((prev) => [...prev, ...reminders]);
+
+      // Pending guarantor approvals
+      const { data: pendingLoans } = await supabase
+        .from('loans_with_guarantors')
         .select('*')
-        .eq('loan_id', loan.id);
+        .eq('guarantor_id', fetchedMember.id)
+        .eq('status', 'pending');
 
-      const allAccepted = allGuarantors?.every((g) => g.status === 'accepted');
-
-      if (allAccepted) {
-        // Notify admin that loan is ready for approval
-        await supabase.from('notifications').insert({
-          member_id: null,
-          type: 'loan_ready_for_admin',
-          title: 'Loan Ready for Approval',
-          message: `Loan ${loan.loan_number} by member ${loan.member_id} has all guarantor approvals.`,
-          recipient_role: 'admin',
-          metadata: JSON.stringify({ loanId: loan.id }),
-          sent_at: new Date(),
-          read: false,
-        });
-      }
-
-      // Call dashboard callbacks
-      if (decision === 'accepted') onApprove();
-      else onReject();
-
-      onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit decision');
-    } finally {
-      setLoading(false);
+      setPendingGuarantorLoans(pendingLoans || []);
+    } catch (err) {
+      console.error('Failed to load member data:', err);
     }
   };
 
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-md p-6 relative shadow-2xl border border-gray-100 animate-fadeIn">
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition"
-        >
-          <XCircle className="w-6 h-6" />
-        </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Navbar */}
+      <nav className="bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] flex items-center justify-center shadow-md hover:scale-110 transition-transform duration-300">
+                <DollarSign className="w-6 h-6 text-white" />
+              </div>
+              <h1 className="text-xl font-bold text-white tracking-wide">My Account</h1>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2 text-white hover:text-[#D8468C] hover:bg-white/20 rounded-xl transition-transform duration-300 hover:scale-105"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+              <div className="text-right">
+                <p className="text-sm font-medium text-white">{profile?.full_name}</p>
+                <p className="text-xs text-white/80">{member?.member_number}</p>
+              </div>
+              <button
+                onClick={() => signOut()}
+                className="p-2 text-white hover:text-red-600 hover:bg-white/20 rounded-xl transition-transform duration-300 hover:scale-105"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
 
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Loan Guarantee Approval</h2>
+      {/* Notifications */}
+      {showNotifications && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="bg-white rounded-2xl card-shadow p-4 max-h-96 overflow-y-auto">
+            <h3 className="font-bold text-gray-800 mb-3">Notifications</h3>
+            {notifications.length === 0 ? (
+              <p className="text-sm text-gray-600">No notifications</p>
+            ) : (
+              <div className="space-y-2">
+                {notifications.map((notif) => (
+                  <div
+                    key={notif.id}
+                    className={`p-3 rounded-xl ${notif.read ? 'bg-gray-50' : 'bg-blue-50'}`}
+                    onClick={async () => {
+                      if (!notif.read) {
+                        await supabase
+                          .from('notifications')
+                          .update({ read: true })
+                          .eq('id', notif.id);
+                        loadMemberData();
+                      }
+                    }}
+                  >
+                    <p className="text-sm font-medium text-gray-800">{notif.title}</p>
+                    <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(notif.sent_at).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
-            {error}
+      {/* Dashboard Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Account Balance */}
+          <div className="bg-white rounded-2xl p-6 card-shadow-hover">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#00BFFF] flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-1">Account Balance (UGX)</p>
+            <h3 className="text-3xl font-bold text-[#007B8A]">
+              {member ? member.account_balance.toLocaleString() : '0'}
+            </h3>
+          </div>
+
+          {/* Total Contributions */}
+          <div className="bg-white rounded-2xl p-6 card-shadow-hover">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00BFFF] to-[#D8468C] flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-1">Total Contributions (UGX)</p>
+            <h3 className="text-3xl font-bold text-[#007B8A]">
+              {member ? member.total_contributions.toLocaleString() : '0'}
+            </h3>
+          </div>
+
+          {/* Active Loans */}
+          <div className="bg-white rounded-2xl p-6 card-shadow-hover">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] flex items-center justify-center">
+                <CreditCard className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-1">Active Loans</p>
+            <h3 className="text-3xl font-bold text-gray-800">
+              {loans.filter((l) => l.status === 'disbursed').length}
+            </h3>
+          </div>
+        </div>
+
+        {/* Pending Guarantor Approvals */}
+        {pendingGuarantorLoans.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 card-shadow mb-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-3">Pending Guarantor Approvals</h3>
+            <div className="space-y-3">
+              {pendingGuarantorLoans.map((loan) => (
+                <div
+                  key={loan.id}
+                  className="flex justify-between items-center p-3 bg-yellow-50 rounded-xl cursor-pointer"
+                  onClick={() => setShowGuarantorModal(loan)}
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{loan.loan_number}</p>
+                    <p className="text-xs text-gray-600">
+                      Amount Requested: {Number(loan.amount_requested).toLocaleString()} UGX
+                    </p>
+                  </div>
+                  <button className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-sm font-medium">
+                    Approve / Reject
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        <p className="mb-4">
-          Loan <strong>{loan.loan_number}</strong> requested by member ID{' '}
-          <strong>{loan.member_id}</strong> needs your approval.
-        </p>
+        {/* Transactions and Loans */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Recent Transactions */}
+          <div className="bg-white rounded-2xl card-shadow p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-800">Recent Transactions</h3>
+              <FileText className="w-5 h-5 text-gray-400" />
+            </div>
+            <div className="space-y-3">
+              {transactions.slice(0, 5).map((tx) => (
+                <div
+                  key={tx.id}
+                  className="flex justify-between items-center p-3 bg-gray-50 rounded-xl"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-800 capitalize">{tx.transaction_type}</p>
+                    <p className="text-xs text-gray-600">
+                      {new Date(tx.transaction_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p
+                      className={`text-sm font-semibold ${
+                        tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'
+                      }`}
+                    >
+                      {tx.transaction_type === 'withdrawal' ? '-' : '+'}
+                      {Number(tx.amount).toLocaleString()} UGX
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Bal: {Number(tx.balance_after).toLocaleString()} UGX
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={() => handleDecision('accepted')}
-            disabled={loading}
-            className="flex-1 py-2 bg-green-500 text-white font-medium rounded-xl disabled:opacity-50"
-          >
-            {loading ? 'Processing...' : 'Accept'}
-          </button>
-          <button
-            onClick={() => handleDecision('declined')}
-            disabled={loading}
-            className="flex-1 py-2 bg-red-500 text-white font-medium rounded-xl disabled:opacity-50"
-          >
-            {loading ? 'Processing...' : 'Decline'}
-          </button>
+          {/* My Loans */}
+          <div className="bg-white rounded-2xl card-shadow p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-800">My Loans</h3>
+              <button
+                onClick={() => setShowLoanModal(true)}
+                className="flex items-center gap-2 px-3 py-1.5 btn-primary text-white text-sm font-medium rounded-lg"
+              >
+                <Send className="w-4 h-4" /> Request Loan
+              </button>
+            </div>
+            <div className="space-y-3">
+              {loans.length === 0 ? (
+                <p className="text-sm text-gray-600">No loans yet</p>
+              ) : (
+                loans.map((loan) => (
+                  <div key={loan.id} className="p-3 bg-gray-50 rounded-xl">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{loan.loan_number}</p>
+                        <p className="text-xs text-gray-600">
+                          {new Date(loan.requested_date).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <span
+                        className={`status-badge text-xs ${
+                          loan.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : loan.status === 'approved'
+                            ? 'bg-blue-100 text-blue-800'
+                            : loan.status === 'rejected'
+                            ? 'bg-red-100 text-red-800'
+                            : loan.status === 'disbursed'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {loan.status}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>
+                        Amount:{' '}
+                        {Number(loan.amount_approved || loan.amount_requested).toLocaleString()} UGX
+                      </span>
+                      {loan.outstanding_balance !== null && (
+                        <span className="font-semibold text-[#007B8A]">
+                          Outstanding: {Number(loan.outstanding_balance).toLocaleString()} UGX
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Modals */}
+      {showLoanModal && member && (
+        <LoanRequestModal
+          member={member}
+          profile={profile}
+          onClose={() => setShowLoanModal(false)}
+          onSuccess={loadMemberData}
+        />
+      )}
+
+      {showGuarantorModal && member && (
+        <GuarantorApprovalModal
+          loan={showGuarantorModal}
+          member={member}
+          onClose={() => setShowGuarantorModal(null)}
+          onApprove={loadMemberData}
+          onReject={loadMemberData}
+        />
+      )}
     </div>
   );
 }
