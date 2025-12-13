@@ -3,8 +3,8 @@ import { supabase, Member, Loan } from '../lib/supabase';
 import { XCircle } from 'lucide-react';
 
 interface GuarantorApprovalModalProps {
-  loan: Loan | null; 
-  member: Member | null; 
+  loan: Loan | null;
+  member: Member | null;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -25,7 +25,7 @@ export default function GuarantorApprovalModal({
     setError('');
 
     try {
-      // 1️⃣ Update guarantor status
+      // 1️⃣ Update this member's guarantor status
       const { error: updateError } = await supabase
         .from('loan_guarantees')
         .update({ status: decision })
@@ -34,7 +34,7 @@ export default function GuarantorApprovalModal({
 
       if (updateError) throw updateError;
 
-      // 2️⃣ Notify member
+      // 2️⃣ Notify the borrower (loan member)
       const message =
         decision === 'approved'
           ? `${member.full_name} approved your loan guarantee.`
@@ -51,18 +51,22 @@ export default function GuarantorApprovalModal({
           loanId: loan.id,
           decision,
         }),
+        sent_at: new Date(),
+        read: false,
       });
 
-      // 3️⃣ Check if all guarantors approved
-      const { data: allGuarantors } = await supabase
+      // 3️⃣ Check if all guarantors have approved
+      const { data: allGuarantors, error: fetchError } = await supabase
         .from('loan_guarantees')
         .select('*')
         .eq('loan_id', loan.id);
 
+      if (fetchError) throw fetchError;
+
       const allApproved = allGuarantors?.every(g => g.status === 'approved');
 
       if (allApproved) {
-        // Notify admin
+        // Notify admin that loan is ready
         await supabase.from('notifications').insert({
           member_id: null,
           type: 'loan_ready_for_admin',
@@ -75,7 +79,7 @@ export default function GuarantorApprovalModal({
         });
       }
 
-      onSuccess();
+      onSuccess(); // Refresh dashboard data
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to submit decision');
