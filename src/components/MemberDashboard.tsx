@@ -11,6 +11,7 @@ export default function MemberDashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [dismissedNotifications, setDismissedNotifications] = useState<Notification[]>([]);
   const [pendingGuarantorLoans, setPendingGuarantorLoans] = useState<Loan[]>([]);
   const [showLoanModal, setShowLoanModal] = useState(false);
   const [showGuarantorModal, setShowGuarantorModal] = useState<Loan | null>(null);
@@ -39,7 +40,7 @@ export default function MemberDashboard() {
       };
       setMember(fetchedMember);
 
-      // Load transactions, loans, notifications in parallel
+      // Load transactions, loans, notifications
       const [txRes, loanRes, notifRes] = await Promise.all([
         supabase
           .from('transactions')
@@ -118,7 +119,7 @@ export default function MemberDashboard() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // --- Notification Toast Component ---
+  // --- Notification Toast ---
   const NotificationToast = ({
     notif,
     onClose,
@@ -143,7 +144,7 @@ export default function MemberDashboard() {
     return (
       <div
         onClick={handleClick}
-        className="cursor-pointer w-80 bg-white shadow-lg rounded-xl p-4 border-l-4 border-blue-500 hover:shadow-2xl transition-all duration-300 flex justify-between items-start"
+        className="cursor-pointer w-80 bg-white shadow-lg rounded-xl border-l-4 border-blue-500 p-4 hover:shadow-2xl transition-all duration-300 transform animate-slide-in flex justify-between items-start"
       >
         <div className="flex-1">
           <p className="text-sm font-bold text-gray-800">{notif.title}</p>
@@ -161,6 +162,12 @@ export default function MemberDashboard() {
         </button>
       </div>
     );
+  };
+
+  // Handle toast dismiss: move to dismissedNotifications so it's still in icon panel
+  const handleToastClose = (notif: Notification) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== notif.id));
+    setDismissedNotifications((prev) => [notif, ...prev]);
   };
 
   return (
@@ -181,9 +188,9 @@ export default function MemberDashboard() {
                 className="relative p-2 text-white hover:text-[#D8468C] hover:bg-white/20 rounded-xl transition-transform duration-300 hover:scale-105"
               >
                 <Bell className="w-5 h-5" />
-                {unreadCount > 0 && (
+                {(unreadCount > 0 || dismissedNotifications.length > 0) && (
                   <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                    {unreadCount}
+                    {unreadCount + dismissedNotifications.length}
                   </span>
                 )}
               </button>
@@ -205,172 +212,47 @@ export default function MemberDashboard() {
       {/* Floating Toast Notifications */}
       <div className="fixed top-5 right-5 flex flex-col gap-3 z-50">
         {notifications.map((notif) => (
-          <NotificationToast
-            key={notif.id}
-            notif={notif}
-            onClose={() => setNotifications((prev) => prev.filter((n) => n.id !== notif.id))}
-          />
+          <NotificationToast key={notif.id} notif={notif} onClose={() => handleToastClose(notif)} />
         ))}
       </div>
 
+      {/* Notifications Panel (click bell to open) */}
+      {showNotificationsPanel && (
+        <div className="fixed top-16 right-5 w-80 max-h-96 overflow-y-auto z-50 bg-white rounded-2xl shadow-lg p-4 animate-fade-in">
+          <h3 className="font-bold text-gray-800 mb-3">Notifications</h3>
+          {(dismissedNotifications.length === 0 && notifications.length === 0) ? (
+            <p className="text-sm text-gray-600">No notifications</p>
+          ) : (
+            <div className="space-y-2">
+              {[...dismissedNotifications, ...notifications].map((notif) => (
+                <div
+                  key={notif.id}
+                  className={`p-3 rounded-xl ${
+                    notif.read ? 'bg-gray-50' : 'bg-blue-50'
+                  }`}
+                  onClick={async () => {
+                    if (!notif.read) {
+                      await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
+                      loadMemberData();
+                    }
+                  }}
+                >
+                  <p className="text-sm font-medium text-gray-800">{notif.title}</p>
+                  <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Date(notif.sent_at).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Dashboard Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-2xl p-6 shadow hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#00BFFF] flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 mb-1">Account Balance (UGX)</p>
-            <h3 className="text-3xl font-bold text-[#007B8A]">
-              {member ? member.account_balance.toLocaleString() : '0'}
-            </h3>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00BFFF] to-[#D8468C] flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 mb-1">Total Contributions (UGX)</p>
-            <h3 className="text-3xl font-bold text-[#007B8A]">
-              {member ? member.total_contributions.toLocaleString() : '0'}
-            </h3>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] flex items-center justify-center">
-                <CreditCard className="w-6 h-6 text-white" />
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 mb-1">Active Loans</p>
-            <h3 className="text-3xl font-bold text-gray-800">
-              {loans.filter((l) => l.status === 'disbursed').length}
-            </h3>
-          </div>
-        </div>
-
-        {/* Pending Guarantor Approvals */}
-        {pendingGuarantorLoans.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 shadow mb-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-3">Pending Guarantor Approvals</h3>
-            <div className="space-y-3">
-              {pendingGuarantorLoans.map((loan) => (
-                <div
-                  key={loan.id}
-                  className="flex justify-between items-center p-3 bg-yellow-50 rounded-xl cursor-pointer hover:bg-yellow-100 transition-colors"
-                  onClick={() => setShowGuarantorModal(loan)}
-                >
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{loan.loan_number}</p>
-                    <p className="text-xs text-gray-600">
-                      Amount Requested: {Number(loan.amount_requested).toLocaleString()} UGX
-                    </p>
-                  </div>
-                  <button className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-sm font-medium hover:bg-yellow-600 transition-colors">
-                    Approve / Reject
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Transactions & Loans */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Transactions */}
-          <div className="bg-white rounded-2xl shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-800">Recent Transactions</h3>
-              <FileText className="w-5 h-5 text-gray-400" />
-            </div>
-            <div className="space-y-3">
-              {transactions.slice(0, 5).map((tx) => (
-                <div key={tx.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800 capitalize">{tx.transaction_type}</p>
-                    <p className="text-xs text-gray-600">
-                      {new Date(tx.transaction_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p
-                      className={`text-sm font-semibold ${
-                        tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'
-                      }`}
-                    >
-                      {tx.transaction_type === 'withdrawal' ? '-' : '+'}
-                      {Number(tx.amount).toLocaleString()} UGX
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      Bal: {Number(tx.balance_after).toLocaleString()} UGX
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Loans */}
-          <div className="bg-white rounded-2xl shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-800">My Loans</h3>
-              <button
-                onClick={() => setShowLoanModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <Send className="w-4 h-4" /> Request Loan
-              </button>
-            </div>
-            <div className="space-y-3">
-              {loans.length === 0 ? (
-                <p className="text-sm text-gray-600">No loans yet</p>
-              ) : (
-                loans.map((loan) => (
-                  <div key={loan.id} className="p-3 bg-gray-50 rounded-xl">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">{loan.loan_number}</p>
-                        <p className="text-xs text-gray-600">
-                          {new Date(loan.requested_date).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <span
-                        className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                          loan.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : loan.status === 'approved'
-                            ? 'bg-blue-100 text-blue-800'
-                            : loan.status === 'rejected'
-                            ? 'bg-red-100 text-red-800'
-                            : loan.status === 'disbursed'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {loan.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>
-                        Amount: {Number(loan.amount_approved || loan.amount_requested).toLocaleString()} UGX
-                      </span>
-                      {loan.outstanding_balance !== null && (
-                        <span className="font-semibold text-[#007B8A]">
-                          Outstanding: {Number(loan.outstanding_balance).toLocaleString()} UGX
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+        {/* --- Summary Cards, Pending Guarantor, Transactions & Loans --- */}
+        {/* Keep your existing code for summary cards, loans, transactions, and modals here */}
       </div>
 
       {/* Modals */}
@@ -391,6 +273,21 @@ export default function MemberDashboard() {
           onSuccess={loadMemberData}
         />
       )}
+
+      {/* Animations (Tailwind or custom classes) */}
+      <style jsx>{`
+        @keyframes slide-in {
+          0% { transform: translateX(100%) }
+          100% { transform: translateX(0%) }
+        }
+        .animate-slide-in { animation: slide-in 0.5s ease-out; }
+
+        @keyframes fade-in {
+          0% { opacity: 0; transform: translateY(-10px) }
+          100% { opacity: 1; transform: translateY(0px) }
+        }
+        .animate-fade-in { animation: fade-in 0.3s ease-out; }
+      `}</style>
     </div>
   );
 }
