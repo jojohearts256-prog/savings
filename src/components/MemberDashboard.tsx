@@ -23,7 +23,9 @@ export default function MemberDashboard() {
 
   const loadMemberData = async () => {
     if (!profile) return;
+
     try {
+      // Fetch member
       const memberRes = await supabase
         .from('members')
         .select('*')
@@ -39,6 +41,7 @@ export default function MemberDashboard() {
       };
       setMember(fetchedMember);
 
+      // Fetch transactions, loans, notifications in parallel
       const [txRes, loanRes, notifRes] = await Promise.all([
         supabase
           .from('transactions')
@@ -97,7 +100,6 @@ export default function MemberDashboard() {
         }
       });
 
-      // Merge reminders with allNotifications
       setAllNotifications((prev) => [...prev, ...reminders]);
       setToastNotifications((prev) => [...prev, ...reminders]);
 
@@ -108,12 +110,14 @@ export default function MemberDashboard() {
 
       if (error) throw error;
 
-      const filteredPending = (pendingLoans || []).filter((loan) => {
-        if (!loan.guarantors || !Array.isArray(loan.guarantors)) return false;
-        return loan.guarantors.some(
-          (g: any) => g.member_id === fetchedMember.id && g.status === 'pending'
-        );
-      });
+      const filteredPending = (pendingLoans || [])
+        .filter((loan) => {
+          if (!loan.guarantors || !Array.isArray(loan.guarantors)) return false;
+          return loan.guarantors.some(
+            (g: any) => g.member_id === fetchedMember.id && g.status === 'pending'
+          );
+        })
+        .map((loan) => ({ ...loan, id: loan.loan_id })); // <-- map loan_id to id
 
       setPendingGuarantorLoans(filteredPending);
     } catch (err) {
@@ -125,7 +129,6 @@ export default function MemberDashboard() {
 
   const handleToastClose = (notif: Notification) => {
     setToastNotifications((prev) => prev.filter((n) => n.id !== notif.id));
-    // keep in allNotifications for bell icon
   };
 
   return (
@@ -173,7 +176,6 @@ export default function MemberDashboard() {
           <div
             key={notif.id}
             className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded-xl shadow-md animate-slide-in"
-            onMouseEnter={() => {}}
           >
             <div className="flex justify-between items-start">
               <div>
