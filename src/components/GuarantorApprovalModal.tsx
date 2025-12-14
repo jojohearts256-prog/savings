@@ -18,14 +18,11 @@ export default function GuarantorApprovalModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  if (!loan || !member) return null;
+  if (!loan?.id || !member?.id) {
+    return null; // avoid errors if loan/member ID missing
+  }
 
   const handleDecision = async (decision: 'accepted' | 'declined') => {
-    if (!loan.id || !member.id) {
-      setError('Invalid loan or member ID');
-      return;
-    }
-
     setLoading(true);
     setError('');
 
@@ -33,11 +30,10 @@ export default function GuarantorApprovalModal({
       // Update guarantor row
       const { error: updateError } = await supabase
         .from('loan_guarantees')
-        .update({ status: decision, updated_at: new Date() })
+        .update({ status: decision })
         .eq('loan_id', loan.id)
         .eq('guarantor_id', member.id)
         .single();
-
       if (updateError) throw updateError;
 
       // Notify loan member
@@ -68,7 +64,7 @@ export default function GuarantorApprovalModal({
       if (allAccepted) {
         // Notify admin
         await supabase.from('notifications').insert({
-          member_id: null, // admin
+          member_id: null,
           type: 'loan_ready_for_admin',
           title: 'Loan Ready for Approval',
           message: `Loan ${loan.loan_number} by member ${loan.member_id} has all guarantor approvals.`,
