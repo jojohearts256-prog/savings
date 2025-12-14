@@ -21,20 +21,26 @@ export default function GuarantorApprovalModal({
   if (!loan || !member) return null;
 
   const handleDecision = async (decision: 'accepted' | 'declined') => {
+    if (!loan.id || !member.id) {
+      setError('Invalid loan or member ID');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      // 1️⃣ Update the guarantor row in loan_guarantees
+      // Update guarantor row
       const { error: updateError } = await supabase
         .from('loan_guarantees')
-        .update({ status: decision })
+        .update({ status: decision, updated_at: new Date() })
         .eq('loan_id', loan.id)
         .eq('guarantor_id', member.id)
         .single();
+
       if (updateError) throw updateError;
 
-      // 2️⃣ Notify loan member
+      // Notify loan member
       await supabase.from('notifications').insert({
         member_id: loan.member_id,
         type: 'guarantor_response',
@@ -48,21 +54,21 @@ export default function GuarantorApprovalModal({
         read: false,
       });
 
-      // 3️⃣ Check if all guarantors accepted
+      // Check if all guarantors accepted
       const { data: allGuarantors } = await supabase
         .from('loan_guarantees')
         .select('*')
         .eq('loan_id', loan.id);
 
       const validGuarantors = allGuarantors?.filter(g => g.amount_guaranteed > 0);
-      const allAccepted = validGuarantors && validGuarantors.length > 0 
-        ? validGuarantors.every(g => g.status === 'accepted') 
+      const allAccepted = validGuarantors && validGuarantors.length > 0
+        ? validGuarantors.every(g => g.status === 'accepted')
         : false;
 
       if (allAccepted) {
         // Notify admin
         await supabase.from('notifications').insert({
-          member_id: null, // admin notifications
+          member_id: null, // admin
           type: 'loan_ready_for_admin',
           title: 'Loan Ready for Approval',
           message: `Loan ${loan.loan_number} by member ${loan.member_id} has all guarantor approvals.`,
