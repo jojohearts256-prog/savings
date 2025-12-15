@@ -51,7 +51,13 @@ export type Loan = {
   interest_rate: number;
   repayment_period_months: number;
   reason: string;
-  status: 'pending' | 'approved' | 'rejected' | 'disbursed' | 'completed';
+  status:
+    | 'pending_guarantors'
+    | 'pending'
+    | 'approved'
+    | 'rejected'
+    | 'disbursed'
+    | 'completed';
   requested_date: string;
   approved_date: string | null;
   disbursed_date: string | null;
