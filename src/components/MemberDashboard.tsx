@@ -114,10 +114,10 @@ export default function MemberDashboard() {
         .filter((loan) => {
           if (!loan.guarantors || !Array.isArray(loan.guarantors)) return false;
           return loan.guarantors.some(
-            (g: any) => g.member_id === fetchedMember.id && g.status === 'pending'
+            (g: any) => g.member_id === fetchedMember.id && g.status === 'pending_guarantors' // ✅ correct status
           );
         })
-        .map((loan) => ({ ...loan, id: loan.loan_id })); // <-- map loan_id to id
+        .map((loan) => ({ ...loan, id: loan.loan_id }));
 
       setPendingGuarantorLoans(filteredPending);
     } catch (err) {
@@ -410,7 +410,14 @@ export default function MemberDashboard() {
           loan={showGuarantorModal}
           member={member}
           onClose={() => setShowGuarantorModal(null)}
-          onSuccess={loadMemberData}
+          onSuccess={() => {
+            // remove loan from UI immediately
+            setPendingGuarantorLoans((prev) =>
+              prev.filter((l) => l.id !== showGuarantorModal.id)
+            );
+            setShowGuarantorModal(null);
+            loadMemberData();
+          }}
         />
       )}
     </div>
