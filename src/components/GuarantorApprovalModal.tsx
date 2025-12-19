@@ -15,26 +15,35 @@ export default function GuarantorApprovalModal({
   onClose,
   onSuccess,
 }: GuarantorApprovalModalProps) {
-  const [loading, setLoading] = useState(false);
+  const [loadingAccept, setLoadingAccept] = useState(false);
+  const [loadingDecline, setLoadingDecline] = useState(false);
   const [error, setError] = useState('');
 
-  if (!loan?.id || !member?.id) {
-    return null; // avoid errors if loan/member ID missing
-  }
+  if (!loan?.id || !member?.id) return null;
 
-  const handleDecision = async (decision: 'accepted' | 'declined') => {
-    setLoading(true);
-    setError('');
-
+  const handleDecision = async (decision: 'Accepted' | 'Declined') => {
     try {
-      // Update guarantor row
-      const { error: updateError } = await supabase
+      setError('');
+      if (decision === 'Accepted') setLoadingAccept(true);
+      else setLoadingDecline(true);
+
+      // Update guarantor row safely with upsert to avoid inserting duplicates
+      const guarantorAmount =
+        loan.guarantors?.find((g) => g.member_id === member.id)?.amount_guaranteed || 0;
+
+      const { error: upsertError } = await supabase
         .from('loan_guarantees')
-        .update({ status: decision })
-        .eq('loan_id', loan.id)
-        .eq('guarantor_id', member.id)
-        .single();
-      if (updateError) throw updateError;
+        .upsert(
+          {
+            loan_id: loan.id,
+            guarantor_id: member.id,
+            amount_guaranteed: guarantorAmount,
+            status: decision,
+          },
+          { onConflict: ['loan_id', 'guarantor_id'] }
+        );
+
+      if (upsertError) throw upsertError;
 
       // Notify loan member
       await supabase.from('notifications').insert({
@@ -42,7 +51,7 @@ export default function GuarantorApprovalModal({
         type: 'guarantor_response',
         title: 'Guarantor Response',
         message:
-          decision === 'accepted'
+          decision === 'Accepted'
             ? `${member.full_name} accepted your loan guarantee.`
             : `${member.full_name} declined your loan guarantee.`,
         metadata: JSON.stringify({ guarantor_id: member.id, loanId: loan.id, decision }),
@@ -56,9 +65,9 @@ export default function GuarantorApprovalModal({
         .select('*')
         .eq('loan_id', loan.id);
 
-      const validGuarantors = allGuarantors?.filter(g => g.amount_guaranteed > 0);
+      const validGuarantors = allGuarantors?.filter((g) => g.amount_guaranteed > 0);
       const allAccepted = validGuarantors && validGuarantors.length > 0
-        ? validGuarantors.every(g => g.status === 'accepted')
+        ? validGuarantors.every((g) => g.status === 'Accepted')
         : false;
 
       if (allAccepted) {
@@ -79,7 +88,8 @@ export default function GuarantorApprovalModal({
     } catch (err: any) {
       setError(err.message || 'Failed to submit decision');
     } finally {
-      setLoading(false);
+      setLoadingAccept(false);
+      setLoadingDecline(false);
     }
   };
 
@@ -108,18 +118,18 @@ export default function GuarantorApprovalModal({
 
         <div className="flex gap-3">
           <button
-            onClick={() => handleDecision('accepted')}
-            disabled={loading}
+            onClick={() => handleDecision('Accepted')}
+            disabled={loadingAccept || loadingDecline}
             className="flex-1 py-2 bg-green-500 text-white font-medium rounded-xl disabled:opacity-50"
           >
-            {loading ? 'Processing...' : 'Accept'}
+            {loadingAccept ? 'Processing...' : 'Accept'}
           </button>
           <button
-            onClick={() => handleDecision('declined')}
-            disabled={loading}
+            onClick={() => handleDecision('Declined')}
+            disabled={loadingAccept || loadingDecline}
             className="flex-1 py-2 bg-red-500 text-white font-medium rounded-xl disabled:opacity-50"
           >
-            {loading ? 'Processing...' : 'Decline'}
+            {loadingDecline ? 'Processing...' : 'Decline'}
           </button>
         </div>
       </div>
