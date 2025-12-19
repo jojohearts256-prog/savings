@@ -31,7 +31,6 @@ export default function MemberDashboard() {
         .select('*')
         .eq('profile_id', profile.id)
         .maybeSingle();
-
       if (!memberRes.data) return;
 
       const fetchedMember = {
@@ -86,7 +85,6 @@ export default function MemberDashboard() {
             sent_at: new Date(),
           });
         }
-
         if (diffDays < 0) {
           reminders.push({
             id: `loan-overdue-${loan.id}`,
@@ -99,7 +97,6 @@ export default function MemberDashboard() {
           });
         }
       });
-
       setAllNotifications((prev) => [...prev, ...reminders]);
       setToastNotifications((prev) => [...prev, ...reminders]);
 
@@ -107,19 +104,19 @@ export default function MemberDashboard() {
       const { data: pendingLoans, error } = await supabase
         .from('loans_with_guarantors')
         .select('*');
-
       if (error) throw error;
 
+      // ✅ Filter for loans where THIS member is a pending guarantor
       const filteredPending = (pendingLoans || [])
         .filter((loan) => {
           if (!loan.guarantors || !Array.isArray(loan.guarantors)) return false;
           return loan.guarantors.some(
-            (g: any) => g.member_id === fetchedMember.id && g.status === 'pending'
+            (g: any) => g.guarantor_id === fetchedMember.id && g.status === 'pending'
           );
         })
-        .map((loan) => ({ ...loan, id: loan.loan_id })); // <-- map loan_id to id
-
+        .map((loan) => ({ ...loan, id: loan.loan_id }));
       setPendingGuarantorLoans(filteredPending);
+
     } catch (err) {
       console.error('Failed to load member data:', err);
     }
@@ -366,7 +363,7 @@ export default function MemberDashboard() {
                             ? 'bg-yellow-100 text-yellow-800'
                             : loan.status === 'approved'
                             ? 'bg-blue-100 text-blue-800'
-                            : loan.status === 'rejected'
+                            : loan.status === 'declined'
                             ? 'bg-red-100 text-red-800'
                             : loan.status === 'disbursed'
                             ? 'bg-green-100 text-green-800'
