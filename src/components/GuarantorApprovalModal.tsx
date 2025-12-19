@@ -21,16 +21,19 @@ export default function GuarantorApprovalModal({
 
   if (!loan?.id || !member?.id) return null;
 
-  const handleDecision = async (decision: 'Accepted' | 'Declined') => {
+  // 🔧 status MUST match DB check constraint
+  const handleDecision = async (status: 'pending' | 'declined') => {
     try {
       setError('');
-      if (decision === 'Accepted') setLoadingAccept(true);
-      else setLoadingDecline(true);
+      status === 'pending'
+        ? setLoadingAccept(true)
+        : setLoadingDecline(true);
 
-      // Update guarantor row safely with upsert to avoid inserting duplicates
       const guarantorAmount =
-        loan.guarantors?.find((g) => g.member_id === member.id)?.amount_guaranteed || 0;
+        loan.guarantors?.find((g) => g.member_id === member.id)
+          ?.amount_guaranteed || 0;
 
+      // ✅ Correct upsert matching UNIQUE (loan_id, guarantor_id)
       const { error: upsertError } = await supabase
         .from('loan_guarantees')
         .upsert(
@@ -38,45 +41,53 @@ export default function GuarantorApprovalModal({
             loan_id: loan.id,
             guarantor_id: member.id,
             amount_guaranteed: guarantorAmount,
-            status: decision,
+            status,
           },
           { onConflict: ['loan_id', 'guarantor_id'] }
         );
 
       if (upsertError) throw upsertError;
 
-      // Notify loan member
+      // 🔔 Notify loan owner
       await supabase.from('notifications').insert({
         member_id: loan.member_id,
         type: 'guarantor_response',
         title: 'Guarantor Response',
         message:
-          decision === 'Accepted'
+          status === 'pending'
             ? `${member.full_name} accepted your loan guarantee.`
             : `${member.full_name} declined your loan guarantee.`,
-        metadata: JSON.stringify({ guarantor_id: member.id, loanId: loan.id, decision }),
+        metadata: JSON.stringify({
+          guarantor_id: member.id,
+          loanId: loan.id,
+          status,
+        }),
         sent_at: new Date(),
         read: false,
       });
 
-      // Check if all guarantors accepted
-      const { data: allGuarantors } = await supabase
+      // 🔍 Check all guarantors
+      const { data: allGuarantors, error: fetchError } = await supabase
         .from('loan_guarantees')
         .select('*')
         .eq('loan_id', loan.id);
 
-      const validGuarantors = allGuarantors?.filter((g) => g.amount_guaranteed > 0);
-      const allAccepted = validGuarantors && validGuarantors.length > 0
-        ? validGuarantors.every((g) => g.status === 'Accepted')
-        : false;
+      if (fetchError) throw fetchError;
 
+      const validGuarantors =
+        allGuarantors?.filter((g) => g.amount_guaranteed > 0) || [];
+
+      const allAccepted =
+        validGuarantors.length > 0 &&
+        validGuarantors.every((g) => g.status === 'pending');
+
+      // 🔔 Notify admin when all guarantors accepted
       if (allAccepted) {
-        // Notify admin
         await supabase.from('notifications').insert({
           member_id: null,
           type: 'loan_ready_for_admin',
           title: 'Loan Ready for Approval',
-          message: `Loan ${loan.loan_number} by member ${loan.member_id} has all guarantor approvals.`,
+          message: `Loan ${loan.loan_number} has all guarantor approvals.`,
           metadata: JSON.stringify({ loanId: loan.id }),
           sent_at: new Date(),
           read: false,
@@ -103,7 +114,9 @@ export default function GuarantorApprovalModal({
           <XCircle className="w-6 h-6" />
         </button>
 
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Loan Guarantee Approval</h2>
+        <h2 className="text-xl font-bold text-gray-800 mb-4">
+          Loan Guarantee Approval
+        </h2>
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
@@ -112,20 +125,21 @@ export default function GuarantorApprovalModal({
         )}
 
         <p className="mb-4">
-          Loan <strong>{loan.loan_number}</strong> requested by member ID{' '}
+          Loan <strong>{loan.loan_number}</strong> requested by member{' '}
           <strong>{loan.member_id}</strong> needs your approval.
         </p>
 
         <div className="flex gap-3">
           <button
-            onClick={() => handleDecision('Accepted')}
+            onClick={() => handleDecision('pending')}
             disabled={loadingAccept || loadingDecline}
             className="flex-1 py-2 bg-green-500 text-white font-medium rounded-xl disabled:opacity-50"
           >
             {loadingAccept ? 'Processing...' : 'Accept'}
           </button>
+
           <button
-            onClick={() => handleDecision('Declined')}
+            onClick={() => handleDecision('declined')}
             disabled={loadingAccept || loadingDecline}
             className="flex-1 py-2 bg-red-500 text-white font-medium rounded-xl disabled:opacity-50"
           >
