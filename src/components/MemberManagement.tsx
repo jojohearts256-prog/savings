@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase, Member } from '../lib/supabase';
 import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, Loader2 } from 'lucide-react';
 
-export default function MemberManagement() {
+export default function MemberManagement({ isHelper = false }: { isHelper?: boolean }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [viewModal, setViewModal] = useState<Member | null>(null);
@@ -428,12 +428,14 @@ export default function MemberManagement() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Member Management</h2>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl"
-        >
-          <UserPlus className="w-5 h-5" /> Add Member
-        </button>
+        {!isHelper && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl"
+          >
+            <UserPlus className="w-5 h-5" /> Add Member
+          </button>
+        )}
       </div>
 
       <div className="mb-4">
@@ -473,12 +475,16 @@ export default function MemberManagement() {
                   <button onClick={() => setViewModal(m)} className="p-1 text-gray-500 hover:text-gray-800">
                     <Eye className="w-4 h-4" />
                   </button>
-                  <button onClick={() => setEditModal(m)} className="p-1 text-gray-500 hover:text-gray-800">
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => deleteMember(m.id)} className="p-1 text-red-500 hover:text-red-700">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {!isHelper && (
+                    <>
+                      <button onClick={() => setEditModal(m)} className="p-1 text-gray-500 hover:text-gray-800">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => deleteMember(m.id)} className="p-1 text-red-500 hover:text-red-700">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

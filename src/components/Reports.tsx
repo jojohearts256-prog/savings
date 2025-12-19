@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { FileText, Download, TrendingUp } from 'lucide-react';
 
-export default function Reports() {
+export default function Reports({ isHelper = false }: { isHelper?: boolean }) {
   const [reportType, setReportType] = useState<'monthly' | 'yearly' | 'member'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
@@ -216,9 +216,15 @@ export default function Reports() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
             <select value={reportType} onChange={e => setReportType(e.target.value as any)} className="w-full px-4 py-2 border border-[#70C1F2] rounded-xl">
-              <option value="monthly">Monthly Report</option>
-              <option value="yearly">Yearly Report</option>
-              <option value="member">Member Statement</option>
+              {!isHelper ? (
+                <>
+                  <option value="monthly">Monthly Report</option>
+                  <option value="yearly">Yearly Report</option>
+                  <option value="member">Member Statement</option>
+                </>
+              ) : (
+                <option value="member">Member Statement</option>
+              )}
             </select>
           </div>
 

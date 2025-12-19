@@ -2,6 +2,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import MemberDashboard from './components/MemberDashboard';
+import HelperDashboard from './components/HelperDashboard';
 
 function AppContent() {
   const { user, profile, loading } = useAuth();
@@ -21,8 +22,12 @@ function AppContent() {
     return <Login />;
   }
 
-  if (profile.role === 'admin' || profile.role === 'employee') {
+  if (profile.role === 'admin') {
     return <AdminDashboard />;
+  }
+
+  if (profile.role === 'employee') {
+    return <HelperDashboard />;
   }
 
   if (profile.role === 'member') {

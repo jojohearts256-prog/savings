@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { CreditCard, CheckCircle, XCircle, Clock, TrendingUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-export default function LoanManagement() {
+export default function LoanManagement({ isHelper = false }: { isHelper?: boolean }) {
   const { profile } = useAuth();
   const [loans, setLoans] = useState<any[]>([]);
   const [selectedLoan, setSelectedLoan] = useState<any>(null);
@@ -379,40 +379,44 @@ export default function LoanManagement() {
                     {loan.outstanding_balance ? `UGX ${Number(loan.outstanding_balance).toLocaleString('en-UG')}` : '-'}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex gap-2">
-                      {loan.status === 'pending' && (
-                        <>
+                    {!isHelper ? (
+                      <div className="flex gap-2">
+                        {loan.status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => setSelectedLoan(loan)}
+                              className="px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleLoanAction(loan.id, 'reject')}
+                              className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {loan.status === 'approved' && (
                           <button
-                            onClick={() => setSelectedLoan(loan)}
-                            className="px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs"
+                            onClick={() => handleDisburse(loan.id)}
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs"
                           >
-                            Approve
+                            Disburse
                           </button>
+                        )}
+                        {loan.status === 'disbursed' && (
                           <button
-                            onClick={() => handleLoanAction(loan.id, 'reject')}
-                            className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs"
+                            onClick={() => { setSelectedLoan(loan); setShowRepaymentModal(true); }}
+                            className="px-3 py-1.5 bg-orange-500 text-white rounded-xl text-xs"
                           >
-                            Reject
+                            Repay
                           </button>
-                        </>
-                      )}
-                      {loan.status === 'approved' && (
-                        <button
-                          onClick={() => handleDisburse(loan.id)}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs"
-                        >
-                          Disburse
-                        </button>
-                      )}
-                      {loan.status === 'disbursed' && (
-                        <button
-                          onClick={() => { setSelectedLoan(loan); setShowRepaymentModal(true); }}
-                          className="px-3 py-1.5 bg-orange-500 text-white rounded-xl text-xs"
-                        >
-                          Repay
-                        </button>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">View Only</span>
+                    )}
                   </td>
                 </tr>
               ))}
