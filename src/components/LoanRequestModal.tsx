@@ -110,6 +110,8 @@ export default function LoanRequestModal({ member, profile, onClose, onSuccess }
       const loanNumber = 'LN' + Date.now() + Math.floor(Math.random() * 1000);
 
       // 1️⃣ Create loan
+      const loanStatus = validGuarantors.length > 0 ? 'pending_guarantors' : 'pending';
+
       const { data: loanData, error: loanError } = await supabase
         .from('loans')
         .insert({
@@ -118,6 +120,7 @@ export default function LoanRequestModal({ member, profile, onClose, onSuccess }
           amount_requested: requestedAmount,
           repayment_period_months: parseInt(formData.repayment_period),
           reason: formData.reason,
+          status: loanStatus,
         })
         .select()
         .single();

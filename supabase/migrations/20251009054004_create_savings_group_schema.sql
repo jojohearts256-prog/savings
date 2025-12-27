@@ -137,7 +137,8 @@ CREATE TABLE IF NOT EXISTS loans (
   interest_rate numeric DEFAULT 0 CHECK (interest_rate >= 0),
   repayment_period_months integer NOT NULL CHECK (repayment_period_months > 0),
   reason text NOT NULL,
-  status text DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'disbursed', 'completed')),
+  -- include `pending_guarantors` to represent loans waiting on guarantor responses
+  status text DEFAULT 'pending' CHECK (status IN ('pending', 'pending_guarantors', 'approved', 'rejected', 'disbursed', 'completed')),
   requested_date timestamptz DEFAULT now(),
   approved_date timestamptz,
   disbursed_date timestamptz,
