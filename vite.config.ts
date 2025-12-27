@@ -7,4 +7,11 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  // Reduce number of watched files by ignoring common large folders.
+  server: {
+    watch: {
+      // ignore node_modules, git metadata and supabase migrations/functions
+      ignored: ['**/node_modules/**', '**/.git/**', '**/supabase/**'],
+    },
+  },
 });

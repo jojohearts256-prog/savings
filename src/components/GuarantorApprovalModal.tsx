@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { supabase, Member, Loan } from '../lib/supabase';
+import { supabase, MemberWithProfile, LoanWithGuarantors } from '../lib/supabase';
 import { XCircle } from 'lucide-react';
 
 interface GuarantorApprovalModalProps {
-  loan: Loan | null;
-  member: Member | null;
+  loan: LoanWithGuarantors | null;
+  member: MemberWithProfile | null;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -28,7 +28,7 @@ export default function GuarantorApprovalModal({
       status === 'approved' ? setLoadingAccept(true) : setLoadingDecline(true);
 
       const guarantorAmount =
-        loan.guarantors?.find((g) => g.member_id === member.id)
+        loan.guarantors?.find((g) => g.guarantor_id === member.id)
           ?.amount_guaranteed || 0;
 
       // ✅ Correct upsert matching UNIQUE (loan_id, guarantor_id)
@@ -41,7 +41,7 @@ export default function GuarantorApprovalModal({
             amount_guaranteed: guarantorAmount,
             status,
           },
-          { onConflict: ['loan_id', 'guarantor_id'] }
+          { onConflict: 'loan_id,guarantor_id' }
         );
 
       if (upsertError) throw upsertError;
@@ -168,7 +168,7 @@ export default function GuarantorApprovalModal({
 
         <div className="flex gap-3">
           <button
-            onClick={() => handleDecision('pending')}
+            onClick={() => handleDecision('approved')}
             disabled={loadingAccept || loadingDecline}
             className="flex-1 py-2 bg-green-500 text-white font-medium rounded-xl disabled:opacity-50"
           >

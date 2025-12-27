@@ -29,6 +29,15 @@ export type Member = {
   updated_at: string;
 };
 
+// Some components expect member fields like full_name/email/phone to exist
+// (profiles and members are synced). Make these optional on Member for TS safety.
+export type MemberWithProfile = Member & {
+  full_name?: string;
+  email?: string;
+  phone?: string | null;
+  id_number?: string;
+};
+
 export type Transaction = {
   id: string;
   member_id: string;
@@ -67,6 +76,22 @@ export type Loan = {
   outstanding_balance: number | null;
   created_at: string;
   updated_at: string;
+};
+
+export type LoanGuarantee = {
+  id: string;
+  loan_id: string;
+  guarantor_id: string;
+  amount_guaranteed: number;
+  status: 'pending' | 'approved' | 'declined';
+  responded_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+// Allow loans to optionally include their guarantors when fetched with joins
+export type LoanWithGuarantors = Loan & {
+  guarantors?: LoanGuarantee[];
 };
 
 export type LoanRepayment = {
