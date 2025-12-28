@@ -89,16 +89,20 @@ export default function HelperDashboard() {
         id="tsparticles"
         init={particlesInit}
         loaded={particlesLoaded}
+        className="absolute inset-0 pointer-events-none"
         options={{
+          // keep the canvas confined to this container instead of attaching to <body>
+          fullScreen: { enable: false },
           background: { color: { value: 'transparent' } },
           fpsLimit: 60,
           particles: {
             color: { value: '#ffffff' },
-            opacity: { value: 0.15 },
+            opacity: { value: 0.12 },
             size: { value: { min: 1, max: 3 } },
             move: { enable: true, speed: 0.5 },
           },
         }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
       />
 
       {/* Header */}
