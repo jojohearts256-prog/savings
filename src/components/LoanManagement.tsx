@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { sendNotification } from '../lib/notify';
 import { useAuth } from '../contexts/AuthContext';
 import { CreditCard, CheckCircle, XCircle, Clock, TrendingUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -50,7 +51,7 @@ export default function LoanManagement({ isHelper = false }: { isHelper?: boolea
           .eq('id', loanId);
 
         const loan = loans.find(l => l.id === loanId);
-        await supabase.from('notifications').insert({
+        await sendNotification({
           member_id: loan.member_id,
           type: 'loan_approved',
           title: 'Loan Approved',
@@ -66,7 +67,7 @@ export default function LoanManagement({ isHelper = false }: { isHelper?: boolea
           .eq('id', loanId);
 
         const loan = loans.find(l => l.id === loanId);
-        await supabase.from('notifications').insert({
+        await sendNotification({
           member_id: loan.member_id,
           type: 'loan_rejected',
           title: 'Loan Rejected',
@@ -110,12 +111,20 @@ export default function LoanManagement({ isHelper = false }: { isHelper?: boolea
         recorded_by: profile?.id,
       });
 
-      await supabase.from('notifications').insert({
-        member_id: loan.member_id,
-        type: 'loan_disbursed',
-        title: 'Loan Disbursed',
-        message: `Your loan of UGX ${loan.amount_approved.toLocaleString('en-UG')} has been disbursed to your account.`,
-      });
+      // Notify borrower about disbursement including new balance
+      try {
+        const amountFormatted = Number(loan.amount_approved).toLocaleString('en-UG');
+        const balanceFormatted = Number(newBalance).toLocaleString('en-UG');
+        await sendNotification({
+          member_id: loan.member_id,
+          type: 'loan_disbursed',
+          title: 'Loan Disbursed',
+          message: `Your loan of UGX ${amountFormatted} has been disbursed to your account. New balance: UGX ${balanceFormatted}.`,
+          metadata: { loanId: loan.id },
+        });
+      } catch (notifyErr) {
+        console.warn('Failed to send loan disbursement notification', notifyErr);
+      }
 
       loadLoans();
     } catch (err) {
@@ -220,7 +229,7 @@ export default function LoanManagement({ isHelper = false }: { isHelper?: boolea
           })
           .eq('id', loan.id);
 
-        await supabase.from('notifications').insert({
+        await sendNotification({
           member_id: loan.member_id,
           type: 'loan_repayment',
           title: 'Loan Repayment Recorded',

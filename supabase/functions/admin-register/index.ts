@@ -1,60 +1,63 @@
+// supabase/functions/admin-register/index.ts
+// @ts-ignore: Allow jsr import in Deno edge runtime (no local types)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+// @ts-ignore: Allow jsr import in Deno edge runtime (no local types)
+import { createClient } from "jsr:@supabase/functions-js"; // ✅ Correct import for Edge Functions
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers":
-    "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-Deno.serve(async (req) => {
+export interface AdminRegisterPayload {
+  email: string;
+  password: string;
+  full_name: string;
+  phone?: string;
+  role: "member" | "admin";
+  id_number: string;
+  address?: string;
+  date_of_birth?: string;
+  user_id?: string;
+}
+
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const {
-      email,
-      password,
-      full_name,
-      phone,
-      role,
-      id_number,
-      address,
-      date_of_birth,
-      user_id,
-    } = await req.json();
+    const payload: AdminRegisterPayload = await req.json();
 
-    let currentUserId = user_id;
+    let currentUserId = payload.user_id;
 
-    // ✅ Step 1: Check or create auth user
+    // Step 1: Check or create auth user
     if (!currentUserId) {
       const { data: existingUserData, error: existingUserError } =
         await supabase.auth.admin.listUsers();
       if (existingUserError) throw existingUserError;
 
-      const existingUser = existingUserData.users.find((u) => u.email === email);
+      const existingUser = existingUserData.users.find(u => u.email === payload.email);
 
       if (existingUser) {
         currentUserId = existingUser.id;
       } else {
-        const { data: authData, error: authError } =
-          await supabase.auth.admin.createUser({
-            email,
-            password,
-            email_confirm: true,
-          });
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+          email: payload.email,
+          password: payload.password,
+          email_confirm: true,
+        });
         if (authError) throw authError;
         currentUserId = authData.user.id;
       }
     }
 
-    // ✅ Step 2: Create or update profile
+    // Step 2: Create or update profile
     const { data: existingProfile } = await supabase
       .from("profiles")
       .select("id")
@@ -64,31 +67,31 @@ Deno.serve(async (req) => {
     if (!existingProfile) {
       const { error: profileError } = await supabase.from("profiles").insert({
         id: currentUserId,
-        email,
-        full_name,
-        phone,
-        role,
-        id_number,
-        address,
-        date_of_birth,
+        email: payload.email,
+        full_name: payload.full_name,
+        phone: payload.phone,
+        role: payload.role,
+        id_number: payload.id_number,
+        address: payload.address,
+        date_of_birth: payload.date_of_birth,
       });
       if (profileError) throw profileError;
     } else {
       const { error: updateProfileError } = await supabase
         .from("profiles")
         .update({
-          full_name,
-          phone,
-          id_number,
-          address,
-          date_of_birth,
+          full_name: payload.full_name,
+          phone: payload.phone,
+          id_number: payload.id_number,
+          address: payload.address,
+          date_of_birth: payload.date_of_birth,
         })
         .eq("id", currentUserId);
       if (updateProfileError) throw updateProfileError;
     }
 
-    // ✅ Step 3: Create or update member record
-    if (role === "member") {
+    // Step 3: Create or update member record (only if role is member)
+    if (payload.role === "member") {
       const { data: existingMember } = await supabase
         .from("members")
         .select("id")
@@ -96,104 +99,47 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!existingMember) {
-        const { data: memberNumberData } = await supabase.rpc(
-          "generate_member_number"
-        );
+        const { data: memberNumberData } = await supabase.rpc("generate_member_number");
 
         const { error: memberError } = await supabase.from("members").insert({
           profile_id: currentUserId,
           member_number: memberNumberData,
-          full_name,
-          email,
-          phone,
-          address,
-          date_of_birth,
-          id_number,
+          full_name: payload.full_name,
+          email: payload.email,
+          phone: payload.phone,
+          address: payload.address,
+          date_of_birth: payload.date_of_birth,
+          id_number: payload.id_number,
           status: "active",
           account_balance: 0,
         });
         if (memberError) throw memberError;
       } else {
-        // ✅ Update existing member
+        // Update existing member
         const { error: updateMemberError } = await supabase
           .from("members")
           .update({
-            full_name,
-            email,
-            phone,
-            address,
-            date_of_birth,
-            id_number,
+            full_name: payload.full_name,
+            email: payload.email,
+            phone: payload.phone,
+            address: payload.address,
+            date_of_birth: payload.date_of_birth,
+            id_number: payload.id_number,
           })
           .eq("profile_id", currentUserId);
         if (updateMemberError) throw updateMemberError;
       }
     }
 
-    // ✅ Step 4: Two-way synchronization logic
-    // Keep both tables always consistent
-    // (If the profile exists but member doesn’t, create; if both exist, make sure fields match)
-
-    const { data: memberCheck } = await supabase
-      .from("members")
-      .select("*")
-      .eq("profile_id", currentUserId)
-      .maybeSingle();
-
-    const { data: profileCheck } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", currentUserId)
-      .maybeSingle();
-
-    if (memberCheck && profileCheck) {
-      // 🔁 Ensure data consistency both ways
-      await supabase
-        .from("profiles")
-        .update({
-          full_name: memberCheck.full_name || profileCheck.full_name,
-          phone: memberCheck.phone || profileCheck.phone,
-          id_number: memberCheck.id_number || profileCheck.id_number,
-          address: memberCheck.address || profileCheck.address,
-          date_of_birth: memberCheck.date_of_birth || profileCheck.date_of_birth,
-        })
-        .eq("id", currentUserId);
-
-      await supabase
-        .from("members")
-        .update({
-          full_name: profileCheck.full_name || memberCheck.full_name,
-          phone: profileCheck.phone || memberCheck.phone,
-          id_number: profileCheck.id_number || memberCheck.id_number,
-          address: profileCheck.address || memberCheck.address,
-          date_of_birth: profileCheck.date_of_birth || memberCheck.date_of_birth,
-        })
-        .eq("profile_id", currentUserId);
-    }
-
-    // ✅ Success Response
     return new Response(
-      JSON.stringify({
-        success: true,
-        user_id: currentUserId,
-        email,
-        id_number,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ success: true, user_id: currentUserId, email: payload.email, id_number: payload.id_number }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in admin-register:", error);
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-      }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
