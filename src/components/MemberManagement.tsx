@@ -8,7 +8,7 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
   const [viewModal, setViewModal] = useState<Member | null>(null);
   const [editModal, setEditModal] = useState<Member | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
 
   // ---------------- Helper: Format Name ----------------
   const formatName = (name: string | undefined) => {
@@ -38,7 +38,7 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
   const filteredMembers = members.filter(
     (m) =>
       (m.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-      m.member_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  (m.member_number ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (m.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
       (m.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );

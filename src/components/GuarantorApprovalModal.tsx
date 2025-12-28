@@ -30,6 +30,9 @@ export default function GuarantorApprovalModal({
         loan.guarantors?.find((g) => g.guarantor_id === member.id)
           ?.amount_guaranteed || 0;
 
+      // Normalize status to one of the allowed DB values to avoid check constraint violations
+      const dbStatus = status === 'approved' ? 'approved' : status === 'declined' ? 'declined' : 'pending';
+
       const { error: upsertError } = await supabase
         .from('loan_guarantees')
         .upsert(
@@ -37,7 +40,7 @@ export default function GuarantorApprovalModal({
             loan_id: loan.id,
             guarantor_id: member.id,
             amount_guaranteed: guarantorAmount,
-            status,
+            status: dbStatus,
           },
           { onConflict: 'loan_id,guarantor_id' }
         );

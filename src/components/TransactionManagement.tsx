@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, Member, Profile } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowUpCircle, ArrowDownCircle, Banknote, Search, Printer, Info } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Banknote, Search, Printer } from 'lucide-react';
 
 export default function TransactionManagement() {
   const { profile } = useAuth();
@@ -57,8 +57,8 @@ export default function TransactionManagement() {
         .select('id, full_name, member_number, account_balance, total_contributions')
         .order('created_at', { ascending: false });
 
-      if (membersError) throw membersError;
-      setMembers(membersData || []);
+  if (membersError) throw membersError;
+  setMembers((membersData || []).map((m: any) => ({ ...m, profiles: null })));
     } catch (err: any) {
       console.error('loadMembers error:', err);
       setMembers([]);
@@ -80,12 +80,12 @@ export default function TransactionManagement() {
     const [loading, setLoading] = useState(false);
 
     const filteredMembers = members.filter((m) =>
-      m.full_name.toLowerCase().includes(memberSearch.toLowerCase())
+      (m.full_name ?? '').toLowerCase().includes(memberSearch.toLowerCase())
     );
 
     const handleSelectMember = (member: Member) => {
       setFormData({ ...formData, member_id: String(member.id) });
-      setMemberSearch(member.full_name);
+      setMemberSearch(member.full_name ?? '');
       // Hide suggestions after selection
       setShowSuggestions(false);
     };

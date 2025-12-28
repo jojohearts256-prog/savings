@@ -1,4 +1,4 @@
-import { supabase, Loan, Member, Profile } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { CreditCard, CheckCircle, XCircle, Clock, TrendingUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -192,9 +192,7 @@ export default function LoanManagement({ isHelper = false }: { isHelper?: boolea
       setLoading(true);
       try {
         const repaymentAmount = parseFloat(amount.replace(/,/g, ''));
-        let principalRemaining = Number(loan.outstanding_balance);
-        let interest = principalRemaining * (loan.interest_rate / 100);
-        let totalOutstanding = principalRemaining + interest;
+  let principalRemaining = Number(loan.outstanding_balance);
         const newPrincipal = principalRemaining - repaymentAmount;
         const newInterest = newPrincipal * (loan.interest_rate / 100);
         const newOutstanding = newPrincipal + newInterest;
