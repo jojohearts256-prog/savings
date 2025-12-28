@@ -188,94 +188,114 @@ export default function LoanRequestModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl w-full max-w-md p-6 relative">
-        <button onClick={onClose} className="absolute top-3 right-3">
-          <XCircle />
+      <div className="bg-white rounded-2xl w-full max-w-md p-6 relative shadow-2xl border border-gray-100">
+        <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition">
+          <XCircle className="w-6 h-6" />
         </button>
 
-        <h2 className="text-xl font-bold mb-4">Request Loan</h2>
+        <h2 className="text-xl font-bold text-gray-800 mb-4">Request Loan</h2>
 
-        {error && <p className="text-red-600">{error}</p>}
+        {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">{error}</div>}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="number"
-            placeholder="Loan Amount"
-            value={formData.amount}
-            onChange={(e) =>
-              setFormData({ ...formData, amount: e.target.value })
-            }
-            className="w-full border p-2"
-          />
-
-          <input
-            type="number"
-            placeholder="Repayment Months"
-            value={formData.repayment_period}
-            onChange={(e) =>
-              setFormData({
-                ...formData,
-                repayment_period: e.target.value,
-              })
-            }
-            className="w-full border p-2"
-          />
-
-          <textarea
-            placeholder="Reason"
-            value={formData.reason}
-            onChange={(e) =>
-              setFormData({ ...formData, reason: e.target.value })
-            }
-            className="w-full border p-2"
-          />
-
-          {guarantors.map((g, i) => (
-            <div key={i} className="border p-2">
-              <input
-                placeholder="Search guarantor"
-                value={g.search}
-                onChange={(e) => handleSearch(i, e.target.value)}
-                className="w-full border p-1"
-              />
-
-              {searchResults.map((m) => (
-                <div
-                  key={m.id}
-                  onClick={() => selectGuarantor(i, m)}
-                  className="cursor-pointer hover:bg-gray-100"
-                >
-                  {m.full_name}
-                </div>
-              ))}
-
+        <div className="mb-4 p-4 bg-gray-50 rounded-xl">
+          <div className="flex justify-between items-center mb-2">
+            <div>
+              <p className="text-sm text-gray-600">Member Savings</p>
+              <p className="text-lg font-bold text-[#007B8A]">UGX {memberSavings.toLocaleString()}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Usable Savings</p>
+              <p className="text-lg font-bold text-[#007B8A]">UGX {usableSavings.toLocaleString()}</p>
+            </div>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Amount Requested</p>
+            <input
+              type="number"
+              placeholder="Loan Amount"
+              value={formData.amount}
+              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+              className="w-full border p-2 rounded-xl mt-1"
+            />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-sm text-gray-600">Repayment Months</p>
               <input
                 type="number"
-                placeholder="Guarantee amount"
-                value={g.amount}
-                onChange={(e) =>
-                  handleAmountChange(i, e.target.value)
-                }
-                className="w-full border p-1 mt-1"
+                placeholder="Repayment Months"
+                value={formData.repayment_period}
+                onChange={(e) => setFormData({ ...formData, repayment_period: e.target.value })}
+                className="w-full border p-2 rounded-xl mt-1"
               />
-
-              {i > 0 && (
-                <button
-                  type="button"
-                  onClick={() => removeGuarantor(i)}
-                  className="text-red-500 text-sm"
-                >
-                  Remove
-                </button>
-              )}
             </div>
-          ))}
+            <div>
+              <p className="text-sm text-gray-600">Remaining to cover</p>
+              <div className={`mt-1 text-lg font-bold ${remainingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                UGX {remainingAmount.toLocaleString()}
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white p-2"
-          >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-3">
+            {guarantors.map((g, i) => (
+              <div key={i} className="bg-white border rounded-xl p-3 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <input
+                    placeholder="Search guarantor"
+                    value={g.search}
+                    onChange={(e) => handleSearch(i, e.target.value)}
+                    className="flex-1 border p-2 rounded-xl mr-3"
+                  />
+
+                  <input
+                    type="number"
+                    placeholder="UGX"
+                    value={g.amount}
+                    onChange={(e) => handleAmountChange(i, e.target.value)}
+                    className="w-36 border p-2 rounded-xl"
+                  />
+                </div>
+
+                {searchResults.length > 0 && g.search && (
+                  <div className="mb-2">
+                    {searchResults.map((m) => (
+                      <div key={m.id} onClick={() => selectGuarantor(i, m)} className="cursor-pointer hover:bg-gray-100 p-2 rounded-md">
+                        {m.full_name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-sm text-gray-600 mt-2">
+                  <div>{g.name || 'No guarantor selected'}</div>
+                  <div>
+                    Remaining: <span className={`${remainingAmount > 0 ? 'text-red-600' : 'text-green-600'} font-semibold`}>UGX {remainingAmount.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {i > 0 && (
+                  <div className="mt-2 text-right">
+                    <button type="button" onClick={() => removeGuarantor(i)} className="text-red-500 text-sm">Remove</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="pt-2">
+            <p className="text-sm text-gray-500 mb-2">Reason (optional)</p>
+            <textarea
+              placeholder="Reason"
+              value={formData.reason}
+              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+              className="w-full border p-2 rounded-xl h-24"
+            />
+          </div>
+
+          <button type="submit" disabled={loading} className="w-full bg-[#007B8A] hover:bg-[#006b75] text-white p-3 rounded-2xl font-medium">
             {loading ? 'Submitting…' : 'Submit'}
           </button>
         </form>
