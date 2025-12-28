@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { supabase, Member, Profile } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import type { Member, Profile } from '../lib/supabase';
 import { sendNotification } from '../lib/notify';
 import { XCircle } from 'lucide-react';
 import debounce from 'lodash/debounce';

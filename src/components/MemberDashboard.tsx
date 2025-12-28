@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase, Member, Transaction, Loan, Notification } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import type { Member, Transaction, Loan, Notification } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DollarSign, TrendingUp, CreditCard, Bell, LogOut, FileText, Send } from 'lucide-react';
 import LoanRequestModal from '../components/LoanRequestModal';

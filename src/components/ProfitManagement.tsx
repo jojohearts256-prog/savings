@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase, Member } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import type { Member } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DollarSign, Banknote, Printer } from 'lucide-react';
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { sendNotification } from '../lib/notify';
-import { supabase, Member, Profile } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import type { Member, Profile } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowUpCircle, ArrowDownCircle, Banknote, Search, Printer } from 'lucide-react';
 
