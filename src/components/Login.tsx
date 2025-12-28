@@ -1,8 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Lock, Mail, AlertCircle } from 'lucide-react';
 import Particles from 'react-tsparticles';
-import type { Engine, Container } from 'tsparticles-engine';
 import { loadFull } from 'tsparticles';
 
 export default function Login() {
@@ -26,11 +25,12 @@ export default function Login() {
     }
   };
 
-  const particlesInit = useCallback(async (engine: Engine) => {
+  const particlesInit = useCallback(async (engine: any) => {
     await loadFull(engine);
   }, []);
 
-  const particlesLoaded = useCallback(async (container: Container | undefined) => {
+  const particlesLoaded = useCallback(async (_container?: any): Promise<void> => {
+    void _container;
     return;
   }, []);
 
