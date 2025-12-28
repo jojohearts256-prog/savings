@@ -21,7 +21,14 @@ export default function LoanManagement({ isHelper = false }: { isHelper?: boolea
       )
       .order('requested_date', { ascending: false });
 
-    setLoans(data || []);
+    // Flatten member name and number for easier rendering in the table
+    const flattened = (data || []).map((d: any) => ({
+      ...d,
+      member_name: d?.members?.profiles?.full_name || d?.members?.full_name || d?.member_id,
+      member_number: d?.members?.member_number || '',
+    }));
+
+    setLoans(flattened);
   };
 
   const handleLoanAction = async (loanId: string, action: 'approve' | 'reject', approvedAmount?: number, interestRate?: number) => {
@@ -358,8 +365,8 @@ export default function LoanManagement({ isHelper = false }: { isHelper?: boolea
               {loans.map((loan) => (
                 <tr key={loan.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-800">
-                    {loan.members?.profiles?.full_name}
-                    <div className="text-xs text-gray-500">{loan.members?.member_number}</div>
+                    {loan.member_name}
+                    <div className="text-xs text-gray-500">{loan.member_number}</div>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
                     UGX {Number(loan.amount_requested).toLocaleString('en-UG')}
