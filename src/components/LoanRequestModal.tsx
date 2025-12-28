@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { supabase, Member, Profile } from '../lib/supabase';
+import { sendNotification } from '../lib/notify';
 import { XCircle } from 'lucide-react';
 import debounce from 'lodash/debounce';
 
@@ -178,36 +179,33 @@ export default function LoanRequestModal({
         // Notify each guarantor about the request and their pledged amount
         for (const g of validGuarantors) {
           try {
-            await supabase.from('notifications').insert({
-              member_id: g.member_id,
+            await sendNotification({
+              member_id: g.member_id as string,
               type: 'loan_guarantee_request',
               title: 'Loan Guarantee Request',
               message: `${member?.full_name ?? 'A member'} requested a loan of UGX ${requestedAmount.toLocaleString()} and you pledged UGX ${Math.floor(Number(g.amount)).toLocaleString()}. Approve or reject your guarantee.`,
-              metadata: JSON.stringify({ loanId: loanData.id, guarantor_id: g.member_id, pledged: Math.floor(Number(g.amount)) }),
-              sent_at: new Date(),
-              read: false,
+              metadata: { loanId: loanData.id, guarantor_id: g.member_id, pledged: Math.floor(Number(g.amount)) },
             });
           } catch (e) {
-            // non-fatal: continue if notification fails
-            // console.warn('Failed to notify guarantor', e);
+            // non-fatal: continue if notification/email fails
+            console.warn('Failed to notify guarantor', e);
           }
         }
       }
       else {
         // No guarantors: notify admin about new loan request
         try {
-          await supabase.from('notifications').insert({
+          await sendNotification({
             member_id: null,
             recipient_role: 'admin',
             type: 'loan_request',
             title: 'New Loan Request',
             message: `${member?.full_name ?? 'A member'} requested a loan of UGX ${requestedAmount.toLocaleString()}.`,
-            metadata: JSON.stringify({ loanId: loanData.id, borrower_id: member?.id }),
-            sent_at: new Date(),
-            read: false,
+            metadata: { loanId: loanData.id, borrower_id: member?.id },
           });
         } catch (e) {
           // non-fatal
+          console.warn('failed to notify admin', e);
         }
       }
 

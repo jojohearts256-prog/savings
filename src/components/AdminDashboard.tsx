@@ -140,7 +140,7 @@ export default function AdminDashboard() {
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
-        .in('type', ['loan_request', 'loan_reminder_admin', 'loan_overdue_admin'])
+        .in('type', ['loan_request', 'loan_reminder_admin', 'loan_overdue_admin', 'loan_ready_for_admin'])
         .or('member_id.is.null,recipient_role.eq.admin')
         .order('sent_at', { ascending: false });
       if (error) console.error(error);
@@ -153,7 +153,7 @@ export default function AdminDashboard() {
     // (member_id IS NULL) OR (recipient_role = 'admin') because realtime filters are ANDed.
     const subs: any[] = [];
 
-    const types = 'loan_request,loan_reminder_admin,loan_overdue_admin';
+  const types = 'loan_request,loan_reminder_admin,loan_overdue_admin,loan_ready_for_admin';
 
     const subNull = supabase
       .channel('notifications-admin-null')

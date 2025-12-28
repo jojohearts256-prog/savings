@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { sendNotification } from '../lib/notify';
 import { supabase, Member, Profile } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowUpCircle, ArrowDownCircle, Banknote, Search, Printer } from 'lucide-react';
@@ -146,6 +147,34 @@ export default function TransactionManagement() {
           .eq('id', formData.member_id);
 
         if (updateError) throw updateError;
+
+        // Notify the member about this transaction
+        try {
+          const txType = formData.transaction_type;
+          const amountFormatted = Number(amount).toLocaleString('en-UG');
+          const balanceFormatted = Number(balanceAfter).toLocaleString('en-UG');
+          const titleMap: Record<string, string> = {
+            deposit: 'Deposit Received',
+            withdrawal: 'Withdrawal Recorded',
+            contribution: 'Contribution Recorded',
+          };
+          const messageMap: Record<string, string> = {
+            deposit: `A deposit of UGX ${amountFormatted} was made to your account. Your new balance is UGX ${balanceFormatted}.`,
+            withdrawal: `A withdrawal of UGX ${amountFormatted} was made from your account. Your new balance is UGX ${balanceFormatted}.`,
+            contribution: `A contribution of UGX ${amountFormatted} was recorded. Your new balance is UGX ${balanceFormatted}.`,
+          };
+
+          await sendNotification({
+            member_id: formData.member_id as string,
+            type: txType === 'deposit' ? 'deposit' : txType === 'withdrawal' ? 'withdrawal' : 'contribution',
+            title: titleMap[txType] || 'Transaction Recorded',
+            message: messageMap[txType] || `A transaction of UGX ${amountFormatted} was recorded. Your new balance is UGX ${balanceFormatted}.`,
+            metadata: { transactionId: txData?.id },
+          });
+        } catch (notifyErr) {
+          // non-fatal
+          console.warn('Failed to send transaction notification', notifyErr);
+        }
 
         setShowAddModal(false);
         await loadTransactions();
