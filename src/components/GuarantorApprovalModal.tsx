@@ -31,8 +31,7 @@ export default function GuarantorApprovalModal({
           ?.amount_guaranteed || 0;
 
       // Map frontend decision to DB-allowed values
-      // Accept → 'pending' (waiting for admin), Decline → 'declined'
-      const dbStatus = status === 'decline' ? 'declined' : 'pending';
+      const dbStatus = status === 'decline' ? 'declined' : 'approved';
 
       const { error: upsertError } = await supabase
         .from('loan_guarantees')
@@ -48,8 +47,12 @@ export default function GuarantorApprovalModal({
 
       if (upsertError) throw upsertError;
 
-      // Notify borrower about guarantor response
-      await supabase.from('notifications').insert({
+      // Immediately close modal and refresh parent list
+      onClose();
+      onSuccess();
+
+      // Notify borrower asynchronously
+      supabase.from('notifications').insert({
         member_id: loan.member_id,
         type: 'guarantor_response',
         title: 'Guarantor Response',
@@ -62,7 +65,7 @@ export default function GuarantorApprovalModal({
         read: false,
       });
 
-      // Fetch all guarantors for this loan
+      // Fetch all guarantors for this loan in background
       const { data: allGuarantors, error: fetchError } = await supabase
         .from('loan_guarantees')
         .select('*')
@@ -72,7 +75,7 @@ export default function GuarantorApprovalModal({
 
       const validGuarantors = (allGuarantors as any[]).filter((g) => g.amount_guaranteed > 0) || [];
 
-      // If any guarantor declined → reject loan
+      // Reject loan if any guarantor declined
       const anyDeclined = validGuarantors.some((g) => g.status === 'declined');
       if (anyDeclined) {
         await supabase.from('loans').update({ status: 'rejected' }).eq('id', loan.id);
@@ -86,15 +89,11 @@ export default function GuarantorApprovalModal({
           sent_at: new Date(),
           read: false,
         });
-
-        onSuccess();
-        onClose();
         return;
       }
 
-      // If all guarantors approved → mark loan as pending for admin
-      const allApproved = validGuarantors.length > 0 && validGuarantors.every((g) => g.status === 'pending');
-
+      // Approve loan if all guarantors approved
+      const allApproved = validGuarantors.length > 0 && validGuarantors.every((g) => g.status === 'approved');
       if (allApproved) {
         await supabase.from('loans').update({ status: 'pending' }).eq('id', loan.id);
 
@@ -104,17 +103,36 @@ export default function GuarantorApprovalModal({
           .eq('id', loan.member_id)
           .maybeSingle();
 
+        const guarantorIds = validGuarantors.map((g) => g.guarantor_id);
+        let guarantorProfiles: any[] = [];
+        try {
+          const { data: gp } = await supabase.from('members').select('id, full_name').in('id', guarantorIds);
+          guarantorProfiles = gp || [];
+        } catch (e) {
+          guarantorProfiles = [];
+        }
+
+        const guarantorDetails = validGuarantors
+          .map((g) => {
+            const prof = guarantorProfiles.find((p) => p.id === g.guarantor_id);
+            const name = prof?.full_name ?? String(g.guarantor_id);
+            return `${name} pledged UGX ${Number(g.amount_guaranteed).toLocaleString()}`;
+          })
+          .join('; ');
+
+        // Notify admin
         await supabase.from('notifications').insert({
           member_id: null,
+          recipient_role: 'admin',
           type: 'loan_ready_for_admin',
           title: 'Loan Ready for Approval',
-          message: `Loan request ${loan.loan_number} by ${borrower?.full_name ?? String(loan.member_id)} has been approved by all guarantors and is ready for your review.`,
-          metadata: JSON.stringify({ loanId: loan.id }),
+          message: `Loan ${loan.loan_number} requested by ${borrower?.full_name ?? String(loan.member_id)} for UGX ${Number(loan.amount_requested).toLocaleString()} has all guarantors approved: ${guarantorDetails}.`,
+          metadata: JSON.stringify({ loanId: loan.id, guarantors: validGuarantors }),
           sent_at: new Date(),
           read: false,
         });
 
-        // Notify all guarantors that all have approved
+        // Notify all guarantors
         for (const g of validGuarantors) {
           await supabase.from('notifications').insert({
             member_id: g.guarantor_id,
@@ -127,9 +145,6 @@ export default function GuarantorApprovalModal({
           });
         }
       }
-
-      onSuccess();
-      onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to submit decision');
     } finally {
