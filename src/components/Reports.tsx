@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { FileText, Download, TrendingUp } from 'lucide-react';
+import { Download } from 'lucide-react';
 
 export default function Reports({ isHelper = false }: { isHelper?: boolean }) {
   const [reportType, setReportType] = useState<'monthly' | 'yearly' | 'member'>('monthly');
@@ -152,13 +152,14 @@ export default function Reports({ isHelper = false }: { isHelper?: boolean }) {
             <tbody>
               {paginated.map((row: any, i: number) => (
                 <tr key={i} className={i % 2 === 0 ? 'bg-gray-50' : ''}>
-                  {Object.entries(row).map(([key, val], idx) => (
-                    <td key={idx} className="border border-gray-300 px-2 py-1">
-                      {(key === 'transaction_date' || key === 'requested_date' || key === 'created_at') && val
-                        ? new Date(val).toLocaleDateString()
-                        : val ?? '-'}
-                    </td>
-                  ))}
+                            {Object.entries(row).map(([key, val], idx) => (
+                              <td key={idx} className="border border-gray-300 px-2 py-1">
+                                {(key === 'transaction_date' || key === 'requested_date' || key === 'created_at') &&
+                                (typeof val === 'string' || typeof val === 'number' || val instanceof Date)
+                                  ? new Date(val as string | number | Date).toLocaleDateString()
+                                  : (val === null || val === undefined) ? '-' : (typeof val === 'object' ? JSON.stringify(val) : String(val))}
+                              </td>
+                            ))}
                 </tr>
               ))}
             </tbody>
@@ -166,9 +167,9 @@ export default function Reports({ isHelper = false }: { isHelper?: boolean }) {
         </div>
         {totalPages > 1 && (
           <div className="flex justify-end mt-2 gap-2">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</button>
+            <button onClick={() => setPage((p: number) => Math.max(1, p - 1))} disabled={page === 1}>Prev</button>
             <span>{page} / {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>
+            <button onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>
           </div>
         )}
       </div>

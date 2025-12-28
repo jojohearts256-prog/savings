@@ -134,10 +134,14 @@ export default function AdminDashboard() {
   useEffect(() => {
     // Initial load
     const fetchNotifications = async () => {
+      // Only fetch notifications intended for admin: either member_id IS NULL (generic admin alerts)
+      // or recipient_role explicitly set to 'admin'. This avoids showing member-specific notifications
+      // (e.g., guarantor requests) which target individual members.
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .in('type', ['loan_request', 'loan_reminder_admin', 'loan_overdue_admin'])
+        .or('member_id.is.null,recipient_role.eq.admin')
         .order('sent_at', { ascending: false });
       if (error) console.error(error);
       else setNotifications(data || []);
@@ -145,25 +149,30 @@ export default function AdminDashboard() {
 
     fetchNotifications();
 
-    // Subscribe to new notifications
-    const subscription = supabase
-      .channel('notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `type=in.(loan_request,loan_reminder_admin,loan_overdue_admin)`,
-        },
-        (payload) => {
-          setNotifications((prev) => [payload.new as Notification, ...prev]);
-        }
-      )
+    // Subscribe to new notifications intended for admin. We create two subscriptions
+    // (member_id IS NULL) OR (recipient_role = 'admin') because realtime filters are ANDed.
+    const subs: any[] = [];
+
+    const types = 'loan_request,loan_reminder_admin,loan_overdue_admin';
+
+    const subNull = supabase
+      .channel('notifications-admin-null')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `member_id=is.null,type=in.(${types})` }, (payload) => {
+        setNotifications((prev) => [payload.new as Notification, ...prev]);
+      })
       .subscribe();
+    subs.push(subNull);
+
+    const subRole = supabase
+      .channel('notifications-admin-role')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `recipient_role=eq.admin,type=in.(${types})` }, (payload) => {
+        setNotifications((prev) => [payload.new as Notification, ...prev]);
+      })
+      .subscribe();
+    subs.push(subRole);
 
     return () => {
-      supabase.removeChannel(subscription);
+      subs.forEach((s) => supabase.removeChannel(s));
     };
   }, []);
 
