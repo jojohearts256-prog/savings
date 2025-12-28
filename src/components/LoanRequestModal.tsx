@@ -222,7 +222,7 @@ export default function LoanRequestModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl w-full max-w-md p-6 relative shadow-2xl border border-gray-100">
+    <div className="bg-white rounded-2xl w-full max-w-md p-6 relative shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
         <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition">
           <XCircle className="w-6 h-6" />
         </button>
