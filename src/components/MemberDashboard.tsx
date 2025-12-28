@@ -113,8 +113,11 @@ export default function MemberDashboard() {
       const filteredPending = (pendingLoans || [])
         .filter((loan) => {
           if (!loan.guarantors || !Array.isArray(loan.guarantors)) return false;
+          // loans_with_guarantors returns guarantor objects with guarantor_id
+          // (not member_id). Check guarantor_id to see if the current member
+          // is listed as a guarantor with pending status.
           return loan.guarantors.some(
-            (g: any) => g.member_id === fetchedMember.id && g.status === 'pending'
+            (g: any) => (g.guarantor_id === fetchedMember.id || g.member_id === fetchedMember.id) && g.status === 'pending'
           );
         })
         .map((loan) => ({ ...loan, id: loan.loan_id })); // <-- map loan_id to id
@@ -243,7 +246,7 @@ export default function MemberDashboard() {
             </div>
             <p className="text-sm text-gray-600 mb-1">Account Balance (UGX)</p>
             <h3 className="text-3xl font-bold text-[#007B8A]">
-              {member ? member.account_balance.toLocaleString() : '0'}
+              {member ? (member.account_balance ?? 0).toLocaleString() : '0'}
             </h3>
           </div>
 
@@ -255,7 +258,7 @@ export default function MemberDashboard() {
             </div>
             <p className="text-sm text-gray-600 mb-1">Total Contributions (UGX)</p>
             <h3 className="text-3xl font-bold text-[#007B8A]">
-              {member ? member.total_contributions.toLocaleString() : '0'}
+              {member ? (member.total_contributions ?? 0).toLocaleString() : '0'}
             </h3>
           </div>
 
