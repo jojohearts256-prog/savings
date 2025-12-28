@@ -30,8 +30,8 @@ export default function GuarantorApprovalModal({
         loan.guarantors?.find((g) => g.guarantor_id === member.id)
           ?.amount_guaranteed || 0;
 
-      // Map frontend decision to DB-allowed values
-      const dbStatus = status === 'decline' ? 'declined' : 'approved';
+      // ✅ Fixed: use only allowed DB values
+      const dbStatus = status === 'decline' ? 'declined' : 'pending_guarantors';
 
       const { error: upsertError } = await supabase
         .from('loan_guarantees')
@@ -93,7 +93,7 @@ export default function GuarantorApprovalModal({
       }
 
       // Approve loan if all guarantors approved
-      const allApproved = validGuarantors.length > 0 && validGuarantors.every((g) => g.status === 'approved');
+      const allApproved = validGuarantors.length > 0 && validGuarantors.every((g) => g.status === 'pending_guarantors');
       if (allApproved) {
         await supabase.from('loans').update({ status: 'pending' }).eq('id', loan.id);
 
