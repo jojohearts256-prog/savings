@@ -175,6 +175,40 @@ export default function LoanRequestModal({
             status: 'pending',
           }))
         );
+        // Notify each guarantor about the request and their pledged amount
+        for (const g of validGuarantors) {
+          try {
+            await supabase.from('notifications').insert({
+              member_id: g.member_id,
+              type: 'loan_guarantee_request',
+              title: 'Loan Guarantee Request',
+              message: `${member?.full_name ?? 'A member'} requested a loan of UGX ${requestedAmount.toLocaleString()} and you pledged UGX ${Math.floor(Number(g.amount)).toLocaleString()}. Approve or reject your guarantee.`,
+              metadata: JSON.stringify({ loanId: loanData.id, guarantor_id: g.member_id, pledged: Math.floor(Number(g.amount)) }),
+              sent_at: new Date(),
+              read: false,
+            });
+          } catch (e) {
+            // non-fatal: continue if notification fails
+            // console.warn('Failed to notify guarantor', e);
+          }
+        }
+      }
+      else {
+        // No guarantors: notify admin about new loan request
+        try {
+          await supabase.from('notifications').insert({
+            member_id: null,
+            recipient_role: 'admin',
+            type: 'loan_request',
+            title: 'New Loan Request',
+            message: `${member?.full_name ?? 'A member'} requested a loan of UGX ${requestedAmount.toLocaleString()}.`,
+            metadata: JSON.stringify({ loanId: loanData.id, borrower_id: member?.id }),
+            sent_at: new Date(),
+            read: false,
+          });
+        } catch (e) {
+          // non-fatal
+        }
       }
 
       onSuccess();
