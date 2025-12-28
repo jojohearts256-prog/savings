@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase, Notification } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import type { Notification } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Users,

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { supabase, MemberWithProfile, LoanWithGuarantors } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import type { MemberWithProfile, LoanWithGuarantors } from '../lib/supabase';
 import { sendNotification } from '../lib/notify';
 import { XCircle } from 'lucide-react';
 

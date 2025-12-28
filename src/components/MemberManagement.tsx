@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase, Member } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import type { Member } from '../lib/supabase';
 import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, Loader2 } from 'lucide-react';
 
 export default function MemberManagement({ isHelper = false }: { isHelper?: boolean }) {
@@ -66,26 +67,28 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
       setSubmitting(true);
 
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-register`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({
-              full_name: formData.full_name,
-              email: formData.email,
-              password: formData.password,
-              phone: formData.phone,
-              id_number: formData.id_number,
-              address: formData.address,
-              date_of_birth: formData.date_of_birth,
-              role: formData.role,
-            }),
-          }
-        );
+        // Construct functions host using optional env overrides or the Supabase project ref
+        const PROJECT_REF = (import.meta.env.VITE_SUPABASE_PROJECT_REF as string) || 'devegvzpallxsmbyszcb';
+        const FUNCTIONS_HOST = (import.meta.env.VITE_SUPABASE_FUNCTIONS_URL as string) || `https://${PROJECT_REF}.functions.supabase.co`;
+        const ADMIN_REGISTER_FN = (import.meta.env.VITE_SUPABASE_ADMIN_REGISTER_FN as string) || 'admin-register';
+
+        const response = await fetch(`${FUNCTIONS_HOST}/${ADMIN_REGISTER_FN}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            full_name: formData.full_name,
+            email: formData.email,
+            password: formData.password,
+            phone: formData.phone,
+            id_number: formData.id_number,
+            address: formData.address,
+            date_of_birth: formData.date_of_birth,
+            role: formData.role,
+          }),
+        });
 
         const result = await response.json();
         if (!result.success) throw new Error(result.error || 'Registration failed');
