@@ -6,10 +6,10 @@ const DEFAULT_PROJECT_REF = 'devegvzpallxsmbyszcb';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 // Allow overriding the functions host or function name via env vars. If not provided,
-// construct the functions host using the project ref and default to `bight-service`.
+// construct the functions host using the project ref and default to `send-notification`.
 const PROJECT_REF = (import.meta.env.VITE_SUPABASE_PROJECT_REF as string) || DEFAULT_PROJECT_REF;
 const FUNCTIONS_HOST = (import.meta.env.VITE_SUPABASE_FUNCTIONS_URL as string) || `https://${PROJECT_REF}.functions.supabase.co`;
-const FUNCTION_NAME = (import.meta.env.VITE_SUPABASE_FUNCTION_NAME as string) || 'bight-service';
+const FUNCTION_NAME = (import.meta.env.VITE_SUPABASE_FUNCTION_NAME as string) || 'send-notification';
 
 export type NotificationPayload = {
   member_id?: string | null;
@@ -27,6 +27,9 @@ export async function sendNotification(payload: NotificationPayload) {
     // Prefer calling the functions host directly (deployed function). This uses the
     // project-specific functions domain so it doesn't rely on the local supabase client host.
     const functionUrl = `${FUNCTIONS_HOST}/${FUNCTION_NAME}`;
+
+    // debug: show which function URL we will call (no secrets)
+    // console.debug('notify: calling function', functionUrl);
 
     const res = await fetch(functionUrl, {
       method: 'POST',
