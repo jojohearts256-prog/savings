@@ -1,36 +1,27 @@
-import { supabase } from './supabase';
+import { supabase } from './supabase'
 
-// Project-specific defaults (user provided project ref)
-const DEFAULT_PROJECT_REF = 'devegvzpallxsmbyszcb';
+// Project-specific defaults
+const DEFAULT_PROJECT_REF = 'devegvzpallxsmbyszcb'
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-// Allow overriding the functions host or function name via env vars. If not provided,
-// construct the functions host using the project ref and default to `send-notification`.
-const PROJECT_REF = (import.meta.env.VITE_SUPABASE_PROJECT_REF as string) || DEFAULT_PROJECT_REF;
-const FUNCTIONS_HOST = (import.meta.env.VITE_SUPABASE_FUNCTIONS_URL as string) || `https://${PROJECT_REF}.functions.supabase.co`;
-const FUNCTION_NAME = (import.meta.env.VITE_SUPABASE_FUNCTION_NAME as string) || 'send-notification';
+const PROJECT_REF = (import.meta.env.VITE_SUPABASE_PROJECT_REF as string) || DEFAULT_PROJECT_REF
+const FUNCTIONS_HOST = (import.meta.env.VITE_SUPABASE_FUNCTIONS_URL as string) || `https://${PROJECT_REF}.functions.supabase.co`
+const FUNCTION_NAME = (import.meta.env.VITE_SUPABASE_FUNCTION_NAME as string) || 'bight-service'
 
 export type NotificationPayload = {
-  member_id?: string | null;
-  recipient_role?: string | null;
-  type: string;
-  title: string;
-  message: string;
-  metadata?: any;
-  toEmail?: string; // optional override for testing
-};
+  member_id?: string | null
+  recipient_role?: string | null
+  type: string
+  title: string
+  message: string
+  metadata?: any
+  toEmail?: string
+}
 
 export async function sendNotification(payload: NotificationPayload) {
-  // Try the server-side Edge Function first (preferred — inserts + emails).
   try {
-    // Prefer calling the functions host directly (deployed function). This uses the
-    // project-specific functions domain so it doesn't rely on the local supabase client host.
-    const functionUrl = `${FUNCTIONS_HOST}/${FUNCTION_NAME}`;
-
-    // debug: show which function URL we will call (no secrets)
-    // console.debug('notify: calling function', functionUrl);
-
+    // Call the deployed Edge Function first
+    const functionUrl = `${FUNCTIONS_HOST}/${FUNCTION_NAME}`
     const res = await fetch(functionUrl, {
       method: 'POST',
       headers: {
@@ -38,25 +29,23 @@ export async function sendNotification(payload: NotificationPayload) {
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       },
       body: JSON.stringify(payload),
-    });
+    })
 
     if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      console.warn('sendNotification function returned non-ok:', res.status, txt);
-      throw new Error(`Function returned ${res.status}`);
+      const txt = await res.text().catch(() => '')
+      console.warn('Edge function returned non-ok:', res.status, txt)
+      throw new Error(`Function returned ${res.status}`)
     }
 
-    const json = await res.json().catch(() => null);
-    if (json && json.success) return json;
+    const json = await res.json().catch(() => null)
+    if (json && json.success) return json
 
-    // If function responded but flagged failure, fallthrough to client-side insert
-    console.warn('sendNotification function reported failure, falling back to client insert', json);
+    console.warn('Edge function reported failure, falling back to client insert', json)
   } catch (err) {
-    console.warn('sendNotification helper failed calling Edge Function, falling back to direct insert', err);
+    console.warn('Edge function call failed, falling back to direct insert', err)
   }
 
-  // Fallback: try to insert the notification directly using the client (in-app only).
-  // This ensures users see the notification in the system even if the Edge Function isn't deployed.
+  // Fallback: insert directly into notifications table
   try {
     const { data, error } = await supabase.from('notifications').insert([
       {
@@ -65,20 +54,20 @@ export async function sendNotification(payload: NotificationPayload) {
         type: payload.type,
         title: payload.title,
         message: payload.message,
-        metadata: payload.metadata ? payload.metadata : null,
+        metadata: payload.metadata || null,
         sent_at: new Date().toISOString(),
         read: false,
       },
-    ]).select().maybeSingle();
+    ]).select().maybeSingle()
 
     if (error) {
-      console.warn('Fallback insert to notifications failed', error);
-      return { success: false, error: String(error) };
+      console.warn('Fallback insert failed', error)
+      return { success: false, error: String(error) }
     }
 
-    return { success: true, notification: data, fallback: true };
+    return { success: true, notification: data, fallback: true }
   } catch (e) {
-    console.error('sendNotification fallback failed', e);
-    return { success: false, error: String(e) };
+    console.error('Fallback insert failed', e)
+    return { success: false, error: String(e) }
   }
 }
