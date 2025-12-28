@@ -53,6 +53,7 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
       id_number: '',
       address: '',
       date_of_birth: '',
+      role: 'member',
     });
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
@@ -81,7 +82,7 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
               id_number: formData.id_number,
               address: formData.address,
               date_of_birth: formData.date_of_birth,
-              role: 'member',
+              role: formData.role,
             }),
           }
         );
@@ -102,6 +103,7 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
             id_number: '',
             address: '',
             date_of_birth: '',
+            role: 'member',
           });
           setSuccess(false);
           setShowAddModal(false);
@@ -117,7 +119,7 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
         <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Add New Member</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">Add New User</h2>
 
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
@@ -190,6 +192,17 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
                   className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]"
+                >
+                  <option value="member">Member</option>
+                  <option value="employee">Employee</option>
+                </select>
+              </div>
             </div>
 
             <div>
@@ -209,7 +222,7 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
                 className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                {submitting ? 'Adding...' : 'Add Member'}
+                {submitting ? 'Adding...' : `Add ${formData.role === 'member' ? 'Member' : 'Employee'}`}
               </button>
               <button
                 type="button"
