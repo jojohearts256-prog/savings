@@ -30,7 +30,7 @@ export default function GuarantorApprovalModal({
         loan.guarantors?.find((g) => g.guarantor_id === member.id)
           ?.amount_guaranteed || 0;
 
-      // ✅ Fixed: use only allowed DB values
+      // DB-allowed values
       const dbStatus = status === 'decline' ? 'declined' : 'pending_guarantors';
 
       const { error: upsertError } = await supabase
@@ -65,7 +65,7 @@ export default function GuarantorApprovalModal({
         read: false,
       });
 
-      // Fetch all guarantors for this loan in background
+      // Fetch all guarantors for this loan
       const { data: allGuarantors, error: fetchError } = await supabase
         .from('loan_guarantees')
         .select('*')
@@ -120,10 +120,10 @@ export default function GuarantorApprovalModal({
           })
           .join('; ');
 
-        // Notify admin
+        // ✅ Notify admin using actual ID
+        const adminId = 'e5c82e67-c940-4281-b458-9b54b0930657';
         await supabase.from('notifications').insert({
-          member_id: null,
-          recipient_role: 'admin',
+          member_id: adminId,
           type: 'loan_ready_for_admin',
           title: 'Loan Ready for Approval',
           message: `Loan ${loan.loan_number} requested by ${borrower?.full_name ?? String(loan.member_id)} for UGX ${Number(loan.amount_requested).toLocaleString()} has all guarantors approved: ${guarantorDetails}.`,
