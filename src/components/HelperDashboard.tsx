@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, SetStateAction } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -25,13 +25,23 @@ export default function HelperDashboard() {
     activeLoans: 0,
   });
 
-  const particlesInit = useCallback(async (engine) => {
+  const particlesInit = useCallback(async (engine: any) => {
     await loadFull(engine);
   }, []);
 
-  const particlesLoaded = useCallback(() => {}, []);
+  const particlesLoaded = useCallback(async (_container?: any): Promise<void> => {
+    void _container;
+    return;
+  }, []);
 
-  const StatCard = ({ icon: Icon, label, value, index }) => (
+  interface StatCardProps {
+    icon: any;
+    label: string;
+    value: number | string;
+    index: number;
+  }
+
+  const StatCard: React.FC<StatCardProps> = ({ icon: Icon, label, value, index }) => (
     <div
       className="bg-white/90 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 animate-float"
       style={{ animationDelay: `${index * 0.2}s` }}
@@ -69,7 +79,7 @@ export default function HelperDashboard() {
     loadStats();
   }, []);
 
-  const handleTabChange = (tab) => {
+  const handleTabChange = (tab: SetStateAction<string>) => {
     setActiveTab(tab);
   };
 

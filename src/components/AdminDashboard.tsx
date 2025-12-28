@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { supabase, Notification } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Users,
@@ -31,17 +31,27 @@ export default function AdminDashboard() {
     pendingLoans: 0,
   });
 
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  const notificationRef = useRef(null);
+  const notificationRef = useRef<HTMLDivElement | null>(null);
 
-  const particlesInit = useCallback(async (engine) => {
+  const particlesInit = useCallback(async (engine: any) => {
     await loadFull(engine);
   }, []);
 
-  const particlesLoaded = useCallback(() => {}, []);
+  const particlesLoaded = useCallback(async (_container?: any): Promise<void> => {
+    void _container;
+    return;
+  }, []);
 
-  const StatCard = ({ icon: Icon, label, value, index }) => (
+  interface StatCardProps {
+    icon: any;
+    label: string;
+    value: number | string;
+    index: number;
+  }
+
+  const StatCard: React.FC<StatCardProps> = ({ icon: Icon, label, value, index }) => (
     <div
       className="bg-white/90 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-2 hover:scale-105 animate-float"
       style={{ animationDelay: `${index * 0.2}s` }}
@@ -79,7 +89,7 @@ export default function AdminDashboard() {
     }
   }
 
-  async function markAsRead(id) {
+  async function markAsRead(id: string) {
     try {
       const { error } = await supabase
         .from('notifications')
@@ -88,7 +98,7 @@ export default function AdminDashboard() {
 
       if (error) throw error;
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to mark notification as read:', err);
     }
   }
@@ -97,14 +107,15 @@ export default function AdminDashboard() {
     try {
       await signOut();
     } catch (err) {
-      console.error('Error signing out:', err.message);
+      const e: any = err;
+      console.error('Error signing out:', e?.message || e);
     }
   }
 
   // Close notifications when clicking outside
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+    function handleClickOutside(event: any) {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
       }
     }
@@ -146,7 +157,7 @@ export default function AdminDashboard() {
           filter: `type=in.(loan_request,loan_reminder_admin,loan_overdue_admin)`,
         },
         (payload) => {
-          setNotifications((prev) => [payload.new, ...prev]);
+          setNotifications((prev) => [payload.new as Notification, ...prev]);
         }
       )
       .subscribe();

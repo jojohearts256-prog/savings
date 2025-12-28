@@ -1,234 +1,152 @@
-import { useState, useMemo } from 'react';
-import { supabase, Member, Profile } from '../lib/supabase';
+import { useState } from 'react';
+import { supabase, MemberWithProfile, LoanWithGuarantors } from '../lib/supabase';
 import { XCircle } from 'lucide-react';
-import { debounce } from 'lodash';
 
-interface LoanRequestModalProps {
-  member: Member | null;
-  profile: Profile | null;
+interface GuarantorApprovalModalProps {
+  loan: LoanWithGuarantors | null;
+  member: MemberWithProfile | null;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-interface Guarantor {
-  member_id: string | number;
-  name: string;
-  amount: string;
-  search: string;
-}
-
-export default function LoanRequestModal({
+export default function GuarantorApprovalModal({
+  loan,
   member,
-  profile,
   onClose,
   onSuccess,
-}: LoanRequestModalProps) {
-  const [formData, setFormData] = useState({
-    amount: '',
-    repayment_period: '12',
-    reason: '',
-  });
-
-  const [guarantors, setGuarantors] = useState<Guarantor[]>([
-    { member_id: 0, name: '', amount: '', search: '' },
-  ]);
-  const [searchResults, setSearchResults] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(false);
+}: GuarantorApprovalModalProps) {
+  const [loadingAccept, setLoadingAccept] = useState(false);
+  const [loadingDecline, setLoadingDecline] = useState(false);
   const [error, setError] = useState('');
 
-  const memberSavings = Math.floor(Number(member?.account_balance || 0));
-  const safeSavingsLimit = 1000;
-  const usableSavings = Math.max(memberSavings - safeSavingsLimit, 0);
+  if (!loan?.id || !member?.id) return null;
 
-  const totalGuarantor = useMemo(
-    () =>
-      guarantors.reduce(
-        (sum, g) => sum + Math.floor(Number(g.amount || 0)),
-        0
-      ),
-    [guarantors]
-  );
-
-  const remainingAmount = useMemo(() => {
-    return Math.max(
-      Math.floor(Number(formData.amount || 0)) -
-        usableSavings -
-        totalGuarantor,
-      0
-    );
-  }, [formData.amount, usableSavings, totalGuarantor]);
-
-  const debouncedSearch = debounce(async (query: string) => {
-    if (!query) return setSearchResults([]);
-    const { data } = await supabase
-      .from('members')
-      .select('*')
-      .ilike('full_name', `%${query}%`)
-      .neq('profile_id', profile?.id)
-      .limit(5);
-
-    const filtered =
-      data?.filter(
-        m => !guarantors.some(g => g.member_id === m.id)
-      ) || [];
-    setSearchResults(filtered);
-  }, 300);
-
-  const handleSearch = (index: number, query: string) => {
-    setGuarantors(prev => {
-      const updated = [...prev];
-      updated[index].search = query;
-      return updated;
-    });
-    debouncedSearch(query);
-  };
-
-  const selectGuarantor = (index: number, m: Member) => {
-    setGuarantors(prev => {
-      const updated = [...prev];
-      updated[index].member_id = m.id;
-      updated[index].name = m.full_name;
-      updated[index].search = m.full_name;
-      return updated;
-    });
-    setSearchResults([]);
-
-    if (remainingAmount > 0 && guarantors.length < 3) {
-      setGuarantors(prev => [
-        ...prev,
-        { member_id: 0, name: '', amount: '', search: '' },
-      ]);
-    }
-  };
-
-  const handleAmountChange = (index: number, value: string) => {
-    if (Number(value) < 0) return;
-    setError('');
-    setGuarantors(prev => {
-      const updated = [...prev];
-      updated[index].amount = Math.floor(Number(value)).toString();
-      return updated;
-    });
-  };
-
-  const removeGuarantor = (index: number) =>
-    setGuarantors(prev => prev.filter((_, i) => i !== index));
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
+  const handleDecision = async (status: 'approved' | 'declined') => {
     try {
-      if (!member) throw new Error('Member data not found');
+      setError('');
+      status === 'approved' ? setLoadingAccept(true) : setLoadingDecline(true);
 
-      const requestedAmount = Math.floor(Number(formData.amount));
-      const totalCovered = usableSavings + totalGuarantor;
+      const guarantorAmount =
+        loan.guarantors?.find((g) => g.guarantor_id === member.id)
+          ?.amount_guaranteed || 0;
 
-      if (totalCovered < requestedAmount) {
-        throw new Error(
-          `Loan not fully covered. You need ${
-            requestedAmount - totalCovered
-          } more from guarantors.`
+      const { error: upsertError } = await supabase
+        .from('loan_guarantees')
+        .upsert(
+          {
+            loan_id: loan.id,
+            guarantor_id: member.id,
+            amount_guaranteed: guarantorAmount,
+            status,
+          },
+          { onConflict: 'loan_id,guarantor_id' }
         );
+
+      if (upsertError) throw upsertError;
+
+      await supabase.from('notifications').insert({
+        member_id: loan.member_id,
+        type: 'guarantor_response',
+        title: 'Guarantor Response',
+        message:
+          status === 'approved'
+            ? `${member.full_name ?? 'A guarantor'} accepted your loan guarantee.`
+            : `${member.full_name ?? 'A guarantor'} declined your loan guarantee.`,
+        metadata: JSON.stringify({ guarantor_id: member.id, loanId: loan.id, status }),
+        sent_at: new Date(),
+        read: false,
+      });
+
+      const { data: allGuarantors, error: fetchError } = await supabase
+        .from('loan_guarantees')
+        .select('*')
+        .eq('loan_id', loan.id);
+
+      if (fetchError) throw fetchError;
+
+      const validGuarantors = (allGuarantors as any[])?.filter((g) => g.amount_guaranteed > 0) || [];
+
+      const anyDeclined = validGuarantors.some((g) => g.status === 'declined');
+      if (anyDeclined) {
+        await supabase.from('loans').update({ status: 'rejected' }).eq('id', loan.id);
+
+        await supabase.from('notifications').insert({
+          member_id: loan.member_id,
+          type: 'loan_rejected_by_guarantor',
+          title: 'Loan Declined by Guarantor',
+          message: `Your loan ${loan.loan_number} was declined because a guarantor did not approve.`,
+          metadata: JSON.stringify({ loanId: loan.id }),
+          sent_at: new Date(),
+          read: false,
+        });
+
+        onSuccess();
+        onClose();
+        return;
       }
 
-      const loanNumber =
-        'LN' + Date.now() + Math.floor(Math.random() * 1000);
+      const allApproved = validGuarantors.length > 0 && validGuarantors.every((g) => g.status === 'approved');
 
-      // ✅ FIX: define before use
-      const validGuarantors = guarantors.filter(
-        g => Number(g.amount) > 0
-      );
+      if (allApproved) {
+        await supabase.from('loans').update({ status: 'pending' }).eq('id', loan.id);
 
-      const loanStatus =
-        validGuarantors.length > 0
-          ? 'pending_guarantors'
-          : 'pending';
+        const { data: borrower } = await supabase.from('members').select('full_name').eq('id', loan.member_id).maybeSingle();
 
-      const { data: loanData, error: loanError } = await supabase
-        .from('loans')
-        .insert({
-          member_id: member.id,
-          loan_number: loanNumber,
-          amount_requested: requestedAmount,
-          repayment_period_months: parseInt(
-            formData.repayment_period
-          ),
-          reason: formData.reason,
-          status: loanStatus,
-        })
-        .select()
-        .single();
-
-      if (loanError) throw loanError;
-
-      if (validGuarantors.length > 0) {
-        await supabase.from('loan_guarantees').insert(
-          validGuarantors.map(g => ({
-            loan_id: loanData.id,
-            guarantor_id: g.member_id,
-            amount_guaranteed: Math.floor(Number(g.amount)),
-            status: 'pending',
-          }))
-        );
+        await supabase.from('notifications').insert({
+          member_id: null,
+          type: 'loan_ready_for_admin',
+          title: 'Loan Ready for Approval',
+          message: `Loan request ${loan.loan_number} by ${borrower?.full_name ?? String(loan.member_id)} has been approved by all guarantors and is ready for your review.`,
+          metadata: JSON.stringify({ loanId: loan.id }),
+          sent_at: new Date(),
+          read: false,
+        });
 
         for (const g of validGuarantors) {
           await supabase.from('notifications').insert({
-            member_id: g.member_id,
-            type: 'loan_request',
-            title: 'Loan Approval Needed',
-            message: `${member.full_name} requested ${requestedAmount} UGX. You pledged ${Math.floor(
-              Number(g.amount)
-            )} UGX.`,
-            recipient_role: 'guarantor',
+            member_id: g.guarantor_id,
+            type: 'loan_guarantors_all_approved',
+            title: 'All Guarantors Approved',
+            message: `All guarantors have approved loan ${loan.loan_number}. The loan has been forwarded to admin for final review.`,
+            metadata: JSON.stringify({ loanId: loan.id }),
             sent_at: new Date(),
             read: false,
           });
         }
       }
 
-      if (validGuarantors.length === 0) {
-        await supabase.from('notifications').insert({
-          member_id: null,
-          type: 'loan_ready_for_admin',
-          title: 'Loan Ready for Approval',
-          message: `Loan ${loanNumber} by ${member.full_name} has no guarantors.`,
-          sent_at: new Date(),
-          read: false,
-        });
-      }
-
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to submit loan request');
+      setError(err.message || 'Failed to submit decision');
     } finally {
-      setLoading(false);
+      setLoadingAccept(false);
+      setLoadingDecline(false);
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-md p-6 relative shadow-2xl max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-400 hover:text-red-500"
-        >
+      <div className="bg-white rounded-2xl w-full max-w-md p-6 relative shadow-2xl border border-gray-100 animate-fadeIn">
+        <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition">
           <XCircle className="w-6 h-6" />
         </button>
 
-        <h2 className="text-xl font-bold mb-4">Request Loan</h2>
+        <h2 className="text-xl font-bold text-gray-800 mb-4">Loan Guarantee Approval</h2>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border rounded-xl text-sm text-red-800">
-            {error}
-          </div>
-        )}
+        {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">{error}</div>}
 
-        {/* 🔹 FULL FORM UI IS STILL HERE */}
-        {/* (unchanged from your original code) */}
-        {/* You can confirm nothing is missing */}
+        <p className="mb-4">Loan <strong>{loan.loan_number}</strong> requested by member <strong>{loan.member_id}</strong> needs your approval.</p>
+
+        <div className="flex gap-3">
+          <button onClick={() => handleDecision('approved')} disabled={loadingAccept || loadingDecline} className="flex-1 py-2 bg-green-500 text-white font-medium rounded-xl disabled:opacity-50">
+            {loadingAccept ? 'Processing...' : 'Accept'}
+          </button>
+
+          <button onClick={() => handleDecision('declined')} disabled={loadingAccept || loadingDecline} className="flex-1 py-2 bg-red-500 text-white font-medium rounded-xl disabled:opacity-50">
+            {loadingDecline ? 'Processing...' : 'Decline'}
+          </button>
+        </div>
       </div>
     </div>
   );

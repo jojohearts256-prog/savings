@@ -18,15 +18,20 @@ export type Profile = {
 
 export type Member = {
   id: string;
-  profile_id: string;
-  member_number: string;
-  address: string | null;
-  date_of_birth: string | null;
-  account_balance: number;
-  total_contributions: number;
-  status: 'active' | 'inactive' | 'suspended';
-  created_at: string;
-  updated_at: string;
+  profile_id?: string;
+  member_number?: string;
+  // optional profile fields — members are often fetched joined with profiles
+  full_name?: string;
+  email?: string;
+  phone?: string | null;
+  id_number?: string;
+  address?: string | null;
+  date_of_birth?: string | null;
+  account_balance?: number;
+  total_contributions?: number;
+  status?: 'active' | 'inactive' | 'suspended';
+  created_at?: string;
+  updated_at?: string;
 };
 
 // Some components expect member fields like full_name/email/phone to exist
@@ -106,10 +111,12 @@ export type LoanRepayment = {
 
 export type Notification = {
   id: string;
-  member_id: string;
+  member_id: string | null;
   type: string;
   title: string;
   message: string;
   read: boolean;
-  sent_at: string;
+  sent_at: string | Date;
+  metadata?: any;
+  recipient_role?: string;
 };
