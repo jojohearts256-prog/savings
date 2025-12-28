@@ -246,7 +246,7 @@ export default function MemberDashboard() {
             </div>
             <p className="text-sm text-gray-600 mb-1">Account Balance (UGX)</p>
             <h3 className="text-3xl font-bold text-[#007B8A]">
-              {member ? member.account_balance.toLocaleString() : '0'}
+              {member ? (member.account_balance ?? 0).toLocaleString() : '0'}
             </h3>
           </div>
 
@@ -258,7 +258,7 @@ export default function MemberDashboard() {
             </div>
             <p className="text-sm text-gray-600 mb-1">Total Contributions (UGX)</p>
             <h3 className="text-3xl font-bold text-[#007B8A]">
-              {member ? member.total_contributions.toLocaleString() : '0'}
+              {member ? (member.total_contributions ?? 0).toLocaleString() : '0'}
             </h3>
           </div>
 
