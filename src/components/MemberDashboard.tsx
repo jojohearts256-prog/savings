@@ -113,8 +113,11 @@ export default function MemberDashboard() {
       const filteredPending = (pendingLoans || [])
         .filter((loan) => {
           if (!loan.guarantors || !Array.isArray(loan.guarantors)) return false;
+          // loans_with_guarantors returns guarantor objects with guarantor_id
+          // (not member_id). Check guarantor_id to see if the current member
+          // is listed as a guarantor with pending status.
           return loan.guarantors.some(
-            (g: any) => g.member_id === fetchedMember.id && g.status === 'pending'
+            (g: any) => (g.guarantor_id === fetchedMember.id || g.member_id === fetchedMember.id) && g.status === 'pending'
           );
         })
         .map((loan) => ({ ...loan, id: loan.loan_id })); // <-- map loan_id to id
