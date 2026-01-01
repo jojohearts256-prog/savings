@@ -16,8 +16,9 @@ BEGIN
   -- Count expected guarantors (rows in loan_guarantees for this loan)
   SELECT COUNT(*) INTO expected_count FROM public.loan_guarantees WHERE loan_id = NEW.loan_id;
 
-  -- Count approved guarantors (status = 'approved')
-  SELECT COUNT(*) INTO approved_count FROM public.loan_guarantees WHERE loan_id = NEW.loan_id AND status = 'approved';
+  -- Count approved guarantors
+  -- NOTE: this project uses status='pending' to represent an approved guarantor.
+  SELECT COUNT(*) INTO approved_count FROM public.loan_guarantees WHERE loan_id = NEW.loan_id AND status = 'pending';
 
   -- Count declined guarantors
   SELECT COUNT(*) INTO declined_count FROM public.loan_guarantees WHERE loan_id = NEW.loan_id AND status = 'declined';
@@ -43,6 +44,12 @@ BEGIN
     END IF;
 
     RETURN NEW;
+  END IF;
+
+  -- If not all guarantors are approved yet, keep the loan in pending_guarantors
+  -- (unless there are zero guarantors, in which case this trigger isn't relevant).
+  IF expected_count > 0 AND approved_count < expected_count THEN
+    UPDATE public.loans SET status = 'pending_guarantors' WHERE id = NEW.loan_id;
   END IF;
 
   -- If all expected guarantors have approved, forward to admin
