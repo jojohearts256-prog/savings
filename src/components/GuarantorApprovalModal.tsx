@@ -26,7 +26,9 @@ export default function GuarantorApprovalModal({
   const handleDecision = async (decision: 'accept' | 'decline') => {
     try {
       setError('');
-      decision === 'accept' ? setLoadingAccept(true) : setLoadingDecline(true);
+      decision === 'accept'
+        ? setLoadingAccept(true)
+        : setLoadingDecline(true);
 
       const guarantorAmount =
         loan.guarantors?.find((g) => g.guarantor_id === member.id)
@@ -36,11 +38,10 @@ export default function GuarantorApprovalModal({
         throw new Error('Invalid guaranteed amount');
       }
 
-      // ✅ DB-ALLOWED statuses only
-      const finalStatus: 'pending' | 'declined' =
+      const guarantorStatus: 'pending' | 'declined' =
         decision === 'decline' ? 'declined' : 'pending';
 
-      // ⬇️ Save guarantor decision
+      // 1️⃣ Save THIS guarantor decision only
       const { error: upsertError } = await supabase
         .from('loan_guarantees')
         .upsert(
@@ -48,18 +49,18 @@ export default function GuarantorApprovalModal({
             loan_id: loan.id,
             guarantor_id: member.id,
             amount_guaranteed: guarantorAmount,
-            status: finalStatus,
+            status: guarantorStatus,
           },
           { onConflict: 'loan_id,guarantor_id' }
         );
 
       if (upsertError) throw upsertError;
 
-      // ✅ CLOSE MODAL IMMEDIATELY
-      onClose();
+      // ✅ FORCE modal close immediately
       onSuccess();
+      onClose();
 
-      // ================= BACKGROUND LOGIC BELOW =================
+      // ================= BACKGROUND LOGIC =================
 
       // Notify borrower (non-blocking)
       sendNotification({
@@ -73,23 +74,31 @@ export default function GuarantorApprovalModal({
         metadata: {
           guarantor_id: member.id,
           loanId: loan.id,
-          status: finalStatus,
+          status: guarantorStatus,
         },
       }).catch(console.warn);
 
-      // Fetch all guarantors
-      const { data: allGuarantors, error: fetchError } = await supabase
+      // 2️⃣ Fetch ALL guarantees for this loan
+      const { data: allGuarantees, error: fetchError } = await supabase
         .from('loan_guarantees')
         .select('*')
         .eq('loan_id', loan.id);
 
-      if (fetchError) return;
+      if (fetchError || !allGuarantees) return;
 
-      const validGuarantors =
-        (allGuarantors ?? []).filter((g) => Number(g.amount_guaranteed) > 0);
+      // 3️⃣ Expected guarantors (from loan setup)
+      const expectedGuarantorIds =
+        loan.guarantors?.map((g) => g.guarantor_id) ?? [];
 
-      // ❌ Any decline → reject loan
-      if (validGuarantors.some((g) => g.status === 'declined')) {
+      // Only valid guarantees (must exist + amount > 0)
+      const validGuarantees = allGuarantees.filter(
+        (g) =>
+          expectedGuarantorIds.includes(g.guarantor_id) &&
+          Number(g.amount_guaranteed) > 0
+      );
+
+      // ❌ ANY decline → reject loan immediately
+      if (validGuarantees.some((g) => g.status === 'declined')) {
         await supabase
           .from('loans')
           .update({ status: 'rejected' })
@@ -106,14 +115,19 @@ export default function GuarantorApprovalModal({
         return;
       }
 
-      // ✅ All guarantors approved → all must be `pending`
-      const allApproved =
-        validGuarantors.length > 0 &&
-        validGuarantors.every((g) => g.status === 'pending');
+      // 4️⃣ HARD RULE: all EXPECTED guarantors must exist
+      if (validGuarantees.length !== expectedGuarantorIds.length) {
+        return; // still waiting for others
+      }
+
+      // 5️⃣ HARD RULE: ALL must be approved (`pending`)
+      const allApproved = validGuarantees.every(
+        (g) => g.status === 'pending'
+      );
 
       if (!allApproved) return;
 
-      // ⬇️ Forward loan to admin
+      // 6️⃣ Forward loan to admin
       await supabase
         .from('loans')
         .update({ status: 'pending' })
@@ -125,23 +139,24 @@ export default function GuarantorApprovalModal({
         .eq('id', loan.member_id)
         .maybeSingle();
 
-      const guarantorIds = validGuarantors.map((g) => g.guarantor_id);
+      const guarantorIds = validGuarantees.map((g) => g.guarantor_id);
 
       const { data: guarantorProfiles } = await supabase
         .from('members')
         .select('id, full_name')
         .in('id', guarantorIds);
 
-      const guarantorDetails = validGuarantors
+      const guarantorDetails = validGuarantees
         .map((g) => {
-          const p = guarantorProfiles?.find((x) => x.id === g.guarantor_id);
+          const p = guarantorProfiles?.find(
+            (x) => x.id === g.guarantor_id
+          );
           return `${p?.full_name ?? g.guarantor_id} pledged UGX ${Number(
             g.amount_guaranteed
           ).toLocaleString()}`;
         })
         .join('; ');
 
-      // Notify admin
       await sendNotification({
         member_id: null,
         recipient_role: 'admin',
@@ -153,7 +168,6 @@ export default function GuarantorApprovalModal({
         metadata: { loanId: loan.id },
       });
 
-      // Notify borrower
       await sendNotification({
         member_id: loan.member_id,
         type: 'loan_guarantors_approved',
