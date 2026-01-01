@@ -326,6 +326,32 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
 
         if (memberError) throw memberError;
 
+        // Verify updates were persisted (defensive check). Some deployments
+        // with RLS or other policies may accept the request but not apply it;
+        // re-fetch to confirm and show an error if values didn't change.
+        const [{ data: refreshedProfile }, { data: refreshedMember }] = await Promise.all([
+          supabase.from('profiles').select('full_name, email, phone').eq('id', member.profile_id).maybeSingle(),
+          supabase.from('members').select('id_number, address, date_of_birth').eq('id', member.id).maybeSingle(),
+        ]);
+
+        const profileMatches = refreshedProfile && (
+          (refreshedProfile.full_name || '') === formData.full_name &&
+          (refreshedProfile.email || '') === formData.email &&
+          (refreshedProfile.phone || '') === formData.phone
+        );
+
+        const memberDob = refreshedMember?.date_of_birth ? String(refreshedMember.date_of_birth).slice(0, 10) : '';
+        const memberMatches = refreshedMember && (
+          (refreshedMember.id_number || '') === formData.id_number &&
+          (refreshedMember.address || '') === formData.address &&
+          memberDob === (formData.date_of_birth || '')
+        );
+
+        if (!profileMatches || !memberMatches) {
+          console.error('Update verification failed', { refreshedProfile, refreshedMember });
+          throw new Error('Update did not persist — check database permissions or RLS policies');
+        }
+
         await loadMembers();
         setSuccess(true);
         setTimeout(() => {
