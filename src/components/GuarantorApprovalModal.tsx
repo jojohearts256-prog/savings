@@ -26,9 +26,7 @@ export default function GuarantorApprovalModal({
   const handleDecision = async (decision: 'accept' | 'decline') => {
     try {
       setError('');
-      decision === 'accept'
-        ? setLoadingAccept(true)
-        : setLoadingDecline(true);
+      decision === 'accept' ? setLoadingAccept(true) : setLoadingDecline(true);
 
       const guarantorAmount =
         loan.guarantors?.find((g) => g.guarantor_id === member.id)
@@ -38,15 +36,11 @@ export default function GuarantorApprovalModal({
         throw new Error('Invalid guaranteed amount');
       }
 
-      /**
-       * ✅ GUARANTOR STATUS (DB-ALLOWED)
-       * accept  → pending   (means approved)
-       * decline → declined
-       */
+      // ✅ DB-ALLOWED STATUS ONLY
       const finalStatus: 'pending' | 'declined' =
         decision === 'decline' ? 'declined' : 'pending';
 
-      // ⬇️ Save guarantor decision ONLY
+      // ⬇️ Update ONLY this guarantor
       const { error: upsertError } = await supabase
         .from('loan_guarantees')
         .upsert(
@@ -56,25 +50,17 @@ export default function GuarantorApprovalModal({
             amount_guaranteed: guarantorAmount,
             status: finalStatus,
           },
-          { onConflict: 'loan_id,guarantor_id' }
+          { onConflict: 'loan_id, guarantor_id' }
         );
 
       if (upsertError) throw upsertError;
 
-      /**
-       * ✅ FORCE CLOSE MODAL
-       * Frontend responsibility ends HERE
-       */
+      // ✅ CLOSE MODAL IMMEDIATELY
       onClose();
       onSuccess();
 
-      /**
-       * =========================
-       * BACKGROUND (NON-BLOCKING)
-       * =========================
-       */
-
-      // Notify borrower (fire & forget)
+      // ================= BACKGROUND LOGIC =================
+      // Notify borrower for this guarantor's response
       sendNotification({
         member_id: loan.member_id,
         type: 'guarantor_response',
@@ -90,13 +76,90 @@ export default function GuarantorApprovalModal({
         },
       }).catch(console.warn);
 
-      /**
-       * ❗ NO loan status update here
-       * ❗ DB trigger handles:
-       *    - all guarantors pending → loan.pending
-       *    - any declined → loan.rejected
-       */
+      // Fetch all guarantors to see overall status
+      const { data: allGuarantors, error: fetchError } = await supabase
+        .from('loan_guarantees')
+        .select('*')
+        .eq('loan_id', loan.id);
 
+      if (fetchError || !allGuarantors) return;
+
+      const validGuarantors = allGuarantors.filter(
+        (g) => Number(g.amount_guaranteed) > 0
+      );
+
+      // ❌ If any guarantor declined → notify borrower
+      if (validGuarantors.some((g) => g.status === 'declined')) {
+        await sendNotification({
+          member_id: loan.member_id,
+          type: 'loan_rejected_by_guarantor',
+          title: 'Loan Declined by Guarantor',
+          message: `Your loan ${loan.loan_number} was declined by a guarantor.`,
+          metadata: { loanId: loan.id },
+        });
+        return;
+      }
+
+      // ✅ If all guarantors approved → notify admin & borrower
+      const allApproved =
+        validGuarantors.length > 0 &&
+        validGuarantors.every((g) => g.status === 'pending');
+
+      if (!allApproved) return;
+
+      // Fetch borrower info
+      const { data: borrower } = await supabase
+        .from('members')
+        .select('full_name')
+        .eq('id', loan.member_id)
+        .maybeSingle();
+
+      const guarantorIds = validGuarantors.map((g) => g.guarantor_id);
+      const { data: guarantorProfiles } = await supabase
+        .from('members')
+        .select('id, full_name')
+        .in('id', guarantorIds);
+
+      const guarantorDetails = validGuarantors
+        .map((g) => {
+          const p = guarantorProfiles?.find((x) => x.id === g.guarantor_id);
+          return `${p?.full_name ?? g.guarantor_id} pledged UGX ${Number(
+            g.amount_guaranteed
+          ).toLocaleString()}`;
+        })
+        .join('; ');
+
+      // Notify admin that loan is ready
+      await sendNotification({
+        member_id: null,
+        recipient_role: 'admin',
+        type: 'loan_ready_for_admin',
+        title: 'Loan Ready for Approval',
+        message: `Loan ${loan.loan_number} requested by ${
+          borrower?.full_name ?? loan.member_id
+        } has all guarantors approved: ${guarantorDetails}.`,
+        metadata: { loanId: loan.id },
+      });
+
+      // Notify borrower
+      await sendNotification({
+        member_id: loan.member_id,
+        type: 'loan_guarantors_approved',
+        title: 'Guarantors Approved',
+        message: `All guarantors approved your loan ${loan.loan_number}. It is now with admin.`,
+        metadata: { loanId: loan.id },
+      });
+
+      // Notify all guarantors
+      for (const g of validGuarantors) {
+        await sendNotification({
+          member_id: g.guarantor_id,
+          type: 'loan_guarantors_all_approved',
+          title: 'All Guarantors Approved',
+          message: `All guarantors have approved loan ${loan.loan_number}. It is now with admin.`,
+          metadata: { loanId: loan.id },
+        });
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to submit decision');
     } finally {
