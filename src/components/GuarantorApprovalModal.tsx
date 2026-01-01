@@ -35,6 +35,17 @@ export default function GuarantorApprovalModal({
       // Normalize status to allowed DB values: 'pending'|'approved'|'declined'
       const dbStatus = status === 'decline' ? 'declined' : 'approved';
 
+      // Defensive: ensure we only ever write an allowed value to the DB.
+      const allowed = ['pending', 'approved', 'declined'];
+      let finalStatus = dbStatus;
+      if (!allowed.includes(finalStatus)) {
+        console.warn('GuarantorApprovalModal: normalizing unexpected status', finalStatus);
+        // map common UI statuses to DB values
+        if (finalStatus === 'accept') finalStatus = 'approved';
+        else if (finalStatus === 'decline') finalStatus = 'declined';
+        else finalStatus = 'pending';
+      }
+
       const { error: upsertError } = await supabase
         .from('loan_guarantees')
         .upsert(
@@ -42,7 +53,7 @@ export default function GuarantorApprovalModal({
             loan_id: loan.id,
             guarantor_id: member.id,
             amount_guaranteed: guarantorAmount,
-            status: dbStatus,
+            status: finalStatus,
           },
           { onConflict: 'loan_id,guarantor_id' }
         );
@@ -62,7 +73,7 @@ export default function GuarantorApprovalModal({
           status === 'accept'
             ? `${member.full_name ?? 'A guarantor'} accepted your loan guarantee.`
             : `${member.full_name ?? 'A guarantor'} declined your loan guarantee.`,
-        metadata: { guarantor_id: member.id, loanId: loan.id, status: dbStatus },
+  metadata: { guarantor_id: member.id, loanId: loan.id, status: finalStatus },
       }).catch((e) => console.warn('notify borrower failed', e));
 
       // Fetch all guarantors for this loan
