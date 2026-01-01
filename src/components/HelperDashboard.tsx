@@ -165,10 +165,26 @@ export default function HelperDashboard() {
           ))}
         </div>
 
-        {/* If employee toggled Member View, render MemberDashboard */}
+        {/* If employee toggled Member View, render MemberDashboard in a full-screen overlay */}
         {showMemberView && (
-          <div className="mt-6">
-            <MemberDashboard />
+          <div className="fixed inset-0 z-50 flex flex-col bg-black/40">
+            <div className="bg-white flex items-center justify-between p-3 shadow-md">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowMemberView(false)}
+                  className="px-3 py-1 rounded-lg bg-[#007B8A] text-white"
+                >
+                  Back to Helper
+                </button>
+                <span className="inline-block px-3 py-1 bg-yellow-100 text-sm text-yellow-800 rounded">You are in Member View</span>
+              </div>
+              <div>
+                <button onClick={() => setShowMemberView(false)} className="px-3 py-1 rounded bg-gray-100">Close</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto bg-white">
+              <MemberDashboard hideHeader={true} />
+            </div>
           </div>
         )}
 
