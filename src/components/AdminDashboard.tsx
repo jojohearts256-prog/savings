@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { fetchMembersExcludingAdmins } from '../lib/members';
 import type { Notification } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -71,14 +72,13 @@ export default function AdminDashboard() {
 
   async function loadStats() {
     try {
-      const [membersRes, loansRes] = await Promise.all([
-        supabase.from('members').select('account_balance'),
+      const [membersList, loansRes] = await Promise.all([
+        fetchMembersExcludingAdmins(),
         supabase.from('loans').select('status, outstanding_balance'),
       ]);
 
-      const totalMembers = membersRes?.data?.length || 0;
-      const totalBalance =
-        (membersRes?.data || []).reduce((sum, m) => sum + Number(m?.account_balance || 0), 0) || 0;
+      const totalMembers = membersList?.length || 0;
+      const totalBalance = (membersList || []).reduce((sum: any, m: any) => sum + Number(m?.account_balance || 0), 0) || 0;
       const pendingLoans = (loansRes?.data || []).filter((l) => l?.status === 'pending').length || 0;
       const totalLoans =
         (loansRes?.data || []).reduce((sum, l) => sum + Number(l?.outstanding_balance || 0), 0) || 0;

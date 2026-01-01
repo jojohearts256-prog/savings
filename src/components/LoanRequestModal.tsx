@@ -69,15 +69,16 @@ export default function LoanRequestModal({
 
     const { data } = await supabase
       .from('members')
-      .select('*')
+      // include profile relationship so we can exclude admins
+      .select('*, profiles(id, full_name, role)')
       .ilike('full_name', `%${query}%`)
       .neq('profile_id', profile?.id)
-      .limit(5);
+      .limit(8);
 
     const filtered =
-      data?.filter(
-        (m) => !guarantors.some((g) => g.member_id === m.id)
-      ) || [];
+      (data || [])
+        .filter((m: any) => !guarantors.some((g) => g.member_id === m.id))
+        .filter((m: any) => (m.profiles?.role ?? null) !== 'admin') || [];
 
     setSearchResults(filtered);
   }, 300);
@@ -168,6 +169,8 @@ export default function LoanRequestModal({
 
       if (loanError) throw loanError;
 
+      const borrowerName = profile?.full_name ?? member?.full_name ?? member?.member_number ?? 'A member';
+
       if (validGuarantors.length > 0) {
         await supabase.from('loan_guarantees').insert(
           validGuarantors.map((g) => ({
@@ -184,7 +187,7 @@ export default function LoanRequestModal({
               member_id: g.member_id as string,
               type: 'loan_guarantee_request',
               title: 'Loan Guarantee Request',
-              message: `${member?.full_name ?? 'A member'} requested a loan of UGX ${requestedAmount.toLocaleString()} and you pledged UGX ${Math.floor(Number(g.amount)).toLocaleString()}. Approve or reject your guarantee.`,
+              message: `${borrowerName} requested a loan of UGX ${requestedAmount.toLocaleString()} and you pledged UGX ${Math.floor(Number(g.amount)).toLocaleString()}. Approve or reject your guarantee.`,
               metadata: { loanId: loanData.id, guarantor_id: g.member_id, pledged: Math.floor(Number(g.amount)) },
             });
           } catch (e) {
@@ -201,7 +204,7 @@ export default function LoanRequestModal({
             recipient_role: 'admin',
             type: 'loan_request',
             title: 'New Loan Request',
-            message: `${member?.full_name ?? 'A member'} requested a loan of UGX ${requestedAmount.toLocaleString()}.`,
+            message: `${borrowerName} requested a loan of UGX ${requestedAmount.toLocaleString()}.`,
             metadata: { loanId: loanData.id, borrower_id: member?.id },
           });
         } catch (e) {

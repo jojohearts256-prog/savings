@@ -22,8 +22,11 @@ export default function LoanManagement({ isHelper = false }: { isHelper?: boolea
       )
       .order('requested_date', { ascending: false });
 
+    // Filter out any loans whose member resolves to an admin profile
+    const nonAdmin = (data || []).filter((d: any) => (d?.members?.profiles?.role ?? null) !== 'admin');
+
     // Flatten member name and number for easier rendering in the table
-    const flattened = (data || []).map((d: any) => ({
+    const flattened = nonAdmin.map((d: any) => ({
       ...d,
       member_name: d?.members?.profiles?.full_name || d?.members?.full_name || d?.member_id,
       member_number: d?.members?.member_number || '',

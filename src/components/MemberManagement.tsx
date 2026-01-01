@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { fetchMembersExcludingAdmins } from '../lib/members';
 import type { Member } from '../lib/supabase';
 import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, Loader2 } from 'lucide-react';
 
@@ -27,12 +28,7 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
   }, []);
 
   const loadMembers = async () => {
-    const { data, error } = await supabase
-      .from('members')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) console.error('Error loading members:', error.message);
+    const data = await fetchMembersExcludingAdmins();
     setMembers(data || []);
   };
 
@@ -92,6 +88,42 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
 
         const result = await response.json();
         if (!result.success) throw new Error(result.error || 'Registration failed');
+
+        // If the created role is 'employee', ensure a members row exists for that profile
+        if (formData.role === 'employee') {
+          try {
+            // Find the profile by email (created by the admin-register function)
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('email', formData.email)
+              .maybeSingle();
+
+            if (profileData?.id) {
+              // Check if a members row already exists
+              const { data: existingMember } = await supabase
+                .from('members')
+                .select('id')
+                .eq('profile_id', profileData.id)
+                .maybeSingle();
+
+              if (!existingMember) {
+                // create a members row for the employee so they can act as a member
+                const memberNumber = 'M' + Date.now();
+                await supabase.from('members').insert({
+                  profile_id: profileData.id,
+                  full_name: formData.full_name,
+                  member_number: memberNumber,
+                  account_balance: 0,
+                  total_contributions: 0,
+                  status: 'active',
+                });
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to create member row for employee:', e);
+          }
+        }
 
         await new Promise((res) => setTimeout(res, 800));
         await loadMembers();
