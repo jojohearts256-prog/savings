@@ -6,7 +6,7 @@ import { DollarSign, TrendingUp, CreditCard, Bell, LogOut, FileText, Send } from
 import LoanRequestModal from '../components/LoanRequestModal';
 import GuarantorApprovalModal from '../components/GuarantorApprovalModal';
 
-export default function MemberDashboard() {
+export default function MemberDashboard({ hideHeader = false }: { hideHeader?: boolean }) {
   const { profile, signOut } = useAuth();
   const [member, setMember] = useState<Member | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -138,7 +138,8 @@ export default function MemberDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navbar */}
-      <nav className="bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] shadow-lg">
+      {!hideHeader && (
+        <nav className="bg-gradient-to-r from-[#007B8A] via-[#00BFFF] to-[#D8468C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
@@ -172,9 +173,10 @@ export default function MemberDashboard() {
             </div>
           </div>
         </div>
-      </nav>
+  </nav>
+  )}
 
-      {/* Toast Notifications */}
+  {/* Toast Notifications */}
       <div className="fixed top-20 right-5 flex flex-col gap-2 z-50">
         {toastNotifications.map((notif) => (
           <div

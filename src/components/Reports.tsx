@@ -65,11 +65,14 @@ export default function Reports({ isHelper = false }: { isHelper?: boolean }) {
 
     const { data, error } = await supabase
       .from('members')
-      .select('id, full_name, member_number')
+      .select('id, full_name, member_number, profiles(role)')
       .ilike('full_name', `%${value}%`)
       .limit(10);
 
-    if (!error) setMembers(data || []);
+    if (!error) {
+      const filtered = (data || []).filter((m: any) => (m.profiles?.role ?? null) !== 'admin');
+      setMembers(filtered || []);
+    }
   };
 
   const filterData = (data: any[], filter: string, fields: string[]) => {
