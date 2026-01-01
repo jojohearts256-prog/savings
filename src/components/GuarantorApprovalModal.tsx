@@ -36,11 +36,11 @@ export default function GuarantorApprovalModal({
         throw new Error('Invalid guaranteed amount');
       }
 
-      // ✅ DB-SAFE statuses ONLY
+      // ✅ DB-ALLOWED statuses only
       const finalStatus: 'pending' | 'declined' =
         decision === 'decline' ? 'declined' : 'pending';
 
-      // ⬇️ Write guarantor decision
+      // ⬇️ Save guarantor decision
       const { error: upsertError } = await supabase
         .from('loan_guarantees')
         .upsert(
@@ -55,10 +55,13 @@ export default function GuarantorApprovalModal({
 
       if (upsertError) throw upsertError;
 
+      // ✅ CLOSE MODAL IMMEDIATELY
       onClose();
       onSuccess();
 
-      // Notify borrower
+      // ================= BACKGROUND LOGIC BELOW =================
+
+      // Notify borrower (non-blocking)
       sendNotification({
         member_id: loan.member_id,
         type: 'guarantor_response',
@@ -74,20 +77,23 @@ export default function GuarantorApprovalModal({
         },
       }).catch(console.warn);
 
-      // ⬇️ Fetch all guarantors
+      // Fetch all guarantors
       const { data: allGuarantors, error: fetchError } = await supabase
         .from('loan_guarantees')
         .select('*')
         .eq('loan_id', loan.id);
 
-      if (fetchError) throw fetchError;
+      if (fetchError) return;
 
       const validGuarantors =
         (allGuarantors ?? []).filter((g) => Number(g.amount_guaranteed) > 0);
 
-      // ❌ If ANY guarantor declined → reject loan
+      // ❌ Any decline → reject loan
       if (validGuarantors.some((g) => g.status === 'declined')) {
-        await supabase.from('loans').update({ status: 'rejected' }).eq('id', loan.id);
+        await supabase
+          .from('loans')
+          .update({ status: 'rejected' })
+          .eq('id', loan.id);
 
         await sendNotification({
           member_id: loan.member_id,
@@ -100,7 +106,7 @@ export default function GuarantorApprovalModal({
         return;
       }
 
-      // ✅ ALL guarantors approved → all must be `pending`
+      // ✅ All guarantors approved → all must be `pending`
       const allApproved =
         validGuarantors.length > 0 &&
         validGuarantors.every((g) => g.status === 'pending');
@@ -108,7 +114,10 @@ export default function GuarantorApprovalModal({
       if (!allApproved) return;
 
       // ⬇️ Forward loan to admin
-      await supabase.from('loans').update({ status: 'pending' }).eq('id', loan.id);
+      await supabase
+        .from('loans')
+        .update({ status: 'pending' })
+        .eq('id', loan.id);
 
       const { data: borrower } = await supabase
         .from('members')

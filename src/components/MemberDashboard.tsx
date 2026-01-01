@@ -65,7 +65,7 @@ export default function MemberDashboard({ hideHeader = false }: { hideHeader?: b
 
       setTransactions(txRes.data || []);
       setLoans(loanRes.data || []);
-      setAllNotifications(notifRes.data || []);
+  setAllNotifications(notifRes.data || []);
 
       // Loan reminders
       const reminders: Notification[] = [];
@@ -124,6 +124,38 @@ export default function MemberDashboard({ hideHeader = false }: { hideHeader?: b
         .map((loan) => ({ ...loan, id: loan.loan_id })); // <-- map loan_id to id
 
       setPendingGuarantorLoans(filteredPending);
+
+      // Subscribe to realtime notifications for this member so new notifications
+      // (e.g., guarantor requests) show up without a full reload.
+      try {
+        const channel = supabase
+          .channel(`notifications-member-${fetchedMember.id}`)
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'notifications', filter: `member_id=eq.${fetchedMember.id}` },
+            (payload: any) => {
+              const newNotif = payload.new as Notification;
+              setAllNotifications((prev) => [newNotif, ...(prev || [])]);
+              setToastNotifications((prev) => [newNotif, ...(prev || [])]);
+            }
+          )
+          .subscribe();
+
+        // cleanup when profile changes or component unmounts
+        // removeChannel requires the channel object
+        const remove = () => {
+          try {
+            supabase.removeChannel(channel);
+          } catch (e) {
+            // ignore
+          }
+        };
+        // store cleanup on window so we can remove later when profile changes
+        // (simple approach; could also useRef)
+        (window as any).__removeNotificationsChannel = remove;
+      } catch (e) {
+        console.warn('Failed to subscribe to member notifications', e);
+      }
     } catch (err) {
       console.error('Failed to load member data:', err);
     }
