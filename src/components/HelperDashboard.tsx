@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, SetStateAction } from 'react';
 import { supabase } from '../lib/supabase';
-import { fetchMembersExcludingAdmins } from '../lib/members';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Users,
@@ -63,12 +62,14 @@ export default function HelperDashboard() {
 
   async function loadStats() {
     try {
-      const [membersList, loansRes] = await Promise.all([
-        fetchMembersExcludingAdmins(),
+      const [membersRes, loansRes] = await Promise.all([
+        supabase.from('members').select('*, profiles(id, full_name, role)').order('created_at', { ascending: false }),
         supabase.from('loans').select('status'),
       ]);
 
-      const totalMembers = membersList?.length || 0;
+      const membersList = membersRes.data || [];
+
+  const totalMembers = membersList?.length || 0;
       const pendingLoans = (loansRes?.data || []).filter((l) => l?.status === 'pending').length || 0;
       const activeLoans = (loansRes?.data || []).filter((l) => l?.status === 'disbursed').length || 0;
 

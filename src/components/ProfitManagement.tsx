@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { fetchMembersExcludingAdmins } from '../lib/members';
 import type { Member } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DollarSign, Banknote, Printer } from 'lucide-react';
@@ -36,7 +35,11 @@ export default function ProfitManagement() {
 
   const loadMembers = async () => {
     try {
-      const data = await fetchMembersExcludingAdmins();
+      const { data, error } = await supabase
+        .from('members')
+        .select('*, profiles(id, full_name, role)')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
       setMembers(data || []);
     } catch (err: any) {
       console.error(err);

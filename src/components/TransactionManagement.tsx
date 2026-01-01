@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sendNotification } from '../lib/notify';
 import { supabase } from '../lib/supabase';
-import { fetchMembersExcludingAdmins } from '../lib/members';
 import type { Member, Profile } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowUpCircle, ArrowDownCircle, Banknote, Search, Printer } from 'lucide-react';
@@ -55,8 +54,11 @@ export default function TransactionManagement() {
   const loadMembers = async () => {
     setLoadingMembers(true);
     try {
-      const data = await fetchMembersExcludingAdmins();
-      // ensure the shape expected by the component
+      const { data, error } = await supabase
+        .from('members')
+        .select('*, profiles(id, full_name, role)')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
       setMembers((data || []).map((m: any) => ({ ...m, profiles: (m as any).profiles ?? null })));
     } catch (err: any) {
       console.error('loadMembers error:', err);

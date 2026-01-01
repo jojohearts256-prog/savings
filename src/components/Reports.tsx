@@ -70,8 +70,7 @@ export default function Reports({ isHelper = false }: { isHelper?: boolean }) {
       .limit(10);
 
     if (!error) {
-      const filtered = (data || []).filter((m: any) => (m.profiles?.role ?? null) !== 'admin');
-      setMembers(filtered || []);
+      setMembers(data || []);
     }
   };
 

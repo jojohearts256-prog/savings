@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { fetchMembersExcludingAdmins } from '../lib/members';
 import type { Notification } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -18,6 +17,7 @@ import TransactionManagement from './TransactionManagement';
 import LoanManagement from './LoanManagement';
 import Reports from './Reports';
 import ProfitManagement from './ProfitManagement';
+import MemberDashboard from './MemberDashboard';
 import Particles from 'react-tsparticles';
 import { loadFull } from 'tsparticles';
 import CountUp from 'react-countup';
@@ -26,6 +26,7 @@ export default function AdminDashboard() {
   const { profile, signOut } = useAuth();
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showMemberView, setShowMemberView] = useState(false);
   const [stats, setStats] = useState({
     totalMembers: 0,
     totalBalance: 0,
@@ -72,13 +73,15 @@ export default function AdminDashboard() {
 
   async function loadStats() {
     try {
-      const [membersList, loansRes] = await Promise.all([
-        fetchMembersExcludingAdmins(),
+      const [membersRes, loansRes] = await Promise.all([
+        supabase.from('members').select('*, profiles(id, full_name, role, account_balance)').order('created_at', { ascending: false }),
         supabase.from('loans').select('status, outstanding_balance'),
       ]);
 
-      const totalMembers = membersList?.length || 0;
-      const totalBalance = (membersList || []).reduce((sum: any, m: any) => sum + Number(m?.account_balance || 0), 0) || 0;
+      const membersList = membersRes.data || [];
+
+  const totalMembers = membersList?.length || 0;
+  const totalBalance = (membersList || []).reduce((sum: any, m: any) => sum + Number(m?.account_balance || 0), 0) || 0;
       const pendingLoans = (loansRes?.data || []).filter((l) => l?.status === 'pending').length || 0;
       const totalLoans =
         (loansRes?.data || []).reduce((sum, l) => sum + Number(l?.outstanding_balance || 0), 0) || 0;
@@ -264,6 +267,15 @@ export default function AdminDashboard() {
                 <p className="text-sm font-medium text-white">{profile?.full_name}</p>
                 <p className="text-xs text-white/80 capitalize">{profile?.role}</p>
               </div>
+              {/* Admin: quick switch to Member view */}
+              {profile?.role === 'admin' && (
+                <button
+                  onClick={() => setShowMemberView((s) => !s)}
+                  className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-white/90 mr-2"
+                >
+                  {showMemberView ? 'Back to Admin' : 'Member View'}
+                </button>
+              )}
               <button
                 onClick={handleSignOut}
                 className="p-2 bg-white/20 hover:bg-red-500/30 rounded-xl transition-all duration-300 hover:scale-110 shadow-md hover:shadow-lg"
@@ -274,6 +286,29 @@ export default function AdminDashboard() {
           </div>
         </div>
       </nav>
+
+      {/* If admin toggled Member View, render MemberDashboard in a full-screen overlay */}
+      {showMemberView && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/40">
+          <div className="bg-white flex items-center justify-between p-3 shadow-md">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowMemberView(false)}
+                className="px-3 py-1 rounded-lg bg-[#071A3F] text-white"
+              >
+                Back to Admin
+              </button>
+              <span className="inline-block px-3 py-1 bg-yellow-100 text-sm text-yellow-800 rounded">You are in Member View</span>
+            </div>
+            <div>
+              <button onClick={() => setShowMemberView(false)} className="px-3 py-1 rounded bg-gray-100">Close</button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-auto bg-white">
+            <MemberDashboard hideHeader={true} />
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
