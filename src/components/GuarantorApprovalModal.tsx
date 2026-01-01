@@ -23,29 +23,24 @@ export default function GuarantorApprovalModal({
 
   if (!loan?.id || !member?.id) return null;
 
-  const handleDecision = async (status: 'accept' | 'decline') => {
+  const handleDecision = async (decision: 'accept' | 'decline') => {
     try {
       setError('');
-      status === 'accept' ? setLoadingAccept(true) : setLoadingDecline(true);
+      decision === 'accept' ? setLoadingAccept(true) : setLoadingDecline(true);
 
       const guarantorAmount =
         loan.guarantors?.find((g) => g.guarantor_id === member.id)
-          ?.amount_guaranteed || 0;
+          ?.amount_guaranteed ?? 0;
 
-      // Normalize status to allowed DB values: 'pending'|'approved'|'declined'
-      const dbStatus = status === 'decline' ? 'declined' : 'approved';
-
-      // Defensive: ensure we only ever write an allowed value to the DB.
-      const allowed = ['pending', 'approved', 'declined'];
-      let finalStatus = dbStatus;
-      if (!allowed.includes(finalStatus)) {
-        console.warn('GuarantorApprovalModal: normalizing unexpected status', finalStatus);
-        // map common UI statuses to DB values
-        if (finalStatus === 'accept') finalStatus = 'approved';
-        else if (finalStatus === 'decline') finalStatus = 'declined';
-        else finalStatus = 'pending';
+      if (guarantorAmount <= 0) {
+        throw new Error('Invalid guaranteed amount');
       }
 
+      // ✅ DB-SAFE statuses ONLY
+      const finalStatus: 'pending' | 'declined' =
+        decision === 'decline' ? 'declined' : 'pending';
+
+      // ⬇️ Write guarantor decision
       const { error: upsertError } = await supabase
         .from('loan_guarantees')
         .upsert(
@@ -60,23 +55,26 @@ export default function GuarantorApprovalModal({
 
       if (upsertError) throw upsertError;
 
-      // Immediately close modal and refresh parent list
       onClose();
       onSuccess();
 
-      // Notify borrower asynchronously (server-side insert + email)
+      // Notify borrower
       sendNotification({
         member_id: loan.member_id,
         type: 'guarantor_response',
         title: 'Guarantor Response',
         message:
-          status === 'accept'
+          decision === 'accept'
             ? `${member.full_name ?? 'A guarantor'} accepted your loan guarantee.`
             : `${member.full_name ?? 'A guarantor'} declined your loan guarantee.`,
-  metadata: { guarantor_id: member.id, loanId: loan.id, status: finalStatus },
-      }).catch((e) => console.warn('notify borrower failed', e));
+        metadata: {
+          guarantor_id: member.id,
+          loanId: loan.id,
+          status: finalStatus,
+        },
+      }).catch(console.warn);
 
-      // Fetch all guarantors for this loan
+      // ⬇️ Fetch all guarantors
       const { data: allGuarantors, error: fetchError } = await supabase
         .from('loan_guarantees')
         .select('*')
@@ -84,81 +82,76 @@ export default function GuarantorApprovalModal({
 
       if (fetchError) throw fetchError;
 
-      const validGuarantors = (allGuarantors as any[]).filter((g) => g.amount_guaranteed > 0) || [];
+      const validGuarantors =
+        (allGuarantors ?? []).filter((g) => Number(g.amount_guaranteed) > 0);
 
-      // Reject loan if any guarantor declined
-      const anyDeclined = validGuarantors.some((g) => g.status === 'declined');
-      if (anyDeclined) {
+      // ❌ If ANY guarantor declined → reject loan
+      if (validGuarantors.some((g) => g.status === 'declined')) {
         await supabase.from('loans').update({ status: 'rejected' }).eq('id', loan.id);
 
         await sendNotification({
           member_id: loan.member_id,
           type: 'loan_rejected_by_guarantor',
-          title: 'Loan Declined by Guarantor',
-          message: `Your loan ${loan.loan_number} was declined because a guarantor did not approve.`,
+          title: 'Loan Declined',
+          message: `Your loan ${loan.loan_number} was declined by a guarantor.`,
           metadata: { loanId: loan.id },
         });
+
         return;
       }
 
-      // Approve loan if all guarantors approved
-      const allApproved = validGuarantors.length > 0 && validGuarantors.every((g) => g.status === 'approved');
-      if (allApproved) {
-        await supabase.from('loans').update({ status: 'pending' }).eq('id', loan.id);
+      // ✅ ALL guarantors approved → all must be `pending`
+      const allApproved =
+        validGuarantors.length > 0 &&
+        validGuarantors.every((g) => g.status === 'pending');
 
-        const { data: borrower } = await supabase
-          .from('members')
-          .select('full_name')
-          .eq('id', loan.member_id)
-          .maybeSingle();
+      if (!allApproved) return;
 
-        const guarantorIds = validGuarantors.map((g) => g.guarantor_id);
-        let guarantorProfiles: any[] = [];
-        try {
-          const { data: gp } = await supabase.from('members').select('id, full_name').in('id', guarantorIds);
-          guarantorProfiles = gp || [];
-        } catch (e) {
-          guarantorProfiles = [];
-        }
+      // ⬇️ Forward loan to admin
+      await supabase.from('loans').update({ status: 'pending' }).eq('id', loan.id);
 
-        const guarantorDetails = validGuarantors
-          .map((g) => {
-            const prof = guarantorProfiles.find((p) => p.id === g.guarantor_id);
-            const name = prof?.full_name ?? String(g.guarantor_id);
-            return `${name} pledged UGX ${Number(g.amount_guaranteed).toLocaleString()}`;
-          })
-          .join('; ');
+      const { data: borrower } = await supabase
+        .from('members')
+        .select('full_name')
+        .eq('id', loan.member_id)
+        .maybeSingle();
 
-        // Notify admin (use member_id = null and recipient_role = 'admin' so admin feed picks it up)
-        await sendNotification({
-          member_id: null,
-          recipient_role: 'admin',
-          type: 'loan_ready_for_admin',
-          title: 'Loan Ready for Approval',
-          message: `Loan ${loan.loan_number} requested by ${borrower?.full_name ?? String(loan.member_id)} for UGX ${Number(loan.amount_requested).toLocaleString()} has all guarantors approved: ${guarantorDetails}.`,
-          metadata: { loanId: loan.id, guarantors: validGuarantors },
-        });
+      const guarantorIds = validGuarantors.map((g) => g.guarantor_id);
 
-        // Notify borrower that all guarantors approved and loan has been forwarded to admin
-        await sendNotification({
-          member_id: loan.member_id,
-          type: 'loan_guarantors_approved',
-          title: 'Guarantors Approved',
-          message: `All your guarantors have approved loan ${loan.loan_number}. The loan has been forwarded to admin for final review.`,
-          metadata: { loanId: loan.id },
-        });
+      const { data: guarantorProfiles } = await supabase
+        .from('members')
+        .select('id, full_name')
+        .in('id', guarantorIds);
 
-        // Notify all guarantors
-        for (const g of validGuarantors) {
-          await sendNotification({
-            member_id: g.guarantor_id,
-            type: 'loan_guarantors_all_approved',
-            title: 'All Guarantors Approved',
-            message: `All guarantors have approved loan ${loan.loan_number}. The loan has been forwarded to admin for final review.`,
-            metadata: { loanId: loan.id },
-          });
-        }
-      }
+      const guarantorDetails = validGuarantors
+        .map((g) => {
+          const p = guarantorProfiles?.find((x) => x.id === g.guarantor_id);
+          return `${p?.full_name ?? g.guarantor_id} pledged UGX ${Number(
+            g.amount_guaranteed
+          ).toLocaleString()}`;
+        })
+        .join('; ');
+
+      // Notify admin
+      await sendNotification({
+        member_id: null,
+        recipient_role: 'admin',
+        type: 'loan_ready_for_admin',
+        title: 'Loan Ready for Approval',
+        message: `Loan ${loan.loan_number} requested by ${
+          borrower?.full_name ?? loan.member_id
+        } has all guarantors approved: ${guarantorDetails}.`,
+        metadata: { loanId: loan.id },
+      });
+
+      // Notify borrower
+      await sendNotification({
+        member_id: loan.member_id,
+        type: 'loan_guarantors_approved',
+        title: 'Guarantors Approved',
+        message: `All guarantors approved your loan ${loan.loan_number}. It is now with admin.`,
+        metadata: { loanId: loan.id },
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to submit decision');
     } finally {
@@ -169,24 +162,31 @@ export default function GuarantorApprovalModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-md p-6 relative shadow-2xl border border-gray-100 animate-fadeIn">
-        <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition">
+      <div className="bg-white rounded-2xl w-full max-w-md p-6 relative shadow-2xl">
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-gray-400 hover:text-red-500"
+        >
           <XCircle className="w-6 h-6" />
         </button>
 
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Loan Guarantee Approval</h2>
+        <h2 className="text-xl font-bold mb-4">Loan Guarantee Approval</h2>
 
-        {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">{error}</div>}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+            {error}
+          </div>
+        )}
 
         <p className="mb-4">
-          Loan <strong>{loan.loan_number}</strong> requested by member <strong>{loan.member_id}</strong> needs your approval.
+          Loan <strong>{loan.loan_number}</strong> requires your approval.
         </p>
 
         <div className="flex gap-3">
           <button
             onClick={() => handleDecision('accept')}
             disabled={loadingAccept || loadingDecline}
-            className="flex-1 py-2 bg-green-500 text-white font-medium rounded-xl disabled:opacity-50"
+            className="flex-1 py-2 bg-green-500 text-white rounded-xl"
           >
             {loadingAccept ? 'Processing...' : 'Accept'}
           </button>
@@ -194,7 +194,7 @@ export default function GuarantorApprovalModal({
           <button
             onClick={() => handleDecision('decline')}
             disabled={loadingAccept || loadingDecline}
-            className="flex-1 py-2 bg-red-500 text-white font-medium rounded-xl disabled:opacity-50"
+            className="flex-1 py-2 bg-red-500 text-white rounded-xl"
           >
             {loadingDecline ? 'Processing...' : 'Decline'}
           </button>

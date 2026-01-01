@@ -75,10 +75,7 @@ export default function LoanRequestModal({
       .neq('profile_id', profile?.id)
       .limit(8);
 
-    const filtered =
-      (data || [])
-        .filter((m: any) => !guarantors.some((g) => g.member_id === m.id))
-        .filter((m: any) => (m.profiles?.role ?? null) !== 'admin') || [];
+    const filtered = (data || []).filter((m: any) => !guarantors.some((g) => g.member_id === m.id)) || [];
 
     setSearchResults(filtered);
   }, 300);

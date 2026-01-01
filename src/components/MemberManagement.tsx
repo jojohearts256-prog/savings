@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { fetchMembersExcludingAdmins } from '../lib/members';
 import type { Member } from '../lib/supabase';
 import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, Loader2 } from 'lucide-react';
 
@@ -28,8 +27,17 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
   }, []);
 
   const loadMembers = async () => {
-    const data = await fetchMembersExcludingAdmins();
-    setMembers(data || []);
+    try {
+      const { data, error } = await supabase
+        .from('members')
+        .select('*, profiles(id, full_name, role)')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setMembers(data || []);
+    } catch (err) {
+      console.error('Failed to load members:', err);
+      setMembers([]);
+    }
   };
 
   const filteredMembers = members.filter(
