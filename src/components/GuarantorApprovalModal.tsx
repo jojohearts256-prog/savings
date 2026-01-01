@@ -23,28 +23,30 @@ export default function GuarantorApprovalModal({
 
   if (!loan?.id || !member?.id) return null;
 
-  const handleDecision = async (status: 'accept' | 'decline') => {
+  const handleDecision = async (decision: 'accept' | 'decline') => {
     try {
       setError('');
-      status === 'accept' ? setLoadingAccept(true) : setLoadingDecline(true);
+      decision === 'accept'
+        ? setLoadingAccept(true)
+        : setLoadingDecline(true);
 
       const guarantorAmount =
         loan.guarantors?.find((g) => g.guarantor_id === member.id)
-          ?.amount_guaranteed || 0;
+          ?.amount_guaranteed ?? 0;
 
-      // Normalize status to allowed DB values: 'pending'|'approved'|'declined'
-      const dbStatus = status === 'decline' ? 'declined' : 'approved';
-
-      // Defensive: ensure we only ever write an allowed value to the DB.
-      const allowed = ['pending', 'approved', 'declined'];
-      let finalStatus = dbStatus;
-      if (!allowed.includes(finalStatus)) {
-        console.warn('GuarantorApprovalModal: normalizing unexpected status', finalStatus);
-        if (finalStatus === 'accept') finalStatus = 'approved';
-        else if (finalStatus === 'decline') finalStatus = 'declined';
-        else finalStatus = 'pending';
+      if (guarantorAmount <= 0) {
+        throw new Error('Invalid guaranteed amount');
       }
 
+      /**
+       * ✅ GUARANTOR STATUS (DB-ALLOWED)
+       * accept  → pending   (means approved)
+       * decline → declined
+       */
+      const finalStatus: 'pending' | 'declined' =
+        decision === 'decline' ? 'declined' : 'pending';
+
+      // ⬇️ Save guarantor decision ONLY
       const { error: upsertError } = await supabase
         .from('loan_guarantees')
         .upsert(
@@ -59,21 +61,42 @@ export default function GuarantorApprovalModal({
 
       if (upsertError) throw upsertError;
 
-      // Immediately close modal and refresh parent list
+      /**
+       * ✅ FORCE CLOSE MODAL
+       * Frontend responsibility ends HERE
+       */
       onClose();
       onSuccess();
 
-      // Notify borrower asynchronously about this guarantor's decision
+      /**
+       * =========================
+       * BACKGROUND (NON-BLOCKING)
+       * =========================
+       */
+
+      // Notify borrower (fire & forget)
       sendNotification({
         member_id: loan.member_id,
         type: 'guarantor_response',
         title: 'Guarantor Response',
         message:
-          status === 'accept'
+          decision === 'accept'
             ? `${member.full_name ?? 'A guarantor'} accepted your loan guarantee.`
             : `${member.full_name ?? 'A guarantor'} declined your loan guarantee.`,
-        metadata: { guarantor_id: member.id, loanId: loan.id, status: finalStatus },
-      }).catch((e) => console.warn('notify borrower failed', e));
+        metadata: {
+          guarantor_id: member.id,
+          loanId: loan.id,
+          status: finalStatus,
+        },
+      }).catch(console.warn);
+
+      /**
+       * ❗ NO loan status update here
+       * ❗ DB trigger handles:
+       *    - all guarantors pending → loan.pending
+       *    - any declined → loan.rejected
+       */
+
     } catch (err: any) {
       setError(err.message || 'Failed to submit decision');
     } finally {
@@ -92,7 +115,9 @@ export default function GuarantorApprovalModal({
           <XCircle className="w-6 h-6" />
         </button>
 
-        <h2 className="text-xl font-bold mb-4">Loan Guarantee Approval</h2>
+        <h2 className="text-xl font-bold mb-4">
+          Loan Guarantee Approval
+        </h2>
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
