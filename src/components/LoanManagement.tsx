@@ -3,6 +3,7 @@ import { sendNotification } from '../lib/notify';
 import { notifyUser } from '../lib/notifyUser';
 import { useAuth } from '../contexts/AuthContext';
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import LoanTable from './loan-management/LoanTable';
 import ApprovalModal from './loan-management/ApprovalModal';
 import RepaymentModal from './loan-management/RepaymentModal';
@@ -39,6 +40,8 @@ export default function LoanManagement({ isHelper = false }: { isHelper?: boolea
 
   const handleLoanAction = async (loanId: string, action: 'approve' | 'reject', approvedAmount?: number, interestRate?: number) => {
     try {
+      const toastId = toast.loading(action === 'approve' ? 'Approving loan...' : 'Rejecting loan...');
+
       if (action === 'approve' && approvedAmount && interestRate !== undefined) {
         const totalRepayable = approvedAmount + (approvedAmount * interestRate / 100);
 
@@ -76,6 +79,8 @@ export default function LoanManagement({ isHelper = false }: { isHelper?: boolea
             console.warn('notifyUser failed (loan approved)', e);
           }
         }
+
+        toast.success('Loan approved', { id: toastId });
       } else if (action === 'reject') {
         await supabase
           .from('loans')
@@ -106,16 +111,20 @@ export default function LoanManagement({ isHelper = false }: { isHelper?: boolea
             console.warn('notifyUser failed (loan rejected)', e);
           }
         }
+
+        toast.success('Loan rejected', { id: toastId });
       }
 
       loadLoans();
     } catch (err) {
       console.error('Error processing loan:', err);
+      toast.error('Failed to process loan');
     }
   };
 
   const handleDisburse = async (loanId: string) => {
     try {
+      const toastId = toast.loading('Disbursing loan...');
       const loan = loans.find(l => l.id === loanId);
       if (!loan) return;
 
@@ -174,8 +183,11 @@ export default function LoanManagement({ isHelper = false }: { isHelper?: boolea
       }
 
       loadLoans();
+
+      toast.success('Loan disbursed', { id: toastId });
     } catch (err) {
       console.error('Error disbursing loan:', err);
+      toast.error('Failed to disburse loan');
     }
   };
 

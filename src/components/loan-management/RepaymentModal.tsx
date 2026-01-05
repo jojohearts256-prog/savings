@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Loan } from './types';
+import toast from 'react-hot-toast';
 
 export default function RepaymentModal({
   loan,
@@ -18,11 +19,16 @@ export default function RepaymentModal({
     e.preventDefault();
     setLoading(true);
     try {
+      const toastId = toast.loading('Recording repayment...');
       const repaymentAmount = parseFloat(amount.replace(/,/g, ''));
       await onRecord(repaymentAmount, notes);
       onClose();
+
+      toast.success('Repayment recorded', { id: toastId });
     } catch (err) {
       console.error('Error recording repayment:', err);
+
+      toast.error('Failed to record repayment');
     } finally {
       setLoading(false);
     }

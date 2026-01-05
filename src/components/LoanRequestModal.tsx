@@ -5,6 +5,7 @@ import { sendNotification } from '../lib/notify';
 import { notifyUser } from '../lib/notifyUser';
 import { XCircle } from 'lucide-react';
 import debounce from 'lodash/debounce';
+import toast from 'react-hot-toast';
 
 interface LoanRequestModalProps {
   member: Member | null;
@@ -128,6 +129,8 @@ export default function LoanRequestModal({
     setLoading(true);
     setError('');
 
+    const toastId = toast.loading('Submitting loan request...');
+
     try {
       if (!member) throw new Error('Member data not found');
 
@@ -222,8 +225,12 @@ export default function LoanRequestModal({
 
       onSuccess();
       onClose();
+
+      toast.success('Loan requested successfully', { id: toastId });
     } catch (err: any) {
       setError(err.message);
+
+      toast.error(err.message || 'Failed to submit loan request', { id: toastId });
     } finally {
       setLoading(false);
     }

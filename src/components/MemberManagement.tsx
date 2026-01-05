@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Member } from '../lib/supabase';
 import { UserPlus, Search } from 'lucide-react';
+import toast from 'react-hot-toast';
 import AddMemberModal from './member-management/AddMemberModal';
 import EditMemberModal from './member-management/EditMemberModal';
 import ViewMemberModal from './member-management/ViewMemberModal';
@@ -51,9 +52,14 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
     const confirmDelete = confirm('Are you sure you want to delete this member?');
     if (!confirmDelete) return;
     setLoading(true);
+    const toastId = toast.loading('Deleting member...');
     const { error } = await supabase.from('members').delete().eq('id', memberId);
-    if (error) alert('Failed to delete member: ' + error.message);
-    else setMembers((prev) => prev.filter((m) => m.id !== memberId));
+    if (error) {
+      toast.error(`Failed to delete member: ${error.message}`, { id: toastId });
+    } else {
+      setMembers((prev) => prev.filter((m) => m.id !== memberId));
+      toast.success('Member deleted', { id: toastId });
+    }
     setLoading(false);
   };
 
