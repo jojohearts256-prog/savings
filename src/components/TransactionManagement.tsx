@@ -83,10 +83,13 @@ export default function TransactionManagement() {
   );
 
   return (
-    <div className="p-4">
+    <div className="p-4 motion-pop">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Transaction Management</h2>
-        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors">
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-[#008080] text-white font-medium rounded-xl hover:bg-[#006666] transition-colors motion-btn"
+        >
           <Banknote className="w-5 h-5" />
           New Transaction
         </button>

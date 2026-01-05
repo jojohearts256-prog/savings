@@ -380,7 +380,7 @@ export default function MemberDashboard({ hideHeader = false }: { hideHeader?: b
               <h3 className="text-lg font-bold text-gray-800">My Loans</h3>
               <button
                 onClick={() => setShowLoanModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 btn-primary text-white text-sm font-medium rounded-lg"
+                className="flex items-center gap-2 px-3 py-1.5 btn-primary motion-btn text-white text-sm font-medium rounded-lg"
               >
                 <Send className="w-4 h-4" /> Request Loan
               </button>

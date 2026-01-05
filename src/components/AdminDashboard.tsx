@@ -7,6 +7,7 @@ import {
   DollarSign,
   TrendingUp,
   CreditCard,
+  Settings,
   LogOut,
   FileText,
   Bell,
@@ -18,6 +19,7 @@ import LoanManagement from './LoanManagement';
 import Reports from './Reports';
 import ProfitManagement from './ProfitManagement';
 import MemberDashboard from './MemberDashboard';
+import SystemSettingsPanel from './settings/SystemSettingsPanel';
 import Particles from 'react-tsparticles';
 import { loadFull } from 'tsparticles';
 import CountUp from 'react-countup';
@@ -187,6 +189,7 @@ export default function AdminDashboard() {
     { id: 'loans', label: 'Loans', icon: CreditCard },
     { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'profits', label: 'Profits', icon: Banknote },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
@@ -351,6 +354,11 @@ export default function AdminDashboard() {
         {activeTab === 'loans' && <LoanManagement />}
         {activeTab === 'reports' && <Reports />}
         {activeTab === 'profits' && <ProfitManagement />}
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <SystemSettingsPanel />
+          </div>
+        )}
       </div>
 
       <style>{`
