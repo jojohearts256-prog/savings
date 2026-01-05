@@ -80,7 +80,8 @@ export default function Login() {
 
       {/* Login Form on Left */}
       <div className="relative z-10 w-full md:w-1/2 flex items-center justify-start px-12">
-        <div className="p-10 w-full max-w-md rounded-3xl bg-[#0D1B3D]/90 backdrop-blur-xl shadow-2xl animate-float transform-gpu transition-transform duration-500">
+        <div className="w-full max-w-md">
+          <div className="p-10 rounded-3xl bg-[#0D1B3D]/90 backdrop-blur-xl shadow-2xl animate-float transform-gpu transition-transform duration-500">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] mb-4 shadow-md">
               <Lock className="w-8 h-8 text-white" />
@@ -142,6 +143,32 @@ export default function Login() {
 
           <div className="mt-6 text-center text-sm text-gray-200">
             <p>Contact your administrator for login credentials</p>
+          </div>
+
+          <div className="mt-8 pt-5 border-t border-white/15">
+            <div className="text-xs text-gray-200/90 space-y-2">
+              <p className="font-semibold text-gray-100">Need help?</p>
+              <div className="space-y-1">
+                <p>
+                  <span className="text-gray-100/90">Email:</span>{' '}
+                  <a className="underline underline-offset-2 hover:text-white" href="mailto:jeanmadrinenamulinde@gmail.com">
+                    jeanmadrinenamulinde@gmail.com
+                  </a>
+                </p>
+                <p>
+                  <span className="text-gray-100/90">Phone:</span>{' '}
+                  <a className="underline underline-offset-2 hover:text-white" href="tel:0744707649">
+                    0744707649
+                  </a>
+                </p>
+                <p className="text-gray-200/80">Hours: Mon–Fri, 8:00am–5:00pm</p>
+              </div>
+
+              <p className="pt-2 text-gray-200/70">
+                © {new Date().getFullYear()} SmartSave. All rights reserved.
+              </p>
+            </div>
+          </div>
           </div>
         </div>
       </div>
