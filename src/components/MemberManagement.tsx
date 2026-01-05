@@ -64,13 +64,13 @@ export default function MemberManagement({ isHelper = false }: { isHelper?: bool
   };
 
   return (
-    <div>
+    <div className="motion-pop">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Member Management</h2>
         {!isHelper && (
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 btn-primary text-white font-medium rounded-xl"
+            className="flex items-center gap-2 px-4 py-2 btn-primary motion-btn text-white font-medium rounded-xl"
           >
             <UserPlus className="w-5 h-5" /> Add Member
           </button>

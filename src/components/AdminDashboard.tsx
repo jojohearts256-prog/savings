@@ -274,7 +274,7 @@ export default function AdminDashboard() {
               {profile?.role === 'admin' && (
                 <button
                   onClick={() => setShowMemberView((s) => !s)}
-                  className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-white/90 mr-2"
+                  className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-white/90 mr-2 motion-btn"
                 >
                   {showMemberView ? 'Back to Admin' : 'Member View'}
                 </button>
@@ -326,7 +326,7 @@ export default function AdminDashboard() {
                     activeTab === id
                       ? 'border-[#071A3F] text-[#071A3F]'
                       : 'border-transparent text-gray-600 hover:text-[#D8468C] hover:border-[#D8468C]'
-                  } hover:scale-105`}
+                  } hover:scale-105 motion-btn`}
                 >
                   <Icon className="w-4 h-4" />
                   {label}

@@ -35,8 +35,8 @@ export default function RepaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 motion-pop">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full motion-card">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Record Repayment</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="bg-blue-50 rounded-xl p-4 mb-4">
@@ -69,7 +69,7 @@ export default function RepaymentModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2 btn-primary text-white font-medium rounded-xl disabled:opacity-50"
+              className="flex-1 py-2 btn-primary motion-btn text-white font-medium rounded-xl disabled:opacity-50"
             >
               {loading ? 'Recording...' : 'Record Repayment'}
             </button>

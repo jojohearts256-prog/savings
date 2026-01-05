@@ -34,7 +34,17 @@ function AppContent() {
     return <MemberDashboard />;
   }
 
-  return <Login />;
+  // Unknown role — show a simple state instead of re-rendering Login
+  return (
+    <div className="min-h-screen gradient-bg flex items-center justify-center p-6">
+      <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 text-center max-w-md">
+        <p className="text-white font-semibold">Access blocked</p>
+        <p className="text-white/80 text-sm mt-2">
+          Your account role isn’t recognized. Please contact an administrator.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function App() {

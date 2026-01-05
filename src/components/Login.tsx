@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useCallback, useState } from 'react';
 import { Lock, Mail, AlertCircle } from 'lucide-react';
 import Particles from 'react-tsparticles';
 import { loadFull } from 'tsparticles';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -35,7 +35,7 @@ export default function Login() {
   }, []);
 
   return (
-    <div className="min-h-screen relative flex">
+    <div className="min-h-screen relative flex flex-col">
       {/* Background Image */}
       <div
         className="absolute inset-0 bg-cover bg-center"
@@ -43,7 +43,7 @@ export default function Login() {
           backgroundImage:
             "url('https://i.pinimg.com/1200x/26/a5/2e/26a52e8b95ed4915aeb8cc8dd4bbd36f.jpg')",
         }}
-      ></div>
+      />
 
       {/* Particles */}
       <Particles
@@ -66,133 +66,131 @@ export default function Login() {
               direction: 'none',
               random: true,
               straight: false,
-              outModes: { default: 'out' }
+              outModes: { default: 'out' },
             },
-            links: { enable: true, distance: 140, color: '#00BFFF', opacity: 0.08, width: 1 }
+            links: {
+              enable: true,
+              distance: 140,
+              color: '#00BFFF',
+              opacity: 0.08,
+              width: 1,
+            },
           },
           interactivity: {
-            events: { onHover: { enable: true, mode: 'repulse' }, onClick: { enable: true, mode: 'push' } },
-            modes: { repulse: { distance: 100 }, push: { quantity: 4 } }
+            events: {
+              onHover: { enable: true, mode: 'repulse' },
+              onClick: { enable: true, mode: 'push' },
+            },
+            modes: { repulse: { distance: 100 }, push: { quantity: 4 } },
           },
-          detectRetina: true
+          detectRetina: true,
         }}
       />
 
-      {/* Login Form on Left */}
-      <div className="relative z-10 w-full md:w-1/2 flex items-center justify-start px-12">
-        <div className="w-full max-w-md">
-          <div className="p-10 rounded-3xl bg-[#0D1B3D]/90 backdrop-blur-xl shadow-2xl animate-float transform-gpu transition-transform duration-500">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] mb-4 shadow-md">
-              <Lock className="w-8 h-8 text-white" />
+      <main className="relative z-10 flex-1 w-full flex">
+        {/* Login Form on Left */}
+        <div className="w-full md:w-1/2 flex items-center justify-start px-12 py-12">
+          <div className="w-full max-w-md">
+            <div className="p-10 rounded-3xl bg-[#0D1B3D]/90 backdrop-blur-xl shadow-2xl animate-float transform-gpu transition-transform duration-500">
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#007B8A] to-[#D8468C] mb-4 shadow-md">
+                  <Lock className="w-8 h-8 text-white" />
+                </div>
+                <h1 className="text-3xl font-bold text-white mb-1">SmartSave Management</h1>
+                <p className="text-gray-200/90">Transforming Group Savings into Shared Success</p>
+              </div>
+
+              {error && (
+                <div className="mb-6 p-4 bg-red-100/30 border border-red-200/50 rounded-xl flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-200 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-100">{error}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Email</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-200" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/20 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
+                      placeholder="Enter your email"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-200" />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/20 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
+                      placeholder="Enter your password"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 bg-gradient-to-r from-[#007B8A] to-[#D8468C] text-white font-semibold rounded-xl shadow-md hover:scale-105 transition-transform duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </button>
+              </form>
+
+              <div className="mt-6 text-center text-sm text-gray-200">
+                <p>Contact your administrator for login credentials</p>
+              </div>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-1">
-              SmartSave Management
-            </h1>
-            <p className="text-gray-200/90">
-              Transforming Group Savings into Shared Success
+          </div>
+        </div>
+
+        {/* Motivational Text on Right */}
+        <div className="hidden md:flex w-1/2 items-center justify-center relative px-12">
+          <div className="relative z-10 p-6 rounded-xl bg-black/40">
+            <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-xl animate-slide-fade-1 float-text-1">
+              Grow. Save. Prosper Together.
+            </h2>
+            <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-2 float-text-2">
+              Empowering Financial Growth Digitally.
+            </p>
+            <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-3 float-text-3">
+              Every Coin Counts! Start Saving Today.
+            </p>
+            <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-4 float-text-4">
+              Turn Group Savings into Shared Success.
+            </p>
+            <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-5 float-text-5">
+              Small Steps. Big Future.
             </p>
           </div>
-
-          {error && (
-            <div className="mb-6 p-4 bg-red-100/30 border border-red-200/50 rounded-xl flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-200 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-100">{error}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-white mb-2">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-200" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/20 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-white mb-2">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-200" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-white/40 rounded-xl bg-white/20 text-white placeholder-gray-200 focus:ring-2 focus:ring-[#00BFFF] focus:border-transparent outline-none transition"
-                  placeholder="Enter your password"
-                  required
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-[#007B8A] to-[#D8468C] text-white font-semibold rounded-xl shadow-md hover:scale-105 transition-transform duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-gray-200">
-            <p>Contact your administrator for login credentials</p>
-          </div>
-
-          <div className="mt-8 pt-5 border-t border-white/15">
-            <div className="text-xs text-gray-200/90 space-y-2">
-              <p className="font-semibold text-gray-100">Need help?</p>
-              <div className="space-y-1">
-                <p>
-                  <span className="text-gray-100/90">Email:</span>{' '}
-                  <a className="underline underline-offset-2 hover:text-white" href="mailto:jeanmadrinenamulinde@gmail.com">
-                    jeanmadrinenamulinde@gmail.com
-                  </a>
-                </p>
-                <p>
-                  <span className="text-gray-100/90">Phone:</span>{' '}
-                  <a className="underline underline-offset-2 hover:text-white" href="tel:0744707649">
-                    0744707649
-                  </a>
-                </p>
-                <p className="text-gray-200/80">Hours: Mon–Fri, 8:00am–5:00pm</p>
-              </div>
-
-              <p className="pt-2 text-gray-200/70">
-                © {new Date().getFullYear()} SmartSave. All rights reserved.
-              </p>
-            </div>
-          </div>
-          </div>
         </div>
-      </div>
+      </main>
 
-      {/* Motivational Text on Right */}
-      <div className="hidden md:flex w-1/2 items-center justify-center relative px-12">
-        <div className="relative z-10 p-6 rounded-xl bg-black/40">
-          <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-xl animate-slide-fade-1 float-text-1">
-            Grow. Save. Prosper Together.
-          </h2>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-2 float-text-2">
-            Empowering Financial Growth Digitally.
-          </p>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-3 float-text-3">
-            Every Coin Counts! Start Saving Today.
-          </p>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-4 float-text-4">
-            Turn Group Savings into Shared Success.
-          </p>
-          <p className="text-lg mb-2 text-white drop-shadow-xl animate-slide-fade-5 float-text-5">
-            Small Steps. Big Future.
-          </p>
+      {/* Full-width footer */}
+      <footer className="relative z-10 w-full border-t border-white/15 bg-black/35 backdrop-blur-md">
+        <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between text-xs text-gray-100/90">
+          <span>© {new Date().getFullYear()} SmartSave</span>
+
+          <a
+            href="mailto:jeanmadrinenamulinde@gmail.com"
+            className="underline underline-offset-2 hover:text-white"
+            aria-label="Contact"
+          >
+            Contact
+            <span className="sr-only"> jeanmadrinenamulinde@gmail.com · 0744707649</span>
+          </a>
         </div>
-      </div>
+      </footer>
 
       {/* Animations */}
       <style>{`

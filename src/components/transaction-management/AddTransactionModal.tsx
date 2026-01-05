@@ -159,8 +159,8 @@ export default function AddTransactionModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 motion-pop">
+      <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl motion-card">
         <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Record Transaction</h2>
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">{error}</div>

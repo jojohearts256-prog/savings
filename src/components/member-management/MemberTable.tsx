@@ -25,18 +25,18 @@ export default function MemberTable({ members, onView, onEdit, onDelete, isHelpe
         </thead>
         <tbody>
           {members.map((m: any) => (
-            <tr key={m.id} className="border-b border-gray-100 hover:bg-gray-50">
+            <tr key={m.id} className="border-b border-gray-100 hover:bg-gray-50 motion-row">
               <td className="px-6 py-4 text-sm">{m.member_number}</td>
               <td className="px-6 py-4 text-sm">{formatName(m.full_name)}</td>
               <td className="px-6 py-4 text-sm">{m.email || '-'}</td>
               <td className="px-6 py-4 text-sm">{m.phone || '-'}</td>
               <td className="px-6 py-4 text-sm">UGX {Math.floor(Number(m.account_balance)).toLocaleString()}</td>
               <td className="px-6 py-4 text-sm flex gap-2">
-                <button onClick={() => onView(m)} className="p-1 text-gray-500 hover:text-gray-800"><Eye className="w-4 h-4" /></button>
+                <button onClick={() => onView(m)} className="p-1 text-gray-500 hover:text-gray-800 motion-btn"><Eye className="w-4 h-4" /></button>
                 {!isHelper && (
                   <>
-                    <button onClick={() => onEdit(m)} className="p-1 text-gray-500 hover:text-gray-800"><Edit2 className="w-4 h-4" /></button>
-                    <button onClick={() => onDelete(m.id)} className="p-1 text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => onEdit(m)} className="p-1 text-gray-500 hover:text-gray-800 motion-btn"><Edit2 className="w-4 h-4" /></button>
+                    <button onClick={() => onDelete(m.id)} className="p-1 text-red-500 hover:text-red-700 motion-btn"><Trash2 className="w-4 h-4" /></button>
                   </>
                 )}
               </td>
