@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CheckCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function EditMemberModal({ member, onClose, onSuccess }: { member: any; onClose: () => void; onSuccess: () => void }) {
   const [formData, setFormData] = useState({
@@ -20,6 +21,8 @@ export default function EditMemberModal({ member, onClose, onSuccess }: { member
     setLoading(true);
     setError('');
     setSuccess(false);
+
+    const toastId = toast.loading('Saving changes...');
 
     try {
       const { error: profileError } = await supabase.from('profiles').update({
@@ -56,12 +59,16 @@ export default function EditMemberModal({ member, onClose, onSuccess }: { member
 
       onSuccess();
       setSuccess(true);
+
+  toast.success('Member updated successfully', { id: toastId });
       setTimeout(() => {
         setSuccess(false);
         onClose();
       }, 1200);
     } catch (err: any) {
       setError(err.message || 'Failed to update member');
+
+      toast.error(err.message || 'Failed to update member', { id: toastId });
     } finally {
       setLoading(false);
     }

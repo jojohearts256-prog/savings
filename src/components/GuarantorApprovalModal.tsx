@@ -4,6 +4,7 @@ import type { MemberWithProfile, LoanWithGuarantors } from '../lib/supabase';
 import { sendNotification } from '../lib/notify';
 import { notifyUser } from '../lib/notifyUser';
 import { XCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface GuarantorApprovalModalProps {
   loan: LoanWithGuarantors | null;
@@ -28,6 +29,8 @@ export default function GuarantorApprovalModal({
     try {
       setError('');
       decision === 'accept' ? setLoadingAccept(true) : setLoadingDecline(true);
+
+      const toastId = toast.loading(decision === 'accept' ? 'Submitting approval...' : 'Submitting rejection...');
 
       const guarantorAmount =
         loan.guarantors?.find((g) => g.guarantor_id === member.id)
@@ -57,6 +60,8 @@ export default function GuarantorApprovalModal({
         );
 
       if (upsertError) throw upsertError;
+
+  toast.success(decision === 'accept' ? 'Guarantee approved' : 'Guarantee declined', { id: toastId });
 
       // ✅ Close on both approve and reject AFTER success
       onSuccess();
@@ -88,6 +93,8 @@ export default function GuarantorApprovalModal({
       // accidentally advance it early.
     } catch (err: any) {
       setError(err.message || 'Failed to submit decision');
+
+      toast.error(err.message || 'Failed to submit decision');
     } finally {
       setLoadingAccept(false);
       setLoadingDecline(false);

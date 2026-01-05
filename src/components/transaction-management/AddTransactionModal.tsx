@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { sendNotification } from '../../lib/notify';
 import { notifyUser } from '../../lib/notifyUser';
 import type { TransactionRow, TransactionType } from './types';
+import toast from 'react-hot-toast';
 
 export default function AddTransactionModal({
   members,
@@ -48,6 +49,8 @@ export default function AddTransactionModal({
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    const toastId = toast.loading('Recording transaction...');
 
     try {
       const member = members.find((m) => String(m.id) === String(formData.member_id));
@@ -144,8 +147,12 @@ export default function AddTransactionModal({
         },
         member
       );
+
+      toast.success('Transaction recorded successfully', { id: toastId });
     } catch (err: any) {
       setError(err.message || 'Failed to record transaction');
+
+      toast.error(err.message || 'Failed to record transaction', { id: toastId });
     } finally {
       setLoading(false);
     }

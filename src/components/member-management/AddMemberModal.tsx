@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Loader2, CheckCircle } from 'lucide-react';
 import { notifyUser } from '../../lib/notifyUser';
+import toast from 'react-hot-toast';
 
 export default function AddMemberModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [formData, setFormData] = useState({
@@ -23,6 +24,8 @@ export default function AddMemberModal({ onClose, onSuccess }: { onClose: () => 
     setError('');
     setSuccess(false);
     setSubmitting(true);
+
+    const toastId = toast.loading('Creating user...');
 
     try {
       const result = await notifyUser({
@@ -64,6 +67,8 @@ export default function AddMemberModal({ onClose, onSuccess }: { onClose: () => 
       onSuccess();
       setSuccess(true);
 
+  toast.success(`${formData.role === 'employee' ? 'Employee' : 'Member'} added successfully`, { id: toastId });
+
       setTimeout(() => {
         setFormData({
           full_name: '',
@@ -81,6 +86,8 @@ export default function AddMemberModal({ onClose, onSuccess }: { onClose: () => 
     } catch (err: any) {
       console.error('Registration error:', err.message);
       setError(err.message || 'Failed to register member');
+
+      toast.error(err.message || 'Failed to create user', { id: toastId });
     } finally {
       setSubmitting(false);
     }
