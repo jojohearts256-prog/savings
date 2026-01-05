@@ -143,7 +143,7 @@ export default function LoanRequestModal({
         'LN' + Date.now() + Math.floor(Math.random() * 1000);
 
       const validGuarantors = guarantors.filter(
-        (g) => Number(g.amount) > 0 && Number(g.member_id) > 0
+        (g) => Number(g.amount) > 0
       );
 
       const loanStatus = validGuarantors.length > 0 ? 'pending_guarantors' : 'pending';
