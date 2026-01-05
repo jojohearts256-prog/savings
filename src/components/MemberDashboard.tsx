@@ -118,7 +118,7 @@ export default function MemberDashboard({ hideHeader = false }: { hideHeader?: b
           // (not member_id). Check guarantor_id to see if the current member
           // is listed as a guarantor with pending status.
           return loan.guarantors.some(
-            (g: any) => (g.guarantor_id === fetchedMember.id || g.member_id === fetchedMember.id) && g.status === 'pending'
+            (g: any) => (g.guarantor_id === fetchedMember.id || g.member_id === fetchedMember.id) && g.status === 'pending_guarantors'
           );
         })
         .map((loan) => ({ ...loan, id: loan.loan_id })); // <-- map loan_id to id
