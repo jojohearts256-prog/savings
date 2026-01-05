@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Loader2, CheckCircle } from 'lucide-react';
+import { notifyUser } from '../../lib/notifyUser';
 
 export default function AddMemberModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [formData, setFormData] = useState({
@@ -24,30 +25,18 @@ export default function AddMemberModal({ onClose, onSuccess }: { onClose: () => 
     setSubmitting(true);
 
     try {
-      const PROJECT_REF = (import.meta.env.VITE_SUPABASE_PROJECT_REF as string) || 'devegvzpallxsmbyszcb';
-      const FUNCTIONS_HOST = (import.meta.env.VITE_SUPABASE_FUNCTIONS_URL as string) || `https://${PROJECT_REF}.functions.supabase.co`;
-      const ADMIN_REGISTER_FN = (import.meta.env.VITE_SUPABASE_ADMIN_REGISTER_FN as string) || 'admin-register';
-
-      const response = await fetch(`${FUNCTIONS_HOST}/${ADMIN_REGISTER_FN}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          full_name: formData.full_name,
-          email: formData.email,
-          password: formData.password,
-          phone: formData.phone,
-          id_number: formData.id_number,
-          address: formData.address,
-          date_of_birth: formData.date_of_birth,
-          role: formData.role,
-        }),
+      const result = await notifyUser({
+        full_name: formData.full_name,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone,
+        id_number: formData.id_number,
+        address: formData.address,
+        date_of_birth: formData.date_of_birth,
+        role: formData.role,
       });
 
-      const result = await response.json();
-      if (!result.success) throw new Error(result.error || 'Registration failed');
+      if (!result?.success) throw new Error(result?.error || 'Registration failed');
 
       if (formData.role === 'employee') {
         try {

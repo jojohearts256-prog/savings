@@ -36,7 +36,7 @@ export default function EditMemberModal({ member, onClose, onSuccess }: { member
       if (memberError) throw memberError;
 
       const [{ data: refreshedProfile }, { data: refreshedMember }] = await Promise.all([
-        supabase.from('profiles').select('full_name, email, phone').eq('id', member.profile_id).maybeSingle(),
+        supabase.from('profiles').select('full_name, phone').eq('id', member.profile_id).maybeSingle(),
         supabase.from('members').select('id_number, address, date_of_birth').eq('id', member.id).maybeSingle(),
       ]);
 
