@@ -50,3 +50,69 @@ body {
   font-size: 0.875rem;
   font-weight: 500;
 }
+
+/* ------------------------------
+   Motion utilities (subtle, consistent)
+   ------------------------------ */
+
+.motion-card {
+  transition: transform 250ms ease, box-shadow 250ms ease, filter 250ms ease;
+  will-change: transform;
+}
+
+.motion-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 30px -18px rgba(7, 26, 63, 0.55);
+}
+
+.motion-card:active {
+  transform: translateY(-1px);
+}
+
+.motion-btn {
+  transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease;
+  will-change: transform;
+}
+
+.motion-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 18px -14px rgba(0, 128, 128, 0.6);
+}
+
+.motion-btn:active {
+  transform: translateY(0px) scale(0.98);
+}
+
+.motion-row {
+  transition: background-color 180ms ease, transform 180ms ease;
+}
+
+.motion-row:hover {
+  transform: translateX(2px);
+}
+
+.motion-pop {
+  animation: motion-pop 420ms ease both;
+}
+
+@keyframes motion-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-card,
+  .motion-btn,
+  .motion-row {
+    transition: none !important;
+  }
+  .motion-pop {
+    animation: none !important;
+  }
+}
