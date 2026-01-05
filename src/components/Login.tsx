@@ -178,17 +178,32 @@ export default function Login() {
 
       {/* Full-width footer */}
       <footer className="relative z-10 w-full border-t border-white/15 bg-black/35 backdrop-blur-md">
-        <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between text-xs text-gray-100/90">
-          <span>© {new Date().getFullYear()} SmartSave</span>
+        <div className="mx-auto max-w-6xl px-6 py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold tracking-wide text-white">
+              SmartSave
+            </span>
+            <span className="h-4 w-px bg-gradient-to-b from-transparent via-white/35 to-transparent" />
+            <span className="text-xs text-gray-100/80">
+              Save smarter. Grow together.
+            </span>
+          </div>
 
-          <a
-            href="mailto:jeanmadrinenamulinde@gmail.com"
-            className="underline underline-offset-2 hover:text-white"
-            aria-label="Contact"
-          >
-            Contact
-            <span className="sr-only"> jeanmadrinenamulinde@gmail.com · 0744707649</span>
-          </a>
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-gray-100/75">
+              © {new Date().getFullYear()} SmartSave • All rights reserved
+            </span>
+
+            <a
+              href="mailto:jeanmadrinenamulinde@gmail.com"
+              className="group inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/90 hover:text-white hover:bg-white/10 hover:border-white/30 transition"
+              aria-label="Contact"
+            >
+              Contact
+              <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-[#00BFFF] to-[#D8468C] opacity-80 group-hover:opacity-100 transition" />
+              <span className="sr-only"> jeanmadrinenamulinde@gmail.com · 0744707649</span>
+            </a>
+          </div>
         </div>
       </footer>
 
