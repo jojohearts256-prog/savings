@@ -25,7 +25,7 @@ export async function notifyUser(payload: NotificationPayload) {
   }
 
   try {
-    const response = await fetch('/functions/admin-register', {
+    const response = await fetch('https://devegvzpallxsmbyszcb.supabase.co/functions/v1/admin-register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
