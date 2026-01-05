@@ -94,8 +94,8 @@ export default function AddMemberModal({ onClose, onSuccess }: { onClose: () => 
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
-      <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999] motion-pop">
+      <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto motion-card">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Add New User</h2>
 
         {error && (
@@ -194,7 +194,7 @@ export default function AddMemberModal({ onClose, onSuccess }: { onClose: () => 
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 py-2 bg-[#008080] text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 motion-btn"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {submitting ? 'Adding...' : `Add ${formData.role === 'member' ? 'Member' : 'Employee'}`}

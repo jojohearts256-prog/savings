@@ -37,8 +37,8 @@ export default function ReceiptModal({ tx, onClose }: { tx: TransactionRow; onCl
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 motion-pop">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full motion-card">
         <div id="receipt-content" className="text-sm text-gray-800">
           <div className="header">
             <h1>My Savings System</h1>

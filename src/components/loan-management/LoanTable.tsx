@@ -17,7 +17,7 @@ export default function LoanTable({
   onRepay: (loan: Loan) => void;
 }) {
   return (
-    <div className="bg-white rounded-2xl card-shadow overflow-hidden">
+    <div className="bg-white rounded-2xl card-shadow overflow-hidden motion-card">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -31,7 +31,7 @@ export default function LoanTable({
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loans.map((loan) => (
-              <tr key={loan.id} className="hover:bg-gray-50">
+              <tr key={loan.id} className="hover:bg-gray-50 motion-row">
                 <td className="px-6 py-4 text-sm text-gray-800">
                   {loan.member_name}
                   <div className="text-xs text-gray-500">{loan.member_number}</div>
@@ -60,13 +60,13 @@ export default function LoanTable({
                         <>
                           <button
                             onClick={() => onApprove(loan)}
-                            className="px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs"
+                            className="px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs motion-btn"
                           >
                             Approve
                           </button>
                           <button
                             onClick={() => onReject(loan)}
-                            className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs"
+                            className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs motion-btn"
                           >
                             Reject
                           </button>
@@ -75,7 +75,7 @@ export default function LoanTable({
                       {loan.status === 'approved' && (
                         <button
                           onClick={() => onDisburse(loan)}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs"
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs motion-btn"
                         >
                           Disburse
                         </button>
@@ -83,7 +83,7 @@ export default function LoanTable({
                       {loan.status === 'disbursed' && (
                         <button
                           onClick={() => onRepay(loan)}
-                          className="px-3 py-1.5 bg-orange-500 text-white rounded-xl text-xs"
+                          className="px-3 py-1.5 bg-orange-500 text-white rounded-xl text-xs motion-btn"
                         >
                           Repay
                         </button>
