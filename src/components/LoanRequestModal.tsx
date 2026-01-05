@@ -171,7 +171,7 @@ export default function LoanRequestModal({
             loan_id: loanData.id,
             guarantor_id: g.member_id,
             amount_guaranteed: Math.floor(Number(g.amount)),
-            status: 'pending',
+            status: 'pending_guarantors', // ✅ CHANGED HERE
           }))
         );
         // Notify each guarantor about the request and their pledged amount
