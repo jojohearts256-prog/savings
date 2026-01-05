@@ -171,9 +171,7 @@ export default function LoanRequestModal({
             loan_id: loanData.id,
             guarantor_id: g.member_id,
             amount_guaranteed: Math.floor(Number(g.amount)),
-            // In loan_guarantees, "pending" means the guarantor has NOT yet responded.
-            // The loan itself stays in loans.status='pending_guarantors' until all guarantors respond.
-            status: 'pending',
+            status: 'pending_guarantors',
           }))
         );
         // Notify each guarantor about the request and their pledged amount
