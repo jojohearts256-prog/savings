@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { MemberWithProfile, LoanWithGuarantors } from '../lib/supabase';
 import { sendNotification } from '../lib/notify';
+import { notifyUser } from '../lib/notifyUser';
 import { XCircle } from 'lucide-react';
 
 interface GuarantorApprovalModalProps {
@@ -71,6 +72,15 @@ export default function GuarantorApprovalModal({
             ? `${member.full_name ?? 'A guarantor'} accepted your loan guarantee.`
             : `${member.full_name ?? 'A guarantor'} declined your loan guarantee.`,
         metadata: { guarantor_id: member.id, loanId: loan.id, status: finalStatus },
+      }).catch(console.warn);
+
+      // Email borrower via Edge Function asynchronously
+      notifyUser({
+        user_id: loan.member_id,
+        message:
+          decision === 'accept'
+            ? `${member.full_name ?? 'A guarantor'} accepted your loan guarantee.`
+            : `${member.full_name ?? 'A guarantor'} declined your loan guarantee.`,
       }).catch(console.warn);
 
       // NOTE: loan progression (pending_guarantors -> pending, or -> rejected)

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Member, Profile } from '../lib/supabase';
 import { sendNotification } from '../lib/notify';
+import { notifyUser } from '../lib/notifyUser';
 import { XCircle } from 'lucide-react';
 import debounce from 'lodash/debounce';
 
@@ -184,6 +185,12 @@ export default function LoanRequestModal({
               message: `${borrowerName} requested a loan of UGX ${requestedAmount.toLocaleString()} and you pledged UGX ${Math.floor(Number(g.amount)).toLocaleString()}. Approve or reject your guarantee.`,
               metadata: { loanId: loanData.id, guarantor_id: g.member_id, pledged: Math.floor(Number(g.amount)) },
             });
+
+              // Email via Edge Function
+              await notifyUser({
+                user_id: g.member_id as string,
+                message: `${borrowerName} requested a loan of UGX ${requestedAmount.toLocaleString()}. Please approve or reject your guarantee.`,
+              });
           } catch (e) {
             // non-fatal: continue if notification/email fails
             console.warn('Failed to notify guarantor', e);
@@ -201,6 +208,12 @@ export default function LoanRequestModal({
             message: `${borrowerName} requested a loan of UGX ${requestedAmount.toLocaleString()}.`,
             metadata: { loanId: loanData.id, borrower_id: member?.id },
           });
+
+            // Email admins via Edge Function
+            await notifyUser({
+              role: 'admin',
+              message: 'A new loan request requires approval.',
+            });
         } catch (e) {
           // non-fatal
           console.warn('failed to notify admin', e);
