@@ -24,7 +24,6 @@ export default function EditMemberModal({ member, onClose, onSuccess }: { member
     try {
       const { error: profileError } = await supabase.from('profiles').update({
         full_name: formData.full_name,
-        email: formData.email,
         phone: formData.phone,
       }).eq('id', member.profile_id);
       if (profileError) throw profileError;
@@ -43,7 +42,6 @@ export default function EditMemberModal({ member, onClose, onSuccess }: { member
 
       const profileMatches = refreshedProfile && (
         (refreshedProfile.full_name || '') === formData.full_name &&
-        (refreshedProfile.email || '') === formData.email &&
         (refreshedProfile.phone || '') === formData.phone
       );
 
@@ -85,7 +83,13 @@ export default function EditMemberModal({ member, onClose, onSuccess }: { member
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#008080]" required />
+              <input
+                type="email"
+                value={formData.email}
+                disabled
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl bg-gray-100 text-gray-600 cursor-not-allowed"
+                title="Email cannot be edited"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
